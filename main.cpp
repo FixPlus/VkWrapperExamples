@@ -363,10 +363,10 @@ vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device& device, uint32_t w
     transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout.pNext = nullptr;
     transitLayout.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    transitLayout.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    transitLayout.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     transitLayout.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     transitLayout.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transitLayout.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    transitLayout.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     transitLayout.subresourceRange.baseArrayLayer = 0;
     transitLayout.subresourceRange.baseMipLevel = 0;
     transitLayout.subresourceRange.layerCount = 1;
@@ -533,11 +533,11 @@ int main() {
                                                             VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE,
                                                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                                                             VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
+                                                            VK_IMAGE_LAYOUT_UNDEFINED,
+                                                             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
     auto subpassDescription = vkw::SubpassDescription{};
     subpassDescription.addColorAttachment(attachmentDescription, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    subpassDescription.addDepthAttachment(depthAttachment, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    subpassDescription.addDepthAttachment(depthAttachment, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     auto inputDependency = vkw::SubpassDependency{};
     inputDependency.setDstSubpass(subpassDescription);
