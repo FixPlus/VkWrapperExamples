@@ -1,5 +1,6 @@
 .idea
 .vs
+image.png
 VkTrace
 cmake-build-debug
 cmake-build-release

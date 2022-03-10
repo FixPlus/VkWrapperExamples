@@ -418,7 +418,9 @@ int main() {
 
     vkw::Instance renderInstance{vulkanLib, reqExtensions};
 
-    renderInstance.printExtensions();
+    std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
+                  [](vkw::Instance::extension_const_iterator::value_type const& ext){
+        std::cout << ext.first << std::endl;});
 
     // 2. Create Device
 
