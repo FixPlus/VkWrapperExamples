@@ -1,17 +1,10 @@
 #include <iostream>
 
 #define VKW_EXTENSION_INITIALIZERS_MAP_DEFINITION 1
+
 #include "vkw/SymbolTable.hpp"
 #include "Instance.hpp"
-#include <GLFW/glfw3.h>
-
-#ifdef _WIN32
-#define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(__linux__)
-#define GLFW_EXPOSE_NATIVE_X11
-#endif
-
-#include <GLFW/glfw3native.h>
+#include "SceneProjector.h"
 #include <chrono>
 #include <thread>
 #include <SwapChain.hpp>
@@ -42,6 +35,7 @@
 #include "external/stb_image.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
 class MySwapChain : public vkw::SwapChain {
 public:
     MySwapChain(vkw::Device &device, vkw::Surface &surface) :
@@ -97,7 +91,7 @@ private:
     static VkSwapchainCreateInfoKHR compileInfo(vkw::Device &device, vkw::Surface &surface) {
         VkSwapchainCreateInfoKHR ret{};
 
-        auto& physicalDevice = device.physicalDevice();
+        auto &physicalDevice = device.physicalDevice();
         auto availablePresentQueues = surface.getQueueFamilyIndicesThatSupportPresenting(physicalDevice);
 
         if (!device.supportsPresenting() || availablePresentQueues.empty())
@@ -174,74 +168,10 @@ struct MyAttrs : vkw::AttributeBase<vkw::VertexAttributeType::VEC3F,
 };
 
 struct MyUniform {
-    glm::mat4 displacement;
-    glm::mat4 perspective = glm::perspective(60.0f, 16.0f/9.0f, 0.01f, 1000.0f);
+    glm::mat4 perspective = glm::perspective(60.0f, 16.0f / 9.0f, 0.01f, 1000.0f);
 } myUniform;
 
 
-std::vector<MyAttrs> makeCube(){
-    std::vector<MyAttrs> ret{};
-    // top
-    ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
-
-    ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
-    ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 1.0f}});
-
-    // bottom
-
-    ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
-
-    ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
-    ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 1.0f}});
-
-    // east
-
-    ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-    ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-    ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-
-    // west
-
-    ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-    ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-
-    // north
-
-    ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-    ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-    ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-    ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-
-    // south
-
-    ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-    ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-    ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-    ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-
-    return ret;
-}
 
 template<typename T>
 requires std::derived_from<T, vkw::ShaderBase>
@@ -353,10 +283,282 @@ vkw::ColorImage2D loadTexture(const char *filename, vkw::Device &device) {
     return ret;
 }
 
-vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device& device, uint32_t width, uint32_t height){
+
+class Cube{
+public:
+    Cube(glm::vec3 position, glm::vec3 scale, glm::vec3 rotation): m_translate(position), m_scale(scale), m_rotate(rotation){
+        m_cubeCount++;
+        VmaAllocationCreateInfo createInfo{};
+        createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        createInfo.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+        m_ubo = std::make_unique<vkw::UniformBuffer<M_CubeUniform>>(*m_device, createInfo);
+
+        m_descriptorSet = std::make_unique<vkw::DescriptorSet>(m_descriptorPool.value(), m_texturelessLayout.value());
+        m_descriptorSet->write(1, *m_ubo);
+    }
+
+    Cube(glm::vec3 position, glm::vec3 scale, glm::vec3 rotation, vkw::ColorImage2D& texture): Cube(position, scale, rotation){
+        m_texture = &texture;
+        m_descriptorSet.reset();
+        m_descriptorSet = std::make_unique<vkw::DescriptorSet>(m_descriptorPool.value(), m_textureLayout.value());
+        static VkComponentMapping mapping;
+        mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        m_view = &texture.getView<vkw::ColorImageView>(*m_device, texture.format(), mapping);
+
+        m_descriptorSet->write(1, *m_ubo);
+        m_descriptorSet->write(2, *m_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler.value());
+    }
+
+    Cube(Cube&& another) noexcept = default;
+
+    template<typename T>
+    void writeGlobalUniform(vkw::UniformBuffer<T> const& ubo){
+        m_descriptorSet->write(0, ubo);
+    }
+
+    ~Cube(){
+        m_cubeCount--;
+    }
+
+    void update(double deltaTime){
+
+        m_CubeUniform.model = glm::scale(glm::mat4(1.0f), m_scale);
+        m_CubeUniform.model = glm::rotate(m_CubeUniform.model, glm::radians(m_rotate.x), glm::vec3{1.0f, 0.0f, 0.0f});
+        m_CubeUniform.model = glm::rotate(m_CubeUniform.model, glm::radians(m_rotate.y), glm::vec3{0.0f, 1.0f, 0.0f});
+        m_CubeUniform.model = glm::rotate(m_CubeUniform.model, glm::radians(m_rotate.z), glm::vec3{0.0f, 0.0f, 1.0f});
+        m_CubeUniform.model = glm::translate(m_CubeUniform.model, m_translate);
+
+        auto* mapped = m_ubo->map();
+        memcpy(mapped, &m_CubeUniform, sizeof(m_CubeUniform));
+        m_ubo->flush();
+        m_ubo->unmap();
+    }
+
+    void draw(vkw::CommandBuffer& commandBuffer){
+        if(m_texture){
+            commandBuffer.bindGraphicsPipeline(m_texturePipeline.value());
+            commandBuffer.bindDescriptorSets(m_texturePipelineLayout.value(), VK_PIPELINE_BIND_POINT_GRAPHICS, *m_descriptorSet, 0);
+        } else{
+            commandBuffer.bindGraphicsPipeline(m_texturelessPipeline.value());
+            commandBuffer.bindDescriptorSets(m_texturelessPipelineLayout.value(), VK_PIPELINE_BIND_POINT_GRAPHICS, *m_descriptorSet, 0);
+        }
+        commandBuffer.bindVertexBuffer(m_vbuf.value(), 0, 0);
+        commandBuffer.draw(m_vertices.size(), 1);
+    }
+
+
+    static void Init(vkw::Device& device, vkw::RenderPass& renderPass, uint32_t subpass, uint32_t maxCubes){
+        m_device = &device;
+        m_renderPass = &renderPass;
+        m_vertexShader.emplace(loadShader<vkw::VertexShader>(device, "triangle.vert.spv"));
+        m_textureShader.emplace(loadShader<vkw::FragmentShader>(device, "triangle.frag.spv"));
+        m_texturelessShader.emplace(loadShader<vkw::FragmentShader>(device, "triangle_color.frag.spv"));
+
+        std::vector<VkDescriptorPoolSize> poolSizes{};
+
+        poolSizes.push_back({.type= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount=maxCubes});
+        poolSizes.push_back({.type= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=maxCubes * 2});
+
+        m_descriptorPool.emplace(vkw::DescriptorPool{device, maxCubes, poolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT});
+        vkw::DescriptorSetLayoutBinding bindings[3] = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}};;
+
+        m_textureLayout.emplace(vkw::DescriptorSetLayout{device, {bindings[0], bindings[1], bindings[2]}});
+        m_texturelessLayout.emplace(vkw::DescriptorSetLayout{device, {bindings[0], bindings[1]}});
+
+        m_texturePipelineLayout.emplace(device, m_textureLayout.value());
+        m_texturelessPipelineLayout.emplace(device, m_texturelessLayout.value());
+
+        vkw::GraphicsPipelineCreateInfo texturePipeCreateInfo{renderPass, subpass, m_texturePipelineLayout.value()};
+        vkw::GraphicsPipelineCreateInfo texturelessPipeCreateInfo{renderPass, subpass, m_texturelessPipelineLayout.value()};
+
+        texturePipeCreateInfo.addVertexShader(m_vertexShader.value());
+        texturelessPipeCreateInfo.addVertexShader(m_vertexShader.value());
+
+        vkw::DepthTestStateCreateInfo depthTestCI{VK_COMPARE_OP_LESS, true};
+
+        texturelessPipeCreateInfo.addDepthTestState(depthTestCI);
+        texturePipeCreateInfo.addDepthTestState(depthTestCI);
+
+        texturePipeCreateInfo.addFragmentShader(m_textureShader.value());
+        texturelessPipeCreateInfo.addFragmentShader(m_texturelessShader.value());
+
+        texturelessPipeCreateInfo.addVertexInputState(m_inputState);
+        texturePipeCreateInfo.addVertexInputState(m_inputState);
+
+        m_texturePipeline.emplace(device, texturePipeCreateInfo);
+        m_texturelessPipeline.emplace(device, texturelessPipeCreateInfo);
+
+        m_vertices = m_makeCube();
+
+        VkSamplerCreateInfo samplerCI{};
+
+        samplerCI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerCI.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCI.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCI.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerCI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerCI.minLod = 0.0f;
+        samplerCI.maxLod = 0.0f;
+        samplerCI.magFilter = VK_FILTER_LINEAR;
+        samplerCI.minFilter = VK_FILTER_LINEAR;
+
+        m_sampler.emplace(*m_device, samplerCI);
+
+        VmaAllocationCreateInfo createInfo{};
+        createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        createInfo.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+        m_vbuf.emplace(*m_device, m_vertices.size(), createInfo);
+
+        auto* mapped = m_vbuf.value().map();
+        memcpy(mapped, m_vertices.data(), m_vertices.size() * sizeof(MyAttrs));
+        m_vbuf.value().flush();
+        m_vbuf.value().unmap();
+    }
+    static void Terminate(){
+        m_vbuf.reset();
+        m_sampler.reset();
+        m_texturePipeline.reset();
+        m_texturelessPipeline.reset();
+        m_texturelessPipelineLayout.reset();
+        m_texturePipelineLayout.reset();
+        m_textureLayout.reset();
+        m_texturelessLayout.reset();
+        m_descriptorPool.reset();
+        m_vertexShader.reset();
+        m_textureShader.reset();
+        m_texturelessShader.reset();
+    }
+
+private:
+
+    struct M_CubeUniform{
+        glm::mat4 model;
+    } m_CubeUniform;
+
+    glm::vec3 m_translate;
+    glm::vec3 m_rotate;
+    glm::vec3 m_scale;
+
+
+    std::unique_ptr<vkw::UniformBuffer<M_CubeUniform>> m_ubo{};
+    std::unique_ptr<vkw::DescriptorSet> m_descriptorSet{};
+    vkw::ColorImage2D* m_texture{};
+    vkw::ColorImage2DView const* m_view{};
+
+    /** static members down there **/
+    static std::vector<MyAttrs> m_vertices;
+    static uint32_t m_cubeCount;
+    static vkw::Device* m_device;
+    static vkw::RenderPass* m_renderPass;
+    static std::optional<vkw::Sampler> m_sampler;
+    static const vkw::VertexInputStateCreateInfo<vkw::per_vertex<MyAttrs, 0>> m_inputState;
+    static std::optional<vkw::VertexBuffer<MyAttrs>> m_vbuf;
+    static std::optional<vkw::DescriptorSetLayout> m_textureLayout;
+    static std::optional<vkw::DescriptorSetLayout> m_texturelessLayout;
+    static std::optional<vkw::DescriptorPool> m_descriptorPool;
+    static std::optional<vkw::PipelineLayout> m_texturelessPipelineLayout;
+    static std::optional<vkw::GraphicsPipeline> m_texturelessPipeline;
+    static std::optional<vkw::PipelineLayout> m_texturePipelineLayout;
+    static std::optional<vkw::GraphicsPipeline> m_texturePipeline;
+    static std::optional<vkw::VertexShader> m_vertexShader;
+    static std::optional<vkw::FragmentShader> m_textureShader;
+    static std::optional<vkw::FragmentShader> m_texturelessShader;
+
+    static std::vector<MyAttrs> m_makeCube() {
+        std::vector<MyAttrs> ret{};
+        // top
+        ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
+
+        ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 1.0f}});
+
+        // bottom
+
+        ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
+
+        ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 1.0f}});
+
+        // east
+
+        ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+
+        ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
+
+        // west
+
+        ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+
+        ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
+
+        // north
+
+        ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+
+        ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
+
+        // south
+
+        ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+
+        ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
+
+        return ret;
+    }
+
+};
+
+std::vector<MyAttrs> Cube::m_vertices{};
+uint32_t Cube::m_cubeCount = 0;
+vkw::RenderPass* Cube::m_renderPass;
+std::optional<vkw::Sampler> Cube::m_sampler;
+std::optional<vkw::PipelineLayout> Cube::m_texturelessPipelineLayout{};
+std::optional<vkw::GraphicsPipeline> Cube::m_texturelessPipeline{};
+vkw::Device* Cube::m_device;
+std::optional<vkw::VertexBuffer<MyAttrs>> Cube::m_vbuf{};
+const vkw::VertexInputStateCreateInfo<vkw::per_vertex<MyAttrs, 0>> Cube::m_inputState{};
+std::optional<vkw::DescriptorSetLayout> Cube::m_textureLayout{};
+std::optional<vkw::DescriptorSetLayout> Cube::m_texturelessLayout{};
+std::optional<vkw::DescriptorPool> Cube::m_descriptorPool{};
+std::optional<vkw::PipelineLayout> Cube::m_texturePipelineLayout{};
+std::optional<vkw::GraphicsPipeline> Cube::m_texturePipeline{};
+std::optional<vkw::VertexShader> Cube::m_vertexShader{};
+std::optional<vkw::FragmentShader> Cube::m_textureShader{};
+std::optional<vkw::FragmentShader> Cube::m_texturelessShader{};
+
+
+vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height) {
     VmaAllocationCreateInfo createInfo{};
     createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    auto depthMap = vkw::DepthStencilImage2D{device.getAllocator(), createInfo, VK_FORMAT_D24_UNORM_S8_UINT, width, height, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
+    auto depthMap = vkw::DepthStencilImage2D{device.getAllocator(), createInfo, VK_FORMAT_D24_UNORM_S8_UINT, width,
+                                             height, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
 
     VkImageMemoryBarrier transitLayout{};
     transitLayout.image = depthMap;
@@ -394,33 +596,17 @@ int main() {
 
     // 1. Create Instance and Window
 
-    if (glfwInit() != GLFW_TRUE) {
-        std::cout << "Failed to init GLFW" << std::endl;
-        return 0;
-    }
 
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-    auto *window = glfwCreateWindow(800, 600, "Hello, Boez!", nullptr, nullptr);
-
-    uint32_t count = 0;
-    auto ext = glfwGetRequiredInstanceExtensions(&count);
-
-    std::vector<std::string> reqExtensions;
-    for (int i = 0; i < count; ++i)
-        reqExtensions.emplace_back(ext[i]);
-
-#ifdef __linux__
-    reqExtensions.emplace_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
-#endif
+    TestApp::SceneProjector window{800, 600, "Hello, Boez!"};
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance{vulkanLib, reqExtensions};
+    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib);
 
     std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
-                  [](vkw::Instance::extension_const_iterator::value_type const& ext){
-        std::cout << ext.first << std::endl;});
+                  [](vkw::Instance::extension_const_iterator::value_type const &ext) {
+                      std::cout << ext.first << std::endl;
+                  });
 
     // 2. Create Device
 
@@ -428,7 +614,7 @@ int main() {
 
     vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
 
-    if(devs.empty()) {
+    if (devs.empty()) {
         std::cout << "No available devices supporting vulkan on this machine." << std::endl <<
                   " Make sure your graphics drivers are installed and updated." << std::endl;
         return 1;
@@ -445,18 +631,14 @@ int main() {
     for (auto &d: devs) {
         VkPhysicalDeviceProperties props{};
         renderInstance.core<1, 0>().vkGetPhysicalDeviceProperties(d, &props);
-        std::cout << "Device " << counter << ": " <<  props.deviceName << std::endl;
+        std::cout << "Device " << counter << ": " << props.deviceName << std::endl;
         counter++;
     }
 
     // 3. Create surface
-#ifdef _WIN32
-    auto surface = vkw::Surface(renderInstance, GetModuleHandle(NULL), glfwGetWin32Window(window));
-#elif defined(__linux__)
-    auto surface = vkw::Surface(renderInstance, glfwGetX11Display(), glfwGetX11Window (window));
-#else
-    #error "Platform is not supported"
-#endif
+
+    auto surface = window.surface(renderInstance);
+
     // 4. Create swapchain
 
     std::unique_ptr<MySwapChain> mySwapChain = std::make_unique<MySwapChain>(MySwapChain{device, surface});
@@ -465,44 +647,17 @@ int main() {
 
     // 5. create vertex buffer
 
-    VmaAllocationCreateInfo createInfo{};
-    createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-    createInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
-    auto attrs = makeCube();
-
-    auto vBuf = vkw::VertexBuffer<MyAttrs>(device, attrs.size(), createInfo);
-    auto uBuf = vkw::UniformBuffer<MyUniform>(device, createInfo);
-
     auto texture = loadTexture("image.png", device);
-    VkSamplerCreateInfo samplerCI{};
-    samplerCI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerCI.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCI.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCI.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerCI.minLod = 0.0f;
-    samplerCI.maxLod = 0.0f;
-    samplerCI.magFilter = VK_FILTER_LINEAR;
-    samplerCI.minFilter = VK_FILTER_LINEAR;
-
-    auto sampler = vkw::Sampler(device, samplerCI);
 
     // 6. load data to vertex buffer
 
-
-
-    auto mapped = vBuf.map();
-    memcpy(mapped, attrs.data(), attrs.size() * sizeof(MyAttrs));
-    vBuf.flush();
-    auto uBufMapped = uBuf.map();
 
     auto fence = std::make_unique<vkw::Fence>(device);
 
     // 7. create command pool
 
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
-                                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                                                VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                                         device.getGraphicsQueue()->familyIndex()};
 
     VkComponentMapping mapping;
@@ -531,12 +686,12 @@ int main() {
                                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
     auto depthAttachment = vkw::AttachmentDescription{VK_FORMAT_D24_UNORM_S8_UINT,
-                                                            VK_SAMPLE_COUNT_1_BIT,
-                                                            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                            VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                                            VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                            VK_IMAGE_LAYOUT_UNDEFINED,
-                                                             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+                                                      VK_SAMPLE_COUNT_1_BIT,
+                                                      VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                                      VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                                      VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                                      VK_IMAGE_LAYOUT_UNDEFINED,
+                                                      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
     auto subpassDescription = vkw::SubpassDescription{};
     subpassDescription.addColorAttachment(attachmentDescription, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     subpassDescription.addDepthAttachment(depthAttachment, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
@@ -558,65 +713,45 @@ int main() {
     outputDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 
-    auto renderPass = vkw::RenderPass{device, vkw::RenderPassCreateInfo{{attachmentDescription, depthAttachment}, {subpassDescription},
-                                                                         {inputDependency, outputDependency}}};
+    auto renderPass = vkw::RenderPass{device, vkw::RenderPassCreateInfo{{attachmentDescription, depthAttachment},
+                                                                        {subpassDescription},
+                                                                        {inputDependency,       outputDependency}}};
 
     // 10. create framebuffer for each swapchain image view
 
     auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-    createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
     std::optional<vkw::DepthStencilImage2D> depthMap = createDepthStencilImage(device, extents.width, extents.height);
-    vkw::DepthImage2DArrayView const* depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping, VK_FORMAT_D24_UNORM_S8_UINT);
+    vkw::DepthImage2DArrayView const *depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping,
+                                                                                                      VK_FORMAT_D24_UNORM_S8_UINT);
     std::vector<vkw::FrameBuffer> framebuffers;
 
     for (auto &view: swapChainImageViews) {
         framebuffers.emplace_back(device, renderPass, VkExtent2D{view.get().image()->rawExtents().width,
-                                                                  view.get().image()->rawExtents().height}, vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
+                                                                 view.get().image()->rawExtents().height},
+                                  vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
     }
+    // 11. create Cubes
+    VmaAllocationCreateInfo createInfo{};
+    createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    createInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
-    // 11. create graphics pipeline
+    vkw::UniformBuffer<MyUniform> uBuf{device, createInfo};
 
-    std::vector<VkDescriptorPoolSize> poolSizes;
-    poolSizes.push_back(VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1});
-    poolSizes.push_back(VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1});
+    Cube::Init(device, renderPass, 0, 1000);
 
-    auto descriptorPool = vkw::DescriptorPool{device, 1, poolSizes};
-    auto myBinding = vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
-    auto myTextureBinding = vkw::DescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
-    auto descriptorSetLayout = vkw::DescriptorSetLayout{device, {myBinding, myTextureBinding}};
-    auto myDescriptor = vkw::DescriptorSet{descriptorPool, descriptorSetLayout};
-    myDescriptor.write(0, uBuf);
-    myDescriptor.write(1, textureView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+    auto* uBufMapped = uBuf.map();
 
-    auto vertexInputCreateInfo = vkw::VertexInputStateCreateInfo<vkw::per_vertex<MyAttrs, 0>>{};
+    std::vector<Cube> cubes{};
 
-    auto vertexShader = loadShader<vkw::VertexShader>(device, "triangle.vert.spv");
-    auto fragmentShader = loadShader<vkw::FragmentShader>(device, "triangle.frag.spv");
+    for(int i = 0; i < 1000; ++i) {
+        float scale_mag = (float)(rand() % 5) + 1.0f;
+        glm::vec3 pos = glm::vec3((float)(rand() % 100), (float)(rand() % 100), (float)(rand() % 100));
+        glm::vec3 rotate = glm::vec3((float)(rand() % 100), (float)(rand() % 100), (float)(rand() % 100));
+        auto scale = glm::vec3(scale_mag);
+        cubes.emplace_back(pos, scale, rotate, texture).writeGlobalUniform(uBuf);
 
-    auto pipelineLayout = vkw::PipelineLayout{device, descriptorSetLayout};
-
-    vkw::GraphicsPipelineCreateInfo pipelineCreateInfo{renderPass, 0, pipelineLayout};
-    pipelineCreateInfo.addVertexShader(vertexShader);
-    pipelineCreateInfo.addFragmentShader(fragmentShader);
-    pipelineCreateInfo.addVertexInputState(vertexInputCreateInfo);
-    pipelineCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
-
-    auto pipeline = vkw::GraphicsPipeline{device, pipelineCreateInfo};
-
-    std::cout << "VertexInputStateInfo:" << std::endl;
-    for (uint32_t i = 0; i < vertexInputCreateInfo.totalBindings(); ++i) {
-        auto binding = vertexInputCreateInfo.binding(i);
-        std::cout << "Binding #" << binding.binding << ": stride=" << binding.stride << ", input_rate="
-                  << (binding.inputRate == VK_VERTEX_INPUT_RATE_VERTEX ?
-                      "per_vertex" : "per_instance") << std::endl;
     }
-    for (uint32_t i = 0; i < vertexInputCreateInfo.totalAttributes(); ++i) {
-        auto attribute = vertexInputCreateInfo.attribute(i);
-        std::cout << "Attribute #" << i << ": binding=" << attribute.binding << ", location=" << attribute.location
-                  << ", offset=" << attribute.offset << std::endl;
-    }
-
 
     // 12. create command buffer and sync primitives
 
@@ -626,17 +761,27 @@ int main() {
     auto renderComplete = vkw::Semaphore{device};
 
 
-
     // 13. render on screen in a loop
 
     uint32_t framesTotal = 0;
 
-    myUniform.displacement = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, -1.0f));
+    std::chrono::time_point<std::chrono::high_resolution_clock,
+            std::chrono::duration<double>> tStart, tFinish;
 
-    while (!glfwWindowShouldClose(window)) {
+    tStart = std::chrono::high_resolution_clock::now();
+    myUniform.perspective = window.projection();
+
+    while (!window.shouldClose()) {
         framesTotal++;
-        glfwPollEvents();
+        TestApp::Window::pollEvents();
 
+        tFinish = std::chrono::high_resolution_clock::now();
+
+        double deltaTime = std::chrono::duration<double, std::milli>(tFinish - tStart).count() / 1000.0;
+
+        tStart = std::chrono::high_resolution_clock::now();
+
+        window.update(deltaTime);
 
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
@@ -652,7 +797,7 @@ int main() {
 
         try {
             mySwapChain->acquireNextImage(presentComplete, 1000);
-            myUniform.displacement = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, -1.0f)), framesTotal / 2000.0f, glm::vec3(1.0f, 1.0f, 0.0f));
+            myUniform.perspective = window.projection();
             memcpy(uBufMapped, &myUniform, sizeof(myUniform));
             uBuf.flush();
 
@@ -679,10 +824,10 @@ int main() {
             scissor.offset.y = 0;
             commandBuffer.setViewports({viewport}, 0);
             commandBuffer.setScissors({scissor}, 0);
-            commandBuffer.bindGraphicsPipeline(pipeline);
-            commandBuffer.bindDescriptorSets(pipelineLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, myDescriptor, 0);
-            commandBuffer.bindVertexBuffer(vBuf, 0, 0);
-            commandBuffer.draw(attrs.size(), 1);
+            for(auto& cube: cubes){
+                cube.update(deltaTime);
+                cube.draw(commandBuffer);
+            }
             commandBuffer.endRenderPass();
             commandBuffer.end();
 
@@ -707,13 +852,14 @@ int main() {
 
                 depthMap.reset();
                 depthMap.emplace(createDepthStencilImage(device, extents.width, extents.height));
-                depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping, VK_FORMAT_D24_UNORM_S8_UINT);
+                depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping,
+                                                                                VK_FORMAT_D24_UNORM_S8_UINT);
                 framebuffers.clear();
 
                 for (auto &view: swapChainImageViews) {
                     framebuffers.emplace_back(device, renderPass, VkExtent2D{view.get().image()->rawExtents().width,
-                                                                              view.get().image()->rawExtents().height},
-                                              vkw::Image2DArrayViewConstRefArray {view, *depthImageView});
+                                                                             view.get().image()->rawExtents().height},
+                                              vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
                 }
 
                 //std::cout << "Window resized" << std::endl;
@@ -740,7 +886,8 @@ int main() {
     fence.reset();
     mySwapChain.reset();
 
-    glfwDestroyWindow(window);
+    cubes.clear();
+    Cube::Terminate();
 
     return 0;
 }

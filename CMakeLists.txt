@@ -60,8 +60,10 @@ find_package(glfw3 3.3 REQUIRED)
 set(GLFW_LIBRARY glfw)
 
 add_executable(TestApp main.cpp)
+include_directories(source)
+add_subdirectory(source)
 
-target_link_libraries(TestApp -L${RENDERER_LIB_DIR} ${RENDERER_LIB} ${GLFW_LIBRARY})
+target_link_libraries(TestApp TEST_OBJECTS -L${RENDERER_LIB_DIR} ${RENDERER_LIB})
 
 
 include(cmake/compile_shaders.cmake)
