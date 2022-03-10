@@ -1,9 +1,15 @@
 #include <iostream>
 
+#define VKW_EXTENSION_INITIALIZERS_MAP_DEFINITION 1
+#include "vkw/SymbolTable.hpp"
 #include "Instance.hpp"
 #include <GLFW/glfw3.h>
 
+#ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
+#elif defined(__linux__)
+#define GLFW_EXPOSE_NATIVE_X11
+#endif
 
 #include <GLFW/glfw3native.h>
 #include <chrono>
@@ -29,6 +35,7 @@
 #include <cmath>
 #include <chrono>
 #include <Sampler.hpp>
+#include <Surface.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -346,6 +353,42 @@ vkw::ColorImage2D loadTexture(const char *filename, vkw::Device &device) {
     return ret;
 }
 
+vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device& device, uint32_t width, uint32_t height){
+    VmaAllocationCreateInfo createInfo{};
+    createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    auto depthMap = vkw::DepthStencilImage2D{device.getAllocator(), createInfo, VK_FORMAT_D24_UNORM_S8_UINT, width, height, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
+
+    VkImageMemoryBarrier transitLayout{};
+    transitLayout.image = depthMap;
+    transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    transitLayout.pNext = nullptr;
+    transitLayout.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transitLayout.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    transitLayout.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transitLayout.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transitLayout.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    transitLayout.subresourceRange.baseArrayLayer = 0;
+    transitLayout.subresourceRange.baseMipLevel = 0;
+    transitLayout.subresourceRange.layerCount = 1;
+    transitLayout.subresourceRange.levelCount = 1;
+    transitLayout.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    transitLayout.srcAccessMask = 0;
+
+    auto queue = device.getTransferQueue();
+    auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+    auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
+
+    transferCommand.begin(0);
+    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                       {transitLayout});
+    transferCommand.end();
+
+    queue->submit(transferCommand);
+    queue->waitIdle();
+
+    return depthMap;
+}
+
 int main() {
 
 
@@ -367,6 +410,9 @@ int main() {
     for (int i = 0; i < count; ++i)
         reqExtensions.emplace_back(ext[i]);
 
+#ifdef __linux__
+    reqExtensions.emplace_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+#endif
 
     vkw::Library vulkanLib{};
 
@@ -402,10 +448,13 @@ int main() {
     }
 
     // 3. Create surface
-
+#ifdef _WIN32
     auto surface = vkw::Surface(renderInstance, GetModuleHandle(NULL), glfwGetWin32Window(window));
-
-
+#elif defined(__linux__)
+    auto surface = vkw::Surface(renderInstance, glfwGetX11Display(), glfwGetX11Window (window));
+#else
+    #error "Platform is not supported"
+#endif
     // 4. Create swapchain
 
     std::unique_ptr<MySwapChain> mySwapChain = std::make_unique<MySwapChain>(MySwapChain{device, surface});
@@ -423,7 +472,7 @@ int main() {
     auto vBuf = vkw::VertexBuffer<MyAttrs>(device, attrs.size(), createInfo);
     auto uBuf = vkw::UniformBuffer<MyUniform>(device, createInfo);
 
-    auto texture = loadTexture("image.jpg", device);
+    auto texture = loadTexture("image.png", device);
     VkSamplerCreateInfo samplerCI{};
     samplerCI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerCI.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -479,8 +528,16 @@ int main() {
                                                             VK_ATTACHMENT_STORE_OP_DONT_CARE,
                                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
+    auto depthAttachment = vkw::AttachmentDescription{VK_FORMAT_D24_UNORM_S8_UINT,
+                                                            VK_SAMPLE_COUNT_1_BIT,
+                                                            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                                            VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                                            VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
     auto subpassDescription = vkw::SubpassDescription{};
     subpassDescription.addColorAttachment(attachmentDescription, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    subpassDescription.addDepthAttachment(depthAttachment, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     auto inputDependency = vkw::SubpassDependency{};
     inputDependency.setDstSubpass(subpassDescription);
@@ -499,16 +556,21 @@ int main() {
     outputDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 
-    auto renderPass = vkw::RenderPass{device, vkw::RenderPassCreateInfo{attachmentDescription, {subpassDescription},
+    auto renderPass = vkw::RenderPass{device, vkw::RenderPassCreateInfo{{attachmentDescription, depthAttachment}, {subpassDescription},
                                                                          {inputDependency, outputDependency}}};
 
     // 10. create framebuffer for each swapchain image view
 
+    auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
+    createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    std::optional<vkw::DepthStencilImage2D> depthMap = createDepthStencilImage(device, extents.width, extents.height);
+    vkw::DepthImage2DArrayView const* depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping, VK_FORMAT_D24_UNORM_S8_UINT);
     std::vector<vkw::FrameBuffer> framebuffers;
 
     for (auto &view: swapChainImageViews) {
         framebuffers.emplace_back(device, renderPass, VkExtent2D{view.get().image()->rawExtents().width,
-                                                                  view.get().image()->rawExtents().height}, view);
+                                                                  view.get().image()->rawExtents().height}, vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
     }
 
     // 11. create graphics pipeline
@@ -532,11 +594,13 @@ int main() {
 
     auto pipelineLayout = vkw::PipelineLayout{device, descriptorSetLayout};
 
-    auto pipeline = vkw::GraphicsPipeline{device, vkw::GraphicsPipelineCreateInfo{renderPass, 0, pipelineLayout,
-                                                                                   vkw::ShaderBaseConstRefArray{
-                                                                                           vertexShader,
-                                                                                           fragmentShader},
-                                                                                   vertexInputCreateInfo}};
+    vkw::GraphicsPipelineCreateInfo pipelineCreateInfo{renderPass, 0, pipelineLayout};
+    pipelineCreateInfo.addVertexShader(vertexShader);
+    pipelineCreateInfo.addFragmentShader(fragmentShader);
+    pipelineCreateInfo.addVertexInputState(vertexInputCreateInfo);
+    pipelineCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
+
+    auto pipeline = vkw::GraphicsPipeline{device, pipelineCreateInfo};
 
     std::cout << "VertexInputStateInfo:" << std::endl;
     for (uint32_t i = 0; i < vertexInputCreateInfo.totalBindings(); ++i) {
@@ -572,7 +636,7 @@ int main() {
         glfwPollEvents();
 
 
-        auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
+        extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
         if (extents.width == 0 || extents.height == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -592,10 +656,13 @@ int main() {
 
             commandBuffer.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
             auto &currentFrameBuffer = framebuffers.at(mySwapChain->currentImage());
-            VkClearValue value;
-            value.color = {0.1f, 0.0f, 0.0f, 0.0f};
+            std::array<VkClearValue, 2> values{};
+            values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
+            values.at(1).depthStencil.depth = 1.0f;
+            values.at(1).depthStencil.stencil = 0.0f;
+
             commandBuffer.beginRenderPass(renderPass, currentFrameBuffer, currentFrameBuffer.getFullRenderArea(), false,
-                                          1, &value);
+                                          values.size(), values.data());
             VkViewport viewport;
 
             viewport.height = currentFrameBuffer.getFullRenderArea().extent.height;
@@ -633,12 +700,18 @@ int main() {
                     swapChainImageViews.emplace_back(
                             image.getView<vkw::ColorImageView>(device, image.format(), 0, 1, mapping));
                 }
+
+                extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
+
+                depthMap.reset();
+                depthMap.emplace(createDepthStencilImage(device, extents.width, extents.height));
+                depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping, VK_FORMAT_D24_UNORM_S8_UINT);
                 framebuffers.clear();
 
                 for (auto &view: swapChainImageViews) {
                     framebuffers.emplace_back(device, renderPass, VkExtent2D{view.get().image()->rawExtents().width,
                                                                               view.get().image()->rawExtents().height},
-                                              view);
+                                              vkw::Image2DArrayViewConstRefArray {view, *depthImageView});
                 }
 
                 //std::cout << "Window resized" << std::endl;
