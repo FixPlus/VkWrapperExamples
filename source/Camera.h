@@ -124,7 +124,7 @@ namespace TestApp{
         void update(float deltaTime);
 
         void stop(){
-            m_velocity * 0.0f;
+            m_velocity *= 0.0f;
         }
     private:
         glm::vec3 m_velocity{};

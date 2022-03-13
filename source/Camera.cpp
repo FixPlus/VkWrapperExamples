@@ -15,7 +15,7 @@ namespace TestApp{
                                    glm::vec3(0.0f, 0.0f, 1.0f));
 
         m_camera_mat = glm::translate(m_camera_mat, -m_position);
-        auto perspective = glm::perspective(m_fov, m_ratio, 0.1f, 100.0f);
+        auto perspective = glm::perspective(m_fov, m_ratio, 0.1f, 1000.0f);
         perspective[1][1] *= -1.0f;
         perspective = perspective * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f),
                                      glm::vec3(1.0f, 0.0f, 0.0f));

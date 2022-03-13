@@ -29,6 +29,7 @@
 #include <chrono>
 #include <Sampler.hpp>
 #include <Surface.hpp>
+#include <thread>
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -36,138 +37,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-class MySwapChain : public vkw::SwapChain {
-public:
-    MySwapChain(vkw::Device &device, vkw::Surface &surface) :
-            vkw::SwapChain(device, compileInfo(device, surface)),
-            m_surface(surface) {
+#include "SwapChainImpl.h"
 
-        auto images = retrieveImages();
-        std::vector<VkImageMemoryBarrier> transitLayouts;
-
-        for (auto &image: images) {
-            VkImageMemoryBarrier transitLayout{};
-            transitLayout.image = image;
-            transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            transitLayout.pNext = nullptr;
-            transitLayout.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            transitLayout.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            transitLayout.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            transitLayout.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            transitLayout.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            transitLayout.subresourceRange.baseArrayLayer = 0;
-            transitLayout.subresourceRange.baseMipLevel = 0;
-            transitLayout.subresourceRange.layerCount = 1;
-            transitLayout.subresourceRange.levelCount = 1;
-            transitLayout.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-            transitLayout.srcAccessMask = 0;
-
-            transitLayouts.push_back(transitLayout);
-        }
-
-        auto queue = device.getGraphicsQueue();
-        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
-        auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
-
-        commandBuffer.begin(0);
-
-        commandBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                         transitLayouts);
-
-        commandBuffer.end();
-
-        auto fence = vkw::Fence{device};
-
-        queue->submit(commandBuffer, {}, {}, {}, &fence);
-        fence.wait();
-
-        //queue->waitIdle();
-
-    }
-
-
-private:
-
-    static VkSwapchainCreateInfoKHR compileInfo(vkw::Device &device, vkw::Surface &surface) {
-        VkSwapchainCreateInfoKHR ret{};
-
-        auto &physicalDevice = device.physicalDevice();
-        auto availablePresentQueues = surface.getQueueFamilyIndicesThatSupportPresenting(physicalDevice);
-
-        if (!device.supportsPresenting() || availablePresentQueues.empty())
-            throw vkw::Error("Cannot create SwapChain on device that does not support presenting");
-
-        auto surfCaps = surface.getSurfaceCapabilities(physicalDevice);
-
-        ret.surface = surface;
-        ret.clipped = VK_TRUE;
-        ret.imageExtent = surfCaps.currentExtent;
-        ret.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        ret.imageArrayLayers = 1;
-        ret.presentMode = surface.getAvailablePresentModes(physicalDevice).front();
-        ret.queueFamilyIndexCount = 0;
-        ret.imageColorSpace = surface.getAvailableFormats(physicalDevice).front().colorSpace;
-        ret.imageFormat = surface.getAvailableFormats(physicalDevice).front().format;
-        ret.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        ret.minImageCount = surfCaps.minImageCount;
-        ret.preTransform = surfCaps.currentTransform;
-        ret.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-        auto presentModes = surface.getAvailablePresentModes(physicalDevice);
-        auto presentModeCount = presentModes.size();
-        VkPresentModeKHR swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
-
-        for (size_t i = 0; i < presentModeCount; i++) {
-            if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-                swapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-                break;
-            }
-        }
-
-        if (swapchainPresentMode != VK_PRESENT_MODE_MAILBOX_KHR)
-            for (size_t i = 0; i < presentModeCount; i++) {
-                if (presentModes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-                    swapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-                    break;
-                }
-            }
-
-        // Find a supported composite alpha format (not all devices support alpha
-        // opaque)
-        VkCompositeAlphaFlagBitsKHR compositeAlpha =
-                VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        // Simply select the first composite alpha format available
-        std::vector<VkCompositeAlphaFlagBitsKHR> compositeAlphaFlags = {
-                VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-                VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
-                VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
-                VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
-        };
-        for (auto &compositeAlphaFlag: compositeAlphaFlags) {
-            if (surfCaps.supportedCompositeAlpha & compositeAlphaFlag) {
-                compositeAlpha = compositeAlphaFlag;
-                break;
-            };
-        }
-
-        ret.compositeAlpha = compositeAlpha;
-        ret.presentMode = swapchainPresentMode;
-
-        return ret;
-    }
-
-    vkw::Surface &m_surface;
-};
-
-struct MyAttrs : vkw::AttributeBase<vkw::VertexAttributeType::VEC3F,
-        vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC2F> {
-    glm::vec3 pos;
-    glm::vec3 color = {1.0f, 1.0f, 1.0f};
-    glm::vec3 normal;
-    glm::vec2 uv;
-};
-
-struct MyUniform {
+struct GlobalUniform {
     glm::mat4 perspective = glm::perspective(60.0f, 16.0f / 9.0f, 0.01f, 1000.0f);
 } myUniform;
 
@@ -286,111 +158,106 @@ vkw::ColorImage2D loadTexture(const char *filename, vkw::Device &device) {
 
 class Cube{
 public:
-    Cube(glm::vec3 position, glm::vec3 scale, glm::vec3 rotation): m_translate(position), m_scale(scale), m_rotate(rotation){
-        m_cubeCount++;
-        VmaAllocationCreateInfo createInfo{};
-        createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        createInfo.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-        m_ubo = std::make_unique<vkw::UniformBuffer<M_CubeUniform>>(*m_device, createInfo);
 
-        m_descriptorSet = std::make_unique<vkw::DescriptorSet>(m_descriptorPool.value(), m_texturelessLayout.value());
-        m_descriptorSet->write(1, *m_ubo);
+    Cube(glm::vec3 position, glm::vec3 scale, glm::vec3 rotation):
+    m_translate(position), m_scale(scale), m_rotate(rotation),
+    m_id(Cube::m_cubeCount++){
+        m_cubes.emplace(m_id, this);
+        m_velocity = {std::rand() % 10 - 5.0f, std::rand() % 10 - 5.0f, std::rand() % 10 - 5.0f};
+        m_rotation = {std::rand() % 40 - 20.0f, std::rand() % 40 - 20.0f, std::rand() % 40 - 20.0f};
     }
 
-    Cube(glm::vec3 position, glm::vec3 scale, glm::vec3 rotation, vkw::ColorImage2D& texture): Cube(position, scale, rotation){
-        m_texture = &texture;
-        m_descriptorSet.reset();
-        m_descriptorSet = std::make_unique<vkw::DescriptorSet>(m_descriptorPool.value(), m_textureLayout.value());
-        static VkComponentMapping mapping;
-        mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-        m_view = &texture.getView<vkw::ColorImageView>(*m_device, texture.format(), mapping);
-
-        m_descriptorSet->write(1, *m_ubo);
-        m_descriptorSet->write(2, *m_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler.value());
-    }
-
-    Cube(Cube&& another) noexcept = default;
+    Cube(Cube&& another) noexcept: m_translate(another.m_translate), m_scale(another.m_scale), m_rotate(another.m_rotate),
+                                   m_CubeUniform(another.m_CubeUniform),
+                                   m_id(another.m_id), m_velocity(another.m_velocity), m_rotation(another.m_rotation) {
+        m_cubes.at(m_id) = this;
+        another.m_id = M_MOVED_OUT;
+    };
 
     template<typename T>
-    void writeGlobalUniform(vkw::UniformBuffer<T> const& ubo){
+    static void writeGlobalUniform(vkw::UniformBuffer<T> const& ubo){
         m_descriptorSet->write(0, ubo);
     }
 
     ~Cube(){
+        if(m_id == M_MOVED_OUT)
+            return;
+
         m_cubeCount--;
+
+        if(m_cubes.at(m_cubeCount) != this){
+            auto* swapCube = m_cubes.at(m_cubeCount);
+            swapCube->m_id = m_id;
+            m_cubes.erase(m_cubeCount);
+            m_cubes.at(m_id) = swapCube;
+        }
+
     }
 
     void update(double deltaTime){
 
-        m_CubeUniform.model = glm::scale(glm::mat4(1.0f), m_scale);
+        m_translate += m_velocity * (float)deltaTime;
+        m_rotate += m_rotation * (float)deltaTime;
+
+
+        m_CubeUniform.model = glm::translate(glm::mat4(1.0f), m_translate);
         m_CubeUniform.model = glm::rotate(m_CubeUniform.model, glm::radians(m_rotate.x), glm::vec3{1.0f, 0.0f, 0.0f});
         m_CubeUniform.model = glm::rotate(m_CubeUniform.model, glm::radians(m_rotate.y), glm::vec3{0.0f, 1.0f, 0.0f});
         m_CubeUniform.model = glm::rotate(m_CubeUniform.model, glm::radians(m_rotate.z), glm::vec3{0.0f, 0.0f, 1.0f});
-        m_CubeUniform.model = glm::translate(m_CubeUniform.model, m_translate);
+        m_CubeUniform.model = glm::scale(m_CubeUniform.model, m_scale);
 
-        auto* mapped = m_ubo->map();
-        memcpy(mapped, &m_CubeUniform, sizeof(m_CubeUniform));
-        m_ubo->flush();
-        m_ubo->unmap();
+        m_instance_mapped[m_id] = m_CubeUniform;
+
     }
 
-    void draw(vkw::CommandBuffer& commandBuffer){
-        if(m_texture){
-            commandBuffer.bindGraphicsPipeline(m_texturePipeline.value());
-            commandBuffer.bindDescriptorSets(m_texturePipelineLayout.value(), VK_PIPELINE_BIND_POINT_GRAPHICS, *m_descriptorSet, 0);
-        } else{
-            commandBuffer.bindGraphicsPipeline(m_texturelessPipeline.value());
-            commandBuffer.bindDescriptorSets(m_texturelessPipelineLayout.value(), VK_PIPELINE_BIND_POINT_GRAPHICS, *m_descriptorSet, 0);
-        }
+    static void draw(vkw::CommandBuffer& commandBuffer){
+
+        m_instances->flush();
+
+        commandBuffer.bindGraphicsPipeline(m_texturePipeline.value());
         commandBuffer.bindVertexBuffer(m_vbuf.value(), 0, 0);
-        commandBuffer.draw(m_vertices.size(), 1);
+        commandBuffer.bindVertexBuffer(m_instances.value(), 1, 0);
+
+        commandBuffer.bindDescriptorSets(m_texturePipelineLayout.value(), VK_PIPELINE_BIND_POINT_GRAPHICS, *m_descriptorSet, 0);
+        commandBuffer.draw(m_vertices.size(), m_cubeCount);
+
     }
 
-
-    static void Init(vkw::Device& device, vkw::RenderPass& renderPass, uint32_t subpass, uint32_t maxCubes){
+    static void Init(vkw::Device& device, vkw::RenderPass& renderPass, uint32_t subpass, uint32_t maxCubes, vkw::ColorImage2D& texture){
         m_device = &device;
         m_renderPass = &renderPass;
         m_vertexShader.emplace(loadShader<vkw::VertexShader>(device, "triangle.vert.spv"));
         m_textureShader.emplace(loadShader<vkw::FragmentShader>(device, "triangle.frag.spv"));
-        m_texturelessShader.emplace(loadShader<vkw::FragmentShader>(device, "triangle_color.frag.spv"));
 
         std::vector<VkDescriptorPoolSize> poolSizes{};
 
-        poolSizes.push_back({.type= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount=maxCubes});
-        poolSizes.push_back({.type= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=maxCubes * 2});
+        poolSizes.push_back({.type= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount=1});
+        poolSizes.push_back({.type= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=1});
 
         m_descriptorPool.emplace(vkw::DescriptorPool{device, maxCubes, poolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT});
-        vkw::DescriptorSetLayoutBinding bindings[3] = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}};;
+        vkw::DescriptorSetLayoutBinding bindings[2] = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}};;
 
-        m_textureLayout.emplace(vkw::DescriptorSetLayout{device, {bindings[0], bindings[1], bindings[2]}});
-        m_texturelessLayout.emplace(vkw::DescriptorSetLayout{device, {bindings[0], bindings[1]}});
+        m_textureLayout.emplace(vkw::DescriptorSetLayout{device, {bindings[0], bindings[1]}});
 
         m_texturePipelineLayout.emplace(device, m_textureLayout.value());
-        m_texturelessPipelineLayout.emplace(device, m_texturelessLayout.value());
 
         vkw::GraphicsPipelineCreateInfo texturePipeCreateInfo{renderPass, subpass, m_texturePipelineLayout.value()};
-        vkw::GraphicsPipelineCreateInfo texturelessPipeCreateInfo{renderPass, subpass, m_texturelessPipelineLayout.value()};
+
+        vkw::RasterizationStateCreateInfo rasterizerCI{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE};
+
+        texturePipeCreateInfo.addRasterizationState(rasterizerCI);
 
         texturePipeCreateInfo.addVertexShader(m_vertexShader.value());
-        texturelessPipeCreateInfo.addVertexShader(m_vertexShader.value());
 
         vkw::DepthTestStateCreateInfo depthTestCI{VK_COMPARE_OP_LESS, true};
 
-        texturelessPipeCreateInfo.addDepthTestState(depthTestCI);
         texturePipeCreateInfo.addDepthTestState(depthTestCI);
 
         texturePipeCreateInfo.addFragmentShader(m_textureShader.value());
-        texturelessPipeCreateInfo.addFragmentShader(m_texturelessShader.value());
 
-        texturelessPipeCreateInfo.addVertexInputState(m_inputState);
         texturePipeCreateInfo.addVertexInputState(m_inputState);
 
         m_texturePipeline.emplace(device, texturePipeCreateInfo);
-        m_texturelessPipeline.emplace(device, texturelessPipeCreateInfo);
 
         m_vertices = m_makeCube();
 
@@ -412,73 +279,142 @@ public:
         createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         createInfo.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
-        m_vbuf.emplace(*m_device, m_vertices.size(), createInfo);
+        vkw::Buffer<CubeAttrs> stageBuf{*m_device, m_vertices.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, createInfo};
+        createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        createInfo.requiredFlags = 0;
+        m_vbuf.emplace(*m_device, m_vertices.size(), createInfo, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
-        auto* mapped = m_vbuf.value().map();
-        memcpy(mapped, m_vertices.data(), m_vertices.size() * sizeof(MyAttrs));
-        m_vbuf.value().flush();
-        m_vbuf.value().unmap();
+        auto* mapped = stageBuf.map();
+        memcpy(mapped, m_vertices.data(), m_vertices.size() * sizeof(CubeAttrs));
+        stageBuf.flush();
+        stageBuf.unmap();
+
+        auto queue = device.getTransferQueue();
+        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+        auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
+        transferCommand.begin(0);
+        VkBufferCopy region{};
+        region.size = stageBuf.size() * sizeof(CubeAttrs);
+        region.dstOffset = 0;
+        region.srcOffset = 0;
+
+        transferCommand.copyBufferToBuffer(stageBuf, m_vbuf.value(), {region});
+
+        transferCommand.end();
+        queue->submit(transferCommand);
+        queue->waitIdle();
+
+
+        createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        createInfo.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+        m_instances.emplace(*m_device, maxCubes, createInfo);
+        m_instance_mapped = m_instances->map();
+
+        m_texture = &texture;
+
+        static VkComponentMapping mapping;
+        mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        m_view = &texture.getView<vkw::ColorImageView>(*m_device, texture.format(), mapping);
+
+        m_descriptorSet = std::make_unique<vkw::DescriptorSet>(m_descriptorPool.value(), m_textureLayout.value());
+
+        m_descriptorSet->write(1, *m_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler.value());
+
+        for(int i = 0; i < m_inputState.totalAttributes(); ++i){
+            auto attrib = m_inputState.attribute(i);
+            std::cout << "Attribute #" << attrib.location << ": binding=" << attrib.binding << ", offset=" << attrib.offset
+            << ", format=" << attrib.format << std::endl;
+        }
+
+        std::cout << std::endl;
+
+        for(int i = 0; i < m_inputState.totalBindings(); ++i){
+            auto binding = m_inputState.binding(i);
+            std::cout << "Binding #" <<  binding.binding << ": rate= " << (binding.inputRate == VK_VERTEX_INPUT_RATE_VERTEX ? "per_vertex" : "per_instance")
+            << ", stride = " << binding.stride << std::endl;
+        }
     }
     static void Terminate(){
+        m_instances.reset();
         m_vbuf.reset();
         m_sampler.reset();
         m_texturePipeline.reset();
-        m_texturelessPipeline.reset();
-        m_texturelessPipelineLayout.reset();
         m_texturePipelineLayout.reset();
         m_textureLayout.reset();
-        m_texturelessLayout.reset();
+        m_descriptorSet.reset();
         m_descriptorPool.reset();
         m_vertexShader.reset();
         m_textureShader.reset();
-        m_texturelessShader.reset();
     }
 
 private:
 
-    struct M_CubeUniform{
+    struct CubeAttrs : vkw::AttributeBase<vkw::VertexAttributeType::VEC3F,
+            vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC2F> {
+        glm::vec3 pos;
+        glm::vec3 color = {1.0f, 1.0f, 1.0f};
+        glm::vec3 normal;
+        glm::vec2 uv;
+    };
+
+    struct M_CubeUniform: public vkw::AttributeBase<vkw::VertexAttributeType::VEC4F,
+            vkw::VertexAttributeType::VEC4F,
+            vkw::VertexAttributeType::VEC4F,
+            vkw::VertexAttributeType::VEC4F>{
         glm::mat4 model;
     } m_CubeUniform;
+
+    uint32_t  m_id;
 
     glm::vec3 m_translate;
     glm::vec3 m_rotate;
     glm::vec3 m_scale;
 
+    glm::vec3 m_rotation;
+    glm::vec3 m_velocity;
 
-    std::unique_ptr<vkw::UniformBuffer<M_CubeUniform>> m_ubo{};
-    std::unique_ptr<vkw::DescriptorSet> m_descriptorSet{};
-    vkw::ColorImage2D* m_texture{};
-    vkw::ColorImage2DView const* m_view{};
+
+
 
     /** static members down there **/
-    static std::vector<MyAttrs> m_vertices;
+    static constexpr const uint32_t M_MOVED_OUT = std::numeric_limits<uint32_t>::max();
+    static std::unique_ptr<vkw::DescriptorSet> m_descriptorSet;
+    static std::map<uint32_t, Cube*> m_cubes;
+    static vkw::ColorImage2D* m_texture;
+    static vkw::ColorImage2DView const* m_view;
+    static std::vector<CubeAttrs> m_vertices;
+    static std::optional<vkw::VertexBuffer<M_CubeUniform>> m_instances;
+    static M_CubeUniform* m_instance_mapped;
     static uint32_t m_cubeCount;
     static vkw::Device* m_device;
     static vkw::RenderPass* m_renderPass;
     static std::optional<vkw::Sampler> m_sampler;
-    static const vkw::VertexInputStateCreateInfo<vkw::per_vertex<MyAttrs, 0>> m_inputState;
-    static std::optional<vkw::VertexBuffer<MyAttrs>> m_vbuf;
+    static const vkw::VertexInputStateCreateInfo<vkw::per_vertex<CubeAttrs, 0>, vkw::per_instance<M_CubeUniform, 1>> m_inputState;
+    static std::optional<vkw::VertexBuffer<CubeAttrs>> m_vbuf;
     static std::optional<vkw::DescriptorSetLayout> m_textureLayout;
-    static std::optional<vkw::DescriptorSetLayout> m_texturelessLayout;
     static std::optional<vkw::DescriptorPool> m_descriptorPool;
-    static std::optional<vkw::PipelineLayout> m_texturelessPipelineLayout;
-    static std::optional<vkw::GraphicsPipeline> m_texturelessPipeline;
     static std::optional<vkw::PipelineLayout> m_texturePipelineLayout;
     static std::optional<vkw::GraphicsPipeline> m_texturePipeline;
     static std::optional<vkw::VertexShader> m_vertexShader;
     static std::optional<vkw::FragmentShader> m_textureShader;
-    static std::optional<vkw::FragmentShader> m_texturelessShader;
 
-    static std::vector<MyAttrs> m_makeCube() {
-        std::vector<MyAttrs> ret{};
+    static std::vector<CubeAttrs> m_makeCube() {
+        std::vector<CubeAttrs> ret{};
         // top
         ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
-        ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 0.0f}});
         ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 0.0f}});
+
 
         ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
-        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
         ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
+
 
         // bottom
 
@@ -486,9 +422,13 @@ private:
         ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 0.0f}});
         ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
 
+
+
         ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 0.0f}});
         ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
         ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 1.0f}});
+
+
 
         // east
 
@@ -500,15 +440,20 @@ private:
         ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
         ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
 
+
         // west
 
         ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-        ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
         ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
+
+
 
         ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
         ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+
+
 
         // north
 
@@ -516,42 +461,49 @@ private:
         ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
         ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
 
+
         ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
         ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
         ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
 
+
+
         // south
 
         ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
         ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
+
 
         ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
         ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
+        ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
+
 
         return ret;
     }
 
 };
 
-std::vector<MyAttrs> Cube::m_vertices{};
+std::optional<vkw::VertexBuffer<Cube::M_CubeUniform>> Cube::m_instances{};
+Cube::M_CubeUniform* Cube::m_instance_mapped{};
+std::unique_ptr<vkw::DescriptorSet> Cube::m_descriptorSet{};
+std::map<uint32_t, Cube*> Cube::m_cubes{};
+vkw::ColorImage2D* Cube::m_texture{};
+vkw::ColorImage2DView const* Cube::m_view{};
+std::vector<Cube::CubeAttrs> Cube::m_vertices{};
 uint32_t Cube::m_cubeCount = 0;
 vkw::RenderPass* Cube::m_renderPass;
 std::optional<vkw::Sampler> Cube::m_sampler;
-std::optional<vkw::PipelineLayout> Cube::m_texturelessPipelineLayout{};
-std::optional<vkw::GraphicsPipeline> Cube::m_texturelessPipeline{};
 vkw::Device* Cube::m_device;
-std::optional<vkw::VertexBuffer<MyAttrs>> Cube::m_vbuf{};
-const vkw::VertexInputStateCreateInfo<vkw::per_vertex<MyAttrs, 0>> Cube::m_inputState{};
+std::optional<vkw::VertexBuffer<Cube::CubeAttrs>> Cube::m_vbuf{};
+const vkw::VertexInputStateCreateInfo<vkw::per_vertex<Cube::CubeAttrs, 0>, vkw::per_instance<Cube::M_CubeUniform, 1>> Cube::m_inputState{};
 std::optional<vkw::DescriptorSetLayout> Cube::m_textureLayout{};
-std::optional<vkw::DescriptorSetLayout> Cube::m_texturelessLayout{};
 std::optional<vkw::DescriptorPool> Cube::m_descriptorPool{};
 std::optional<vkw::PipelineLayout> Cube::m_texturePipelineLayout{};
 std::optional<vkw::GraphicsPipeline> Cube::m_texturePipeline{};
 std::optional<vkw::VertexShader> Cube::m_vertexShader{};
 std::optional<vkw::FragmentShader> Cube::m_textureShader{};
-std::optional<vkw::FragmentShader> Cube::m_texturelessShader{};
 
 
 vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height) {
@@ -601,7 +553,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib);
+    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, true);
 
     std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
                   [](vkw::Instance::extension_const_iterator::value_type const &ext) {
@@ -641,7 +593,7 @@ int main() {
 
     // 4. Create swapchain
 
-    std::unique_ptr<MySwapChain> mySwapChain = std::make_unique<MySwapChain>(MySwapChain{device, surface});
+    auto mySwapChain = std::make_unique<TestApp::SwapChainImpl>(TestApp::SwapChainImpl{device, surface});
 
     auto queue = device.getGraphicsQueue();
 
@@ -736,22 +688,25 @@ int main() {
     createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
     createInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
-    vkw::UniformBuffer<MyUniform> uBuf{device, createInfo};
+    vkw::UniformBuffer<GlobalUniform> uBuf{device, createInfo};
 
-    Cube::Init(device, renderPass, 0, 1000);
+    constexpr const int cubeCount = 50000;
+
+    Cube::Init(device, renderPass, 0, cubeCount, texture);
 
     auto* uBufMapped = uBuf.map();
 
     std::vector<Cube> cubes{};
 
-    for(int i = 0; i < 1000; ++i) {
+    for(int i = 0; i < cubeCount; ++i) {
         float scale_mag = (float)(rand() % 5) + 1.0f;
-        glm::vec3 pos = glm::vec3((float)(rand() % 100), (float)(rand() % 100), (float)(rand() % 100));
-        glm::vec3 rotate = glm::vec3((float)(rand() % 100), (float)(rand() % 100), (float)(rand() % 100));
+        glm::vec3 pos = glm::vec3((float)(rand() % 1000), (float)(rand() % 1000), (float)(rand() % 1000));
+        glm::vec3 rotate = glm::vec3((float)(rand() % 1000), (float)(rand() % 1000), (float)(rand() % 1000));
         auto scale = glm::vec3(scale_mag);
-        cubes.emplace_back(pos, scale, rotate, texture).writeGlobalUniform(uBuf);
-
+        cubes.emplace_back(pos, scale, rotate);
     }
+
+    Cube::writeGlobalUniform(uBuf);
 
     // 12. create command buffer and sync primitives
 
@@ -764,22 +719,37 @@ int main() {
     // 13. render on screen in a loop
 
     uint32_t framesTotal = 0;
-
+    uint32_t framesCount = 0;
+    double elapsedTime = 0.0;
+    double fps = 0.0;
     std::chrono::time_point<std::chrono::high_resolution_clock,
             std::chrono::duration<double>> tStart, tFinish;
 
     tStart = std::chrono::high_resolution_clock::now();
     myUniform.perspective = window.projection();
 
+    constexpr const int thread_count = 12;
+    std::vector<std::thread> threads;
+    threads.reserve(thread_count);
+
     while (!window.shouldClose()) {
         framesTotal++;
+
         TestApp::Window::pollEvents();
 
         tFinish = std::chrono::high_resolution_clock::now();
 
         double deltaTime = std::chrono::duration<double, std::milli>(tFinish - tStart).count() / 1000.0;
+        elapsedTime += deltaTime;
 
         tStart = std::chrono::high_resolution_clock::now();
+        framesCount++;
+        if(framesCount > 100){
+            fps = (float)framesCount / elapsedTime;
+            std::cout << "FPS: " << fps << std::endl;
+            framesCount = 0;
+            elapsedTime = 0;
+        }
 
         window.update(deltaTime);
 
@@ -824,10 +794,23 @@ int main() {
             scissor.offset.y = 0;
             commandBuffer.setViewports({viewport}, 0);
             commandBuffer.setScissors({scissor}, 0);
-            for(auto& cube: cubes){
-                cube.update(deltaTime);
-                cube.draw(commandBuffer);
+
+            auto per_thread = cubes.size() / thread_count;
+
+            threads.clear();
+
+            for(int i = 0; i < thread_count;++i){
+                threads.emplace_back([&cubes, i, per_thread, deltaTime](){
+                    for(int j = per_thread * i; j < std::min(per_thread * (i + 1), cubes.size()); ++j)
+                        cubes.at(j).update(deltaTime);
+                });
             }
+
+            for(auto& thread: threads)
+                thread.join();
+
+            Cube::draw(commandBuffer);
+
             commandBuffer.endRenderPass();
             commandBuffer.end();
 
@@ -837,7 +820,7 @@ int main() {
         } catch (vkw::VulkanError &e) {
             if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
                 mySwapChain.reset();
-                mySwapChain = std::make_unique<MySwapChain>(MySwapChain{device, surface});
+                mySwapChain = std::make_unique<TestApp::SwapChainImpl>(TestApp::SwapChainImpl{device, surface});
                 swapChainImages.clear();
                 swapChainImages = mySwapChain->retrieveImages();
 
@@ -880,7 +863,6 @@ int main() {
         fence->reset();
     }
 
-    device.core<1, 0>().vkDeviceWaitIdle(device);
     device.waitIdle();
 
     fence.reset();

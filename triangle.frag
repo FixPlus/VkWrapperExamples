@@ -6,7 +6,7 @@ layout (location = 2) in vec3 inNormal;
 
 layout (location = 0) out vec4 outFragColor;
 
-layout (binding = 2) uniform sampler2D colorMap;
+layout (binding = 1) uniform sampler2D colorMap;
 
 void main(){
     vec3 lightDir = normalize(vec3(1.0, 0.0, 0.5));
