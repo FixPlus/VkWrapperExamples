@@ -20,6 +20,10 @@ namespace TestApp{
             return m_camera;
         }
 
+        glm::vec3 cameraPos() {
+            return m_camera.position();
+        }
+
     protected:
         void keyInput(int key, int scancode, int action, int mods) override {
             if(action == GLFW_PRESS)
