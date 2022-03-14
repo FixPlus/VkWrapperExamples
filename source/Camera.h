@@ -67,6 +67,8 @@ namespace TestApp{
             return m_position;
         }
 
+        glm::vec3 viewDirection() const;
+
         float phi() const{
             return m_Phi;
         }

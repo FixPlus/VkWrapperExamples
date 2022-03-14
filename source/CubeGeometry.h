@@ -154,6 +154,7 @@ namespace TestApp {
             m_parent->m_cubes.emplace(m_id, this);
             m_velocity = {std::rand() % 10 - 5.0f, std::rand() % 10 - 5.0f, std::rand() % 10 - 5.0f};
             m_rotation = {std::rand() % 40 - 20.0f, std::rand() % 40 - 20.0f, std::rand() % 40 - 20.0f};
+            setModelMatrix();
         };
 
 
@@ -188,6 +189,13 @@ namespace TestApp {
             m_rotate += m_rotation * (float) deltaTime;
 
 
+            setModelMatrix();
+
+        }
+
+    private:
+
+        void setModelMatrix() {
             model.model = glm::translate(glm::mat4(1.0f), m_translate);
             model.model = glm::rotate(model.model, glm::radians(m_rotate.x), glm::vec3{1.0f, 0.0f, 0.0f});
             model.model = glm::rotate(model.model, glm::radians(m_rotate.y), glm::vec3{0.0f, 1.0f, 0.0f});
@@ -195,11 +203,7 @@ namespace TestApp {
             model.model = glm::scale(model.model, m_scale);
 
             m_parent->m_instance_mapped[m_id] = model;
-
         }
-
-    private:
-
         friend class CubePool;
 
         CubePool::PerInstance model;

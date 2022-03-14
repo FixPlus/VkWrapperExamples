@@ -24,6 +24,10 @@ namespace TestApp{
             return m_camera.position();
         }
 
+        ControlledCamera const& camera() const{
+            return m_camera;
+        }
+
     protected:
         void keyInput(int key, int scancode, int action, int mods) override {
             if(action == GLFW_PRESS)

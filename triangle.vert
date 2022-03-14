@@ -22,14 +22,20 @@ layout (binding = 3) uniform ShadowSpace{
     mat4 perspective;
 } shadowSpace;
 
+const mat4 biasMat = mat4(
+0.5, 0.0, 0.0, 0.0,
+0.0, 0.5, 0.0, 0.0,
+0.0, 0.0, 1.0, 0.0,
+0.5, 0.5, 0.0, 1.0 );
+
 void main()
 {
 
     outColor = col;
     outUV = inUV;
     outLightDir = maBoi.lightDir;
-    outNormal = (inModel * vec4(normal, 0.0f)).xyz;
+    outNormal = normalize((inModel * vec4(normal, 0.0f)).xyz);
     vec4 position = vec4(inModel * vec4( pos , 1.0));
-    outShadowPos = shadowSpace.perspective * position;
+    outShadowPos = biasMat * shadowSpace.perspective * position;
     gl_Position = maBoi.perspective * position;
 }
