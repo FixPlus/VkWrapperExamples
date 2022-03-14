@@ -40,6 +40,10 @@ namespace TestApp {
             return glfwWindowShouldClose(m_window);
         }
 
+        void close() const{
+            glfwSetWindowShouldClose(m_window, true);
+        }
+
         void disableCursor() {
             if(m_cursorDisabled)
                 return;

@@ -7,18 +7,18 @@ namespace TestApp{
     void Camera::m_set_matrix() {
         m_camera_mat = glm::mat4(1.0f);
 
-        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(-m_Psi),
+        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(m_Psi),
                            glm::vec3(1.0f, 0.0f, 0.0f));
-        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(-m_Tilt),
+        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(m_Phi),
                            glm::vec3(0.0f, 1.0f, 0.0f));
-        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(-m_Phi),
+        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(m_Tilt),
                                    glm::vec3(0.0f, 0.0f, 1.0f));
 
-        m_camera_mat = glm::translate(m_camera_mat, -m_position);
+        m_camera_mat = glm::translate(m_camera_mat, m_position);
         auto perspective = glm::perspective(m_fov, m_ratio, 0.1f, 1000.0f);
         perspective[1][1] *= -1.0f;
-        perspective = perspective * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f),
-                                     glm::vec3(1.0f, 0.0f, 0.0f));
+       // perspective = perspective * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f),
+        //                             glm::vec3(1.0f, 0.0f, 0.0f));
         m_camera_mat = perspective * m_camera_mat;
     }
 
@@ -32,11 +32,11 @@ namespace TestApp{
 
         glm::vec3 camFront;
         camFront.x =
-                glm::cos(glm::radians(psi())) * glm::sin(glm::radians(phi()));
-        camFront.z = -glm::sin(glm::radians(psi()));
-        camFront.y = -glm::cos(glm::radians(psi())) *
+                -glm::cos(glm::radians(psi())) * glm::sin(glm::radians(phi()));
+        camFront.y = glm::sin(glm::radians(psi()));
+        camFront.z = glm::cos(glm::radians(psi())) *
                      glm::cos(glm::radians(phi()));
-        camFront = glm::normalize(-camFront);
+        camFront = glm::normalize(camFront);
 
         float acceleration = force * deltaTime / inertia;
 
@@ -46,16 +46,16 @@ namespace TestApp{
             m_velocity -= camFront * acceleration;
         if (keys.left)
             m_velocity -=
-                    glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 0.0f, 1.0f))) *
+                    glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) *
                     acceleration;
         if (keys.right)
             m_velocity +=
-                    glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 0.0f, 1.0f))) *
+                    glm::normalize(glm::cross(camFront, glm::vec3(0.0f, 1.0f, 0.0f))) *
                     acceleration;
         if (keys.space)
-            m_velocity += glm::vec3(0.0f, 0.0f, 1.0f) * acceleration;
+            m_velocity -= glm::vec3(0.0f, 1.0f, 0.0f) * acceleration;
         if (keys.shift)
-            m_velocity -= glm::vec3(0.0f, 0.0f, 1.0f) * acceleration;
+            m_velocity += glm::vec3(0.0f, 1.0f, 0.0f) * acceleration;
 
         move(m_velocity * deltaTime);
     }

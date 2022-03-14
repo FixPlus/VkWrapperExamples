@@ -29,6 +29,7 @@ void main(){
     float shadow = shadowProj(inShadowPos);
 
     float diffuse = (dot(inLightDir, vec4(inNormal, 0.0f)) + 1.0f) * 0.5f;
-    diffuse = diffuse * 0.6f + 0.4f;
+    diffuse = diffuse * 0.4f + 0.4f;
     outFragColor = vec4(inColor, 1.0f) * texture(colorMap, inUV) * diffuse * shadow;
+
 }

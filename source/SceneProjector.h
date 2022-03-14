@@ -36,7 +36,7 @@ namespace TestApp{
 
         void mouseMove(double xpos, double ypos, double xdelta, double ydelta) override{
             if(cursorDisabled())
-                m_camera.rotate(-xdelta, -ydelta, 0.0f);
+                m_camera.rotate(xdelta, ydelta, 0.0f);
         };
 
 
@@ -51,6 +51,7 @@ namespace TestApp{
                 case GLFW_KEY_C: toggleCursor(); break;
                 case GLFW_KEY_LEFT_SHIFT: m_camera.keys.shift = true; break;
                 case GLFW_KEY_SPACE: m_camera.keys.space = true; break;
+                case GLFW_KEY_ESCAPE: close(); break;
                 default:;
             }
         }
