@@ -82,8 +82,16 @@ void main(){
     float shadow = filterPCF(shadowCoord / shadowCoord.w, cascadeIndex);
 
     float diffuse = dot(-inLightDir, vec4(inNormal, 0.0f));
-    //if(diffuse < 0.0f)
-        //shadow = 0.3f;
+
+    // Self-Shadow artifacts elimination
+
+    if(diffuse < 0.3f && diffuse > 0.0f){
+        float factor = diffuse / 0.3f;
+        shadow = 0.3f * (1.0f - factor) +  shadow * factor;
+    }
+    if(diffuse < 0.0f)
+        shadow = 0.3f;
+
     diffuse = (diffuse + 1.0f) / 2.0f;
     diffuse = diffuse * 0.4f + 0.4f;
     outFragColor = vec4(inColor, 1.0f) * texture(colorMap, inUV);

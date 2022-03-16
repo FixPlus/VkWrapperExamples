@@ -59,9 +59,11 @@ void setShadowMapUniform(TestApp::ShadowCascadesCamera<Cascades> const& camera, 
         auto cascade = camera.cascade(i);
         float shadowDepthFactor = 5.0f;
         auto center = cascade.center;
-        auto shadowDepth = greaterRadius;
-        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f, 2000.0f/*cascade.radius * shadowDepthFactor*/);
-        glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (2000.0f - cascade.radius), center, glm::vec3{0.0f, 1.0f, 0.0f});
+        auto shadowDepth = 2000.0f;
+        if(shadowDepth < cascade.radius * shadowDepthFactor)
+            shadowDepth = cascade.radius * shadowDepthFactor;
+        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f, shadowDepth/*cascade.radius * shadowDepthFactor*/);
+        glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (shadowDepth - cascade.radius), center, glm::vec3{0.0f, 1.0f, 0.0f});
         ubo.cascades[i] = proj * lookAt;
         ubo.splits[i * 4] = cascade.split;
     }
@@ -446,7 +448,7 @@ int main() {
 
     shadowCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
     shadowCreateInfo.addVertexShader(cubeShadowShader);
-    shadowCreateInfo.addRasterizationState(vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 1.5f, 0.0f, 3.0f});
+    shadowCreateInfo.addRasterizationState(vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 2.0f, 0.0f, 6.0f});
     shadowCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
 
     vkw::GraphicsPipeline shadowCubePipeline{device, shadowCreateInfo};
