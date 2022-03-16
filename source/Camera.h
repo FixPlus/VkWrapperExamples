@@ -130,6 +130,9 @@ namespace TestApp{
     class ShadowCascadesCamera: virtual public Camera{
     public:
 
+        void moveSplitLambda(float deltaLambda){
+            m_split_lambda = std::clamp(m_split_lambda + deltaLambda, 0.0f, 1.0f);
+        }
         void update(float deltaTime) override{
             float cascadeSplits[Cascades];
 
@@ -164,7 +167,7 @@ namespace TestApp{
             }
 
 
-            auto lastSplitDist = nearClip;
+            auto lastSplitDist = 0.0f;
 
             for(int i = 0; i < Cascades; ++i){
                 auto splitDist = cascadeSplits[i];
@@ -193,6 +196,7 @@ namespace TestApp{
                 m_cascades[i].radius = frustumCircumscribedRadius;
                 m_cascades[i].center = innerFrustumCenter;
                 m_cascades[i].split = nearClip + splitDist * clipRange;
+                lastSplitDist = splitDist;
             }
         };
 
@@ -208,10 +212,14 @@ namespace TestApp{
             return m_cascades.at(i);
         }
 
+        float splitLambda() const{
+            return m_split_lambda;
+        }
+
     private:
         std::array<Cascade, Cascades> m_cascades;
 
-        float m_split_lambda = 0.95f;
+        float m_split_lambda = 0.5f;
     };
 
     class ControlledCamera: virtual public Camera{

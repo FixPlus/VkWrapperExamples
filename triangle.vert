@@ -31,4 +31,6 @@ void main()
     outWorldPos = position;
     outViewPos = maBoi.cameraSpace * position;
     gl_Position = maBoi.perspective * outViewPos;
+    outViewPos *= -1.0f;
+    outViewPos.w = 1.0f;
 }

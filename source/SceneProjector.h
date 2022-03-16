@@ -2,7 +2,7 @@
 #define TESTAPP_SCENEPROJECTOR_H
 #include "Window.h"
 #include "Camera.h"
-
+#include <iostream>
 namespace TestApp{
 
     template<uint32_t Cascades>
@@ -59,6 +59,8 @@ namespace TestApp{
                 case GLFW_KEY_A: m_camera.keys.left = true; break;
                 case GLFW_KEY_S: m_camera.keys.down = true; break;
                 case GLFW_KEY_D: m_camera.keys.right = true; break;
+                case GLFW_KEY_N: m_camera.moveSplitLambda(-0.05f); std::cout << "lambda: " << m_camera.splitLambda() << std::endl; break;
+                case GLFW_KEY_M: m_camera.moveSplitLambda(+0.05f); std::cout << "lambda: " << m_camera.splitLambda() << std::endl; break;
                 case GLFW_KEY_C: toggleCursor(); break;
                 case GLFW_KEY_LEFT_SHIFT: m_camera.keys.shift = true; break;
                 case GLFW_KEY_SPACE: m_camera.keys.space = true; break;

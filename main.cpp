@@ -49,19 +49,21 @@ struct GlobalUniform {
 
 struct ShadowMapSpace {
     glm::mat4 cascades[TestApp::SHADOW_CASCADES_COUNT];
-    float splits[TestApp::SHADOW_CASCADES_COUNT];
+    float splits[TestApp::SHADOW_CASCADES_COUNT * 4];
 } shadowMapSpace;
 
 template<uint32_t Cascades>
 void setShadowMapUniform(TestApp::ShadowCascadesCamera<Cascades> const& camera, ShadowMapSpace& ubo, glm::vec3 lightDir){
+    auto greaterRadius = camera.cascade(Cascades - 1).radius;
     for(int i = 0; i < Cascades; ++i){
         auto cascade = camera.cascade(i);
         float shadowDepthFactor = 5.0f;
         auto center = cascade.center;
-        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f, cascade.radius * shadowDepthFactor);
-        glm::mat4 lookAt = glm::lookAt(center - lightDir * (shadowDepthFactor - 1.0f), center, glm::vec3{0.0f, 1.0f, 0.0f});
+        auto shadowDepth = greaterRadius;
+        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f, 2000.0f/*cascade.radius * shadowDepthFactor*/);
+        glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (2000.0f - cascade.radius), center, glm::vec3{0.0f, 1.0f, 0.0f});
         ubo.cascades[i] = proj * lookAt;
-        ubo.splits[i] = cascade.split;
+        ubo.splits[i * 4] = cascade.split;
     }
 }
 
@@ -179,7 +181,7 @@ vkw::ColorImage2D loadTexture(const char *filename, vkw::Device &device) {
 vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height) {
     VmaAllocationCreateInfo createInfo{};
     createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    auto depthMap = vkw::DepthStencilImage2D{device.getAllocator(), createInfo, VK_FORMAT_D24_UNORM_S8_UINT, width,
+    auto depthMap = vkw::DepthStencilImage2D{device.getAllocator(), createInfo, VK_FORMAT_D32_SFLOAT, width,
                                              height, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
 
     VkImageMemoryBarrier transitLayout{};
@@ -190,7 +192,7 @@ vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t w
     transitLayout.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     transitLayout.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     transitLayout.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transitLayout.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    transitLayout.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     transitLayout.subresourceRange.baseArrayLayer = 0;
     transitLayout.subresourceRange.baseMipLevel = 0;
     transitLayout.subresourceRange.layerCount = 1;
@@ -223,7 +225,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, true);
+    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, false);
 
     std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
                   [](vkw::Instance::extension_const_iterator::value_type const &ext) {
@@ -247,6 +249,7 @@ int main() {
     deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
 
     auto device = vkw::Device{renderInstance, deviceDesc};
+
 
 
     uint32_t counter = 0;
@@ -297,8 +300,8 @@ int main() {
 
     // 9. create render pass
 
-    auto lightRenderPass = TestApp::LightPass(device, swapChainImageViews.front().get().format(), VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-    auto shadowRenderPass = TestApp::ShadowPass(device, VK_FORMAT_D24_UNORM_S8_UINT);
+    auto lightRenderPass = TestApp::LightPass(device, swapChainImageViews.front().get().format(), VK_FORMAT_D32_SFLOAT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    auto shadowRenderPass = TestApp::ShadowPass(device, VK_FORMAT_D32_SFLOAT);
 
     // 10. create framebuffer for each swapchain image view
 
@@ -306,7 +309,7 @@ int main() {
 
     std::optional<vkw::DepthStencilImage2D> depthMap = createDepthStencilImage(device, extents.width, extents.height);
     vkw::DepthImage2DArrayView const *depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping,
-                                                                                                      VK_FORMAT_D24_UNORM_S8_UINT);
+                                                                                                      VK_FORMAT_D32_SFLOAT);
     std::vector<vkw::FrameBuffer> framebuffers;
 
     try {
@@ -331,13 +334,13 @@ int main() {
 
     ShadowMapSpace shadowProjector{};
 
-    vkw::UniformBuffer<GlobalUniform> shadowProjBuf{device, createInfo};
+    vkw::UniformBuffer<ShadowMapSpace> shadowProjBuf{device, createInfo};
 
     createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     createInfo.requiredFlags = 0;
 
     constexpr const uint32_t shadowMapSize = 2048;
-    vkw::DepthStencilImage2DArray shadowMap{device.getAllocator(), createInfo, VK_FORMAT_D24_UNORM_S8_UINT, shadowMapSize, shadowMapSize, TestApp::SHADOW_CASCADES_COUNT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
+    vkw::DepthStencilImage2DArray shadowMap{device.getAllocator(), createInfo, VK_FORMAT_D32_SFLOAT, shadowMapSize, shadowMapSize, TestApp::SHADOW_CASCADES_COUNT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
     std::vector<vkw::DepthImage2DArrayView const*> shadowMapAttachmentViews{};
     for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i){
         shadowMapAttachmentViews.emplace_back(&shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), i, 1, mapping));
@@ -383,15 +386,15 @@ int main() {
 
 
     std::vector<TestApp::Cube> cubes{};
-
-    for(int i = 0; i < cubeCount; ++i) {
+    cubes.emplace_back(cubePool, glm::vec3{500.0f, -500.0f, 500.0f}, glm::vec3{1000.0f}, glm::vec3{0.0f});
+    for(int i = 0; i < cubeCount - 1; ++i) {
         float scale_mag = (float)(rand() % 5) + 1.0f;
         glm::vec3 pos = glm::vec3((float)(rand() % 1000), (float)(rand() % 1000), (float)(rand() % 1000));
         glm::vec3 rotate = glm::vec3((float)(rand() % 1000), (float)(rand() % 1000), (float)(rand() % 1000));
         auto scale = glm::vec3(scale_mag);
         cubes.emplace_back(cubePool, pos, scale, rotate);
     }
-    //cubes.emplace_back(cubePool, glm::vec3{0.0f, -10.0f, 0.0f}, glm::vec3{20.0f}, glm::vec3{0.0f});
+
 
     //cubes.emplace_back(cubePool, glm::vec3{10.0f, 2.0f, 10.0f}, glm::vec3{1.0f}, glm::vec3{0.0f});
 
@@ -443,7 +446,7 @@ int main() {
 
     shadowCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
     shadowCreateInfo.addVertexShader(cubeShadowShader);
-    shadowCreateInfo.addRasterizationState(vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 1.25f, 0.0f, 1.75f});
+    shadowCreateInfo.addRasterizationState(vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 1.5f, 0.0f, 3.0f});
     shadowCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
 
     vkw::GraphicsPipeline shadowCubePipeline{device, shadowCreateInfo};
@@ -568,7 +571,9 @@ int main() {
             for(int i = 0; i < thread_count;++i){
                 threads.emplace_back([&cubes, i, per_thread, deltaTime](){
                     for(int j = per_thread * i; j < std::min(per_thread * (i + 1), cubes.size()); ++j)
-                        cubes.at(j).update(deltaTime);
+                        if(j != 0)
+                            cubes.at(j).update(deltaTime);
+
                 });
             }
 
@@ -647,7 +652,7 @@ int main() {
                 depthMap.reset();
                 depthMap.emplace(createDepthStencilImage(device, extents.width, extents.height));
                 depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping,
-                                                                                VK_FORMAT_D24_UNORM_S8_UINT);
+                                                                                VK_FORMAT_D32_SFLOAT);
                 framebuffers.clear();
 
                 for (auto &view: swapChainImageViews) {

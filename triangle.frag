@@ -69,10 +69,11 @@ void main(){
     // Get cascade index for the current fragment's view position
     uint cascadeIndex = 0;
     for(uint i = 0; i < SHADOW_CASCADES - 1; ++i) {
-        if(inViewPos.z < shadowSpace.splits[i]) {
+        if(inViewPos.z > shadowSpace.splits[i]) {
             cascadeIndex = i + 1;
         }
     }
+
 
     // Depth compare for shadowing
     vec4 shadowCoord = (biasMat * shadowSpace.cascades[cascadeIndex]) * inWorldPos;
@@ -80,8 +81,28 @@ void main(){
 
     float shadow = filterPCF(shadowCoord / shadowCoord.w, cascadeIndex);
 
-    float diffuse = (dot(-inLightDir, vec4(inNormal, 0.0f)) + 1.0f) * 0.5f;
+    float diffuse = dot(-inLightDir, vec4(inNormal, 0.0f));
+    //if(diffuse < 0.0f)
+        //shadow = 0.3f;
+    diffuse = (diffuse + 1.0f) / 2.0f;
     diffuse = diffuse * 0.4f + 0.4f;
-    outFragColor = vec4(inColor, 1.0f) * texture(colorMap, inUV) * diffuse * shadow;
+    outFragColor = vec4(inColor, 1.0f) * texture(colorMap, inUV);
+    outFragColor *= diffuse * shadow;
 
+    #if 0
+    switch(cascadeIndex) {
+        case 0 :
+        outFragColor.rgb *= vec3(1.0f, 0.5f, 0.5f);
+        break;
+        case 1 :
+        outFragColor.rgb *= vec3(0.5f, 1.0f, 0.5f);
+        break;
+        case 2 :
+        outFragColor.rgb *= vec3(0.5f, 0.5f, 1.0f);
+        break;
+        case 3 :
+        outFragColor.rgb *= vec3(1.0f, 1.00f, 0.5f);
+        break;
+    }
+    #endif
 }
