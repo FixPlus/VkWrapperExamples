@@ -5,21 +5,18 @@ namespace TestApp{
 
 
     void Camera::m_set_matrix() {
-        m_camera_mat = glm::mat4(1.0f);
+        m_view = glm::mat4(1.0f);
 
-        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(m_Psi),
+        m_view = glm::rotate(m_view, glm::radians(m_Psi),
                            glm::vec3(1.0f, 0.0f, 0.0f));
-        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(m_Phi),
+        m_view = glm::rotate(m_view, glm::radians(m_Phi),
                            glm::vec3(0.0f, 1.0f, 0.0f));
-        m_camera_mat = glm::rotate(m_camera_mat, glm::radians(m_Tilt),
+        m_view = glm::rotate(m_view, glm::radians(m_Tilt),
                                    glm::vec3(0.0f, 0.0f, 1.0f));
 
-        m_camera_mat = glm::translate(m_camera_mat, -m_position);
-        auto perspective = glm::perspective(m_fov, m_ratio, 0.1f, 1000.0f);
-        perspective[1][1] *= -1.0f;
-       // perspective = perspective * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f),
-        //                             glm::vec3(1.0f, 0.0f, 0.0f));
-        m_camera_mat = perspective * m_camera_mat;
+        m_view = glm::translate(m_view, -m_position);
+        m_projection = glm::perspective(m_fov, m_ratio, m_near_plane, m_far_plane);
+        m_projection[1][1] *= -1.0f;
     }
 
     glm::vec3 Camera::viewDirection() const{

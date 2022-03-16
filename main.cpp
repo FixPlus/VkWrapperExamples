@@ -42,15 +42,28 @@
 #include "CubeGeometry.h"
 
 struct GlobalUniform {
-    glm::mat4 perspective = glm::perspective(60.0f, 16.0f / 9.0f, 0.01f, 1000.0f);
+    glm::mat4 perspective;
+    glm::mat4 cameraSpace;
     glm::vec4 lightVec = {-1.0f, -1.0f, -1.0f, 0.0f};
 } myUniform;
 
-struct ShadowUniform {
-    glm::mat4 perspective = glm::perspective(60.0f, 16.0f / 9.0f, 0.01f, 1000.0f);
-};
+struct ShadowMapSpace {
+    glm::mat4 cascades[TestApp::SHADOW_CASCADES_COUNT];
+    float splits[TestApp::SHADOW_CASCADES_COUNT];
+} shadowMapSpace;
 
-
+template<uint32_t Cascades>
+void setShadowMapUniform(TestApp::ShadowCascadesCamera<Cascades> const& camera, ShadowMapSpace& ubo, glm::vec3 lightDir){
+    for(int i = 0; i < Cascades; ++i){
+        auto cascade = camera.cascade(i);
+        float shadowDepthFactor = 5.0f;
+        auto center = cascade.center;
+        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f, cascade.radius * shadowDepthFactor);
+        glm::mat4 lookAt = glm::lookAt(center - lightDir * (shadowDepthFactor - 1.0f), center, glm::vec3{0.0f, 1.0f, 0.0f});
+        ubo.cascades[i] = proj * lookAt;
+        ubo.splits[i] = cascade.split;
+    }
+}
 
 template<typename T>
 requires std::derived_from<T, vkw::ShaderBase>
@@ -210,7 +223,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, false);
+    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, true);
 
     std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
                   [](vkw::Instance::extension_const_iterator::value_type const &ext) {
@@ -316,7 +329,7 @@ int main() {
 
     vkw::UniformBuffer<GlobalUniform> uBuf{device, createInfo};
 
-    ShadowUniform shadowProjector{};
+    ShadowMapSpace shadowProjector{};
 
     vkw::UniformBuffer<GlobalUniform> shadowProjBuf{device, createInfo};
 
@@ -324,11 +337,17 @@ int main() {
     createInfo.requiredFlags = 0;
 
     constexpr const uint32_t shadowMapSize = 2048;
-    vkw::DepthStencilImage2D shadowMap{device.getAllocator(), createInfo, VK_FORMAT_D24_UNORM_S8_UINT, shadowMapSize, shadowMapSize, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
-    auto& shadowMapAttachmentView = shadowMap.getView<vkw::DepthImageView>(device, mapping, shadowMap.format());
-    auto& shadowMapSampledView = shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), mapping);
+    vkw::DepthStencilImage2DArray shadowMap{device.getAllocator(), createInfo, VK_FORMAT_D24_UNORM_S8_UINT, shadowMapSize, shadowMapSize, TestApp::SHADOW_CASCADES_COUNT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
+    std::vector<vkw::DepthImage2DArrayView const*> shadowMapAttachmentViews{};
+    for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i){
+        shadowMapAttachmentViews.emplace_back(&shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), i, 1, mapping));
+    }
+    auto& shadowMapSampledView = shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, TestApp::SHADOW_CASCADES_COUNT, mapping);
 
-    vkw::FrameBuffer shadowBuffer{device, shadowRenderPass, VkExtent2D{shadowMapSize, shadowMapSize}, shadowMapAttachmentView};
+    std::vector<vkw::FrameBuffer> shadowBuffers{};
+    for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+        shadowBuffers.emplace_back(device, shadowRenderPass, VkExtent2D{shadowMapSize, shadowMapSize}, *shadowMapAttachmentViews.at(i));
+    }
 
     auto cubeTexture = loadTexture("image.png", device);
     auto& cubeTextureView = cubeTexture.getView<vkw::ColorImageView>(device, cubeTexture.format(), mapping);
@@ -356,13 +375,9 @@ int main() {
     auto* uBufMapped = uBuf.map();
     auto* uShadowGlobal = shadowProjBuf.map();
 
-    auto shadowRange = 40.0f;
-    auto shadowDepth = 1000.0f;
-    glm::mat4 depthProjectionMatrix = glm::ortho(-shadowRange, shadowRange, shadowRange, -shadowRange, 0.0f, shadowDepth);
-    auto frustumCenter = window.camera().position() + window.camera().viewDirection() * shadowRange / 2.0f;
-    glm::mat4 depthViewMatrix = glm::lookAt(frustumCenter - glm::vec3(myUniform.lightVec) * shadowDepth / 2.0f, frustumCenter, glm::vec3(0, 1, 0));
 
-    shadowProjector.perspective = depthProjectionMatrix * depthViewMatrix;
+    setShadowMapUniform(window.camera(),shadowProjector, glm::vec3{myUniform.lightVec});
+
 
     memcpy(uShadowGlobal, &shadowProjector, sizeof(shadowProjector));
 
@@ -392,7 +407,7 @@ int main() {
     auto cubeFragShader = loadShader<vkw::FragmentShader>(device, "triangle.frag.spv");
 
     vkw::PipelineLayout lightLayout{device, cubeLightDescriptorLayout};
-    vkw::PipelineLayout shadowLayout{device, cubeShadowDescriptorLayout};
+    vkw::PipelineLayout shadowLayout{device, cubeShadowDescriptorLayout, {{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(uint32_t)}}};
 
     vkw::GraphicsPipelineCreateInfo lightCreateInfo{lightRenderPass, 0, lightLayout};
     vkw::GraphicsPipelineCreateInfo shadowShowCreateInfo{lightRenderPass, 0, shadowLayout};
@@ -464,7 +479,7 @@ int main() {
             std::chrono::duration<double>> tStart, tFinish;
 
     tStart = std::chrono::high_resolution_clock::now();
-    myUniform.perspective = window.projection();
+    myUniform.perspective = window.camera().projection();
 
     constexpr const int thread_count = 12;
     std::vector<std::thread> threads;
@@ -486,8 +501,8 @@ int main() {
         if(framesCount > 100){
             fps = (float)framesCount / elapsedTime;
             std::cout << "FPS: " << fps << std::endl;
-            //auto camPos = window.camera().position();
-            //std::cout << "x:" << camPos.x << " y:" << camPos.y << " z:" << camPos.z << std::endl;
+            auto camPos = window.camera().position();
+            std::cout << "x:" << camPos.x << " y:" << camPos.y << " z:" << camPos.z << std::endl;
             framesCount = 0;
             elapsedTime = 0;
         }
@@ -511,14 +526,13 @@ int main() {
 
 
 
-            myUniform.perspective = window.projection();
+            myUniform.perspective = window.camera().projection();
+            myUniform.cameraSpace = window.camera().cameraSpace();
             //myUniform.lightVec.x = glm::cos(totalTime);
             //myUniform.lightVec.y = -1.0f;
             //myUniform.lightVec.z = glm::sin(totalTime);
             glm::normalize(myUniform.lightVec);
-            frustumCenter = window.camera().position() ;/*+ window.camera().viewDirection() * shadowRange / 2.0f;*/
-            depthViewMatrix = glm::lookAt(frustumCenter - glm::vec3(myUniform.lightVec) * shadowDepth / 2.0f, frustumCenter, glm::vec3(0, 1, 0));
-            shadowProjector.perspective = depthProjectionMatrix * depthViewMatrix;
+            setShadowMapUniform(window.camera(),shadowProjector, glm::vec3{myUniform.lightVec});
             memcpy(uBufMapped, &myUniform, sizeof(myUniform));
             memcpy(uShadowGlobal, &shadowProjector, sizeof(shadowProjector));
             uBuf.flush();
@@ -561,18 +575,25 @@ int main() {
             for(auto& thread: threads)
                 thread.join();
 
-            commandBuffer.beginRenderPass(shadowRenderPass, shadowBuffer, shadowBuffer.getFullRenderArea(), false, 1, values.data() + 1);
 
-            commandBuffer.setViewports({viewport}, 0);
-            commandBuffer.setScissors({scissor}, 0);
+            for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+                commandBuffer.beginRenderPass(shadowRenderPass, shadowBuffers.at(i), shadowBuffers.at(i).getFullRenderArea(), false,
+                                              1, values.data() + 1);
 
-            commandBuffer.bindGraphicsPipeline(shadowCubePipeline);
-            commandBuffer.bindDescriptorSets(shadowLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowSet, 0);
-            cubePool.bindGeometry(commandBuffer);
-            cubePool.drawGeometry(commandBuffer);
+                commandBuffer.setViewports({viewport}, 0);
+                commandBuffer.setScissors({scissor}, 0);
 
-            commandBuffer.endRenderPass();
+                commandBuffer.bindGraphicsPipeline(shadowCubePipeline);
+                commandBuffer.bindDescriptorSets(shadowLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowSet, 0);
+                cubePool.bindGeometry(commandBuffer);
+                uint32_t id = i;
 
+                commandBuffer.pushConstants(shadowLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, id);
+
+                cubePool.drawGeometry(commandBuffer);
+
+                commandBuffer.endRenderPass();
+            }
 
 
             commandBuffer.beginRenderPass(lightRenderPass, currentFrameBuffer, currentFrameBuffer.getFullRenderArea(), false,

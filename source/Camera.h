@@ -10,7 +10,7 @@ namespace TestApp{
 
     class Camera{
     public:
-        Camera(float fov, float ratio): m_fov(fov), m_ratio(ratio){
+        Camera(float fov = 60.0f, float ratio = 16.0f / 9.0f): m_fov(fov), m_ratio(ratio){
         }
 
         void set(glm::vec3 position){
@@ -57,10 +57,16 @@ namespace TestApp{
             m_need_set_matrix = true;
         }
 
-        operator glm::mat4 const&() {
+        glm::mat4 const& projection() const{
+            return m_projection;
+        }
+        glm::mat4 const& cameraSpace() const{
+            return m_view;
+        }
+
+        void setMatrices() {
             if(m_need_set_matrix)
                 m_set_matrix();
-            return m_camera_mat;
         }
 
         glm::vec3 position() const{
@@ -89,11 +95,24 @@ namespace TestApp{
             return m_ratio;
         }
 
+        float nearPlane() const{
+            return m_near_plane;
+        }
+
+        float farPlane() const{
+            return m_far_plane;
+        }
+
+        /** Here child classes can update their state during frame time. */
+        virtual void update(float deltaTime) { setMatrices();};
+
     private:
         bool m_need_set_matrix = true;
         
         float m_ratio;
         float m_fov;
+        float m_near_plane = 0.1f;
+        float m_far_plane = 1000.0f;
 
         glm::vec3 m_position{};
 
@@ -102,14 +121,101 @@ namespace TestApp{
         float m_Tilt = 0.0f;
 
         void m_set_matrix();
-        glm::mat4 m_camera_mat{};
+        glm::mat4 m_view{};
+        glm::mat4 m_projection{};
     };
 
-
-    class ControlledCamera: public Camera{
+    /** This class sets shadow cascade centers and radius automatically. */
+    template<uint32_t Cascades>
+    class ShadowCascadesCamera: virtual public Camera{
     public:
 
-        ControlledCamera(float fov, float ratio): Camera(fov, ratio){}
+        void update(float deltaTime) override{
+            float cascadeSplits[Cascades];
+
+            float farClip = farPlane();
+            float nearClip = nearPlane();
+            float clipRange = farClip - nearClip;
+            float clipRatio = farClip / nearClip;
+
+            for(int i = 0; i < Cascades; ++i){
+                float p = (float)(i + 1) / (float)Cascades;
+                float log = nearClip * std::pow(clipRatio, p);
+                float linear = nearClip + clipRange * p;
+                float d = (log - linear) * m_split_lambda + linear;
+                cascadeSplits[i] = (d - nearClip) / clipRange;
+            }
+            auto inverseProjection = glm::inverse(projection() * cameraSpace());
+
+            std::array<glm::vec3, 8> frustumCorners = {
+                    glm::vec3(-1.0f,  1.0f, -1.0f),
+                    glm::vec3( 1.0f,  1.0f, -1.0f),
+                    glm::vec3( 1.0f, -1.0f, -1.0f),
+                    glm::vec3(-1.0f, -1.0f, -1.0f),
+                    glm::vec3(-1.0f,  1.0f,  1.0f),
+                    glm::vec3( 1.0f,  1.0f,  1.0f),
+                    glm::vec3( 1.0f, -1.0f,  1.0f),
+                    glm::vec3(-1.0f, -1.0f,  1.0f),
+            };
+
+            for(int i = 0; i < 8; ++i){
+                auto worldSpace = inverseProjection * glm::vec4(frustumCorners.at(i), 1.0f);
+                frustumCorners.at(i) = worldSpace / worldSpace.w;
+            }
+
+
+            auto lastSplitDist = nearClip;
+
+            for(int i = 0; i < Cascades; ++i){
+                auto splitDist = cascadeSplits[i];
+                std::array<glm::vec3, 8> innerFrustumCorners{};
+                std::copy(frustumCorners.begin(), frustumCorners.end(), innerFrustumCorners.begin());
+
+                for (uint32_t j = 0; j < 4; j++) {
+                    glm::vec3 dist = frustumCorners[j + 4] - frustumCorners[j];
+                    innerFrustumCorners[j + 4] = frustumCorners[j] + (dist * splitDist);
+                    innerFrustumCorners[j] = frustumCorners[j] + (dist * lastSplitDist);
+                }
+
+                glm::vec3 innerFrustumCenter{0.0f};
+
+                for(auto& corner: innerFrustumCorners)
+                    innerFrustumCenter += corner;
+
+                innerFrustumCenter /= 8.0f;
+
+                float frustumCircumscribedRadius = 0.0f;
+
+                for(auto& corner: innerFrustumCorners){
+                    frustumCircumscribedRadius = glm::max(frustumCircumscribedRadius, glm::length(corner - innerFrustumCenter));
+                }
+
+                m_cascades[i].radius = frustumCircumscribedRadius;
+                m_cascades[i].center = innerFrustumCenter;
+                m_cascades[i].split = nearClip + splitDist * clipRange;
+            }
+        };
+
+
+
+        struct Cascade{
+            glm::vec3 center;
+            float radius;
+            float split;
+        };
+
+        Cascade const& cascade(uint32_t i) const{
+            return m_cascades.at(i);
+        }
+
+    private:
+        std::array<Cascade, Cascades> m_cascades;
+
+        float m_split_lambda = 0.95f;
+    };
+
+    class ControlledCamera: virtual public Camera{
+    public:
 
         struct {
             bool left = false;
@@ -123,7 +229,7 @@ namespace TestApp{
         float inertia = 0.1f;
         float force = 20.0f;
 
-        void update(float deltaTime);
+        void update(float deltaTime) override;
 
         void stop(){
             m_velocity *= 0.0f;

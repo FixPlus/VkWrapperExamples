@@ -5,8 +5,22 @@
 
 namespace TestApp{
 
+    template<uint32_t Cascades>
+    class SceneCamera: public ControlledCamera, public ShadowCascadesCamera<Cascades>{
+    public:
+        SceneCamera(float fov, float ratio): Camera(fov, ratio){};
+
+        void update(float deltaTime) override{
+            ControlledCamera::update(deltaTime);
+            ShadowCascadesCamera<Cascades>::update(deltaTime);
+        }
+    };
+
+    constexpr const uint32_t SHADOW_CASCADES_COUNT = 4;
     class SceneProjector: public Window{
     public:
+        using SceneCameraT = SceneCamera<SHADOW_CASCADES_COUNT>;
+
         SceneProjector(uint32_t width, uint32_t height, std::string const& title): Window(width, height, title),
                                                                                    m_camera(glm::radians(60.0f), (float)width / (float)height){
 
@@ -16,15 +30,8 @@ namespace TestApp{
             m_camera.update(deltaTime);
         }
 
-        glm::mat4 projection() {
-            return m_camera;
-        }
-
-        glm::vec3 cameraPos() {
-            return m_camera.position();
-        }
-
-        ControlledCamera const& camera() const{
+        SceneCameraT const& camera() {
+            m_camera.setMatrices();
             return m_camera;
         }
 
@@ -75,7 +82,7 @@ namespace TestApp{
 
         }
 
-        ControlledCamera m_camera;
+        SceneCameraT m_camera;
     };
 }
 #endif //TESTAPP_SCENEPROJECTOR_H
