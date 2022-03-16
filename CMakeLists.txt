@@ -52,6 +52,7 @@ set(RENDERER_INCLUDE_DIR ${RENDERER_INSTALL_DIR}/include)
 include_directories(${RENDERER_INCLUDE_DIR})
 include_directories(${RENDERER_INCLUDE_DIR}/vkw)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../glm)
+include_directories(external)
 find_library(RENDERER_LIB NAMES VkWrapper.a libVkWrapper libVkWrapper.so PATHS ${RENDERER_LIB_DIR} REQUIRED)
 message(STATUS ${RENDERER_LIB})
 
@@ -61,11 +62,13 @@ set(GLFW_LIBRARY glfw)
 
 add_executable(TestApp main.cpp)
 include_directories(source)
+add_subdirectory(external)
 add_subdirectory(source)
+
 
 target_link_libraries(TestApp TEST_OBJECTS -L${RENDERER_LIB_DIR} ${RENDERER_LIB})
 
 
 include(cmake/compile_shaders.cmake)
 
-compileShaders(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} TestApp .)
+compileShaders(${CMAKE_CURRENT_SOURCE_DIR}/source/shaders ${CMAKE_CURRENT_BINARY_DIR} TestApp .)

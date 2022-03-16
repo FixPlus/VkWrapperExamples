@@ -23,8 +23,9 @@ namespace TestApp {
 
         CubePool(CubePool &&another) noexcept;
 
-        CubePool& operator=(CubePool const& another) = delete;
-        CubePool& operator=(CubePool&& another) = delete;
+        CubePool &operator=(CubePool const &another) = delete;
+
+        CubePool &operator=(CubePool &&another) = delete;
 
 
         struct PerVertex : vkw::AttributeBase<vkw::VertexAttributeType::VEC3F,
@@ -46,7 +47,7 @@ namespace TestApp {
 
         void drawGeometry(vkw::CommandBuffer &commandBuffer) const;
 
-        static vkw::VertexInputStateCreateInfoBase const& geometryInputState(){
+        static vkw::VertexInputStateCreateInfoBase const &geometryInputState() {
             return m_vsci;
         }
 
@@ -162,7 +163,8 @@ namespace TestApp {
                                        m_rotate(another.m_rotate),
                                        m_parent(another.m_parent),
                                        m_id(another.m_id), m_velocity(another.m_velocity),
-                                       m_rotation(another.m_rotation) {
+                                       m_rotation(another.m_rotation),
+                                       m_static(another.m_static) {
             m_parent->m_cubes.at(m_id) = this;
             another.m_id = M_MOVED_OUT;
         };
@@ -183,11 +185,15 @@ namespace TestApp {
             }
         }
 
+        void makeStatic() {
+            m_static = true;
+        }
+
         void update(double deltaTime) {
-
-            m_translate += m_velocity * (float) deltaTime;
-            m_rotate += m_rotation * (float) deltaTime;
-
+            if (!m_static) {
+                m_translate += m_velocity * (float) deltaTime;
+                m_rotate += m_rotation * (float) deltaTime;
+            }
 
             setModelMatrix();
 
@@ -204,6 +210,7 @@ namespace TestApp {
 
             m_parent->m_instance_mapped[m_id] = model;
         }
+
         friend class CubePool;
 
         CubePool::PerInstance model;
@@ -219,7 +226,9 @@ namespace TestApp {
         glm::vec3 m_rotation;
         glm::vec3 m_velocity;
 
-        CubePool* m_parent;
+        bool m_static = false;
+
+        CubePool *m_parent;
 
     };
 

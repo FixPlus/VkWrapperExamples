@@ -40,6 +40,8 @@
 #include "SwapChainImpl.h"
 #include "RenderPassesImpl.h"
 #include "CubeGeometry.h"
+#include "AssetImport.h"
+#include "GUI.h"
 
 struct GlobalUniform {
     glm::mat4 perspective;
@@ -53,132 +55,24 @@ struct ShadowMapSpace {
 } shadowMapSpace;
 
 template<uint32_t Cascades>
-void setShadowMapUniform(TestApp::ShadowCascadesCamera<Cascades> const& camera, ShadowMapSpace& ubo, glm::vec3 lightDir){
+void
+setShadowMapUniform(TestApp::ShadowCascadesCamera<Cascades> const &camera, ShadowMapSpace &ubo, glm::vec3 lightDir) {
     auto greaterRadius = camera.cascade(Cascades - 1).radius;
-    for(int i = 0; i < Cascades; ++i){
+    for (int i = 0; i < Cascades; ++i) {
         auto cascade = camera.cascade(i);
         float shadowDepthFactor = 5.0f;
         auto center = cascade.center;
         auto shadowDepth = 2000.0f;
-        if(shadowDepth < cascade.radius * shadowDepthFactor)
+        if (shadowDepth < cascade.radius * shadowDepthFactor)
             shadowDepth = cascade.radius * shadowDepthFactor;
-        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f, shadowDepth/*cascade.radius * shadowDepthFactor*/);
-        glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (shadowDepth - cascade.radius), center, glm::vec3{0.0f, 1.0f, 0.0f});
+        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f,
+                                    shadowDepth/*cascade.radius * shadowDepthFactor*/);
+        glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (shadowDepth - cascade.radius), center,
+                                       glm::vec3{0.0f, 1.0f, 0.0f});
         ubo.cascades[i] = proj * lookAt;
         ubo.splits[i * 4] = cascade.split;
     }
 }
-
-template<typename T>
-requires std::derived_from<T, vkw::ShaderBase>
-T loadShader(vkw::Device &device, std::string const &filename) {
-    std::ifstream input{filename, std::ios::binary};
-    std::ifstream is(filename, std::ios::binary | std::ios::in | std::ios::ate);
-
-    if (is.is_open()) {
-        size_t size = is.tellg();
-        is.seekg(0, std::ios::beg);
-        std::vector<char> shaderCode;
-
-        shaderCode.resize(size);
-
-        is.read(shaderCode.data(), size);
-        is.close();
-
-        if (size == 0)
-            throw std::runtime_error(
-                    "Failed to read " + filename);
-
-        return T{device, shaderCode.size(), reinterpret_cast<uint32_t *>(shaderCode.data())};
-    } else {
-        throw std::runtime_error("Failed to open file " + filename);
-    }
-
-    return T{device, 0, nullptr};
-}
-
-vkw::ColorImage2D loadTexture(const char *filename, vkw::Device &device) {
-    int width, height, bits;
-    auto *imageData = stbi_load(filename, &width, &height, &bits, 4);
-    if (!imageData)
-        throw std::runtime_error("Failed to load image: " + std::string(filename));
-
-    VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-    allocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-    vkw::Buffer<unsigned char> stageBuffer{device, width * height * 4u, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, allocInfo};
-
-    auto mappedBuffer = stageBuffer.map();
-    memcpy(mappedBuffer, imageData, width * height * 4u);
-    stageBuffer.flush();
-
-    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-    auto ret = vkw::ColorImage2D{device.getAllocator(), allocInfo, VK_FORMAT_R8G8B8A8_UNORM,
-                                 static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1,
-                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT};
-
-    VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = ret;
-    transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    transitLayout1.pNext = nullptr;
-    transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    transitLayout1.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    transitLayout1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transitLayout1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    transitLayout1.subresourceRange.baseArrayLayer = 0;
-    transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = 1;
-    transitLayout1.subresourceRange.levelCount = 1;
-    transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-    transitLayout1.srcAccessMask = 0;
-
-    VkImageMemoryBarrier transitLayout2{};
-    transitLayout2.image = ret;
-    transitLayout2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    transitLayout2.pNext = nullptr;
-    transitLayout2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    transitLayout2.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    transitLayout2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transitLayout2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    transitLayout2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    transitLayout2.subresourceRange.baseArrayLayer = 0;
-    transitLayout2.subresourceRange.baseMipLevel = 0;
-    transitLayout2.subresourceRange.layerCount = 1;
-    transitLayout2.subresourceRange.levelCount = 1;
-    transitLayout2.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-    transitLayout2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-
-    auto transferQueue = device.getTransferQueue();
-    auto commandPool = vkw::CommandPool{device, 0, transferQueue->familyIndex()};
-    auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
-    transferCommand.begin(0);
-    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout1});
-    VkBufferImageCopy bufferCopy{};
-    bufferCopy.imageExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
-    bufferCopy.imageSubresource.mipLevel = 0;
-    bufferCopy.imageSubresource.layerCount = 1;
-    bufferCopy.imageSubresource.baseArrayLayer = 0;
-    bufferCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-    transferCommand.copyBufferToImage(stageBuffer, ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
-
-    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout2});
-    transferCommand.end();
-
-    transferQueue->submit(transferCommand);
-    transferQueue->waitIdle();
-
-
-    stbi_image_free(imageData);
-
-    return ret;
-}
-
 
 vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height) {
     VmaAllocationCreateInfo createInfo{};
@@ -227,7 +121,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, false);
+    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, true);
 
     std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
                   [](vkw::Instance::extension_const_iterator::value_type const &ext) {
@@ -251,7 +145,6 @@ int main() {
     deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
 
     auto device = vkw::Device{renderInstance, deviceDesc};
-
 
 
     uint32_t counter = 0;
@@ -302,7 +195,8 @@ int main() {
 
     // 9. create render pass
 
-    auto lightRenderPass = TestApp::LightPass(device, swapChainImageViews.front().get().format(), VK_FORMAT_D32_SFLOAT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    auto lightRenderPass = TestApp::LightPass(device, swapChainImageViews.front().get().format(), VK_FORMAT_D32_SFLOAT,
+                                              VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     auto shadowRenderPass = TestApp::ShadowPass(device, VK_FORMAT_D32_SFLOAT);
 
     // 10. create framebuffer for each swapchain image view
@@ -320,7 +214,7 @@ int main() {
                                                                           view.get().image()->rawExtents().height},
                                       vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
         }
-    } catch(vkw::Error &e){
+    } catch (vkw::Error &e) {
         std::cout << e.what() << std::endl;
         return 1;
     }
@@ -342,20 +236,26 @@ int main() {
     createInfo.requiredFlags = 0;
 
     constexpr const uint32_t shadowMapSize = 2048;
-    vkw::DepthStencilImage2DArray shadowMap{device.getAllocator(), createInfo, VK_FORMAT_D32_SFLOAT, shadowMapSize, shadowMapSize, TestApp::SHADOW_CASCADES_COUNT, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
-    std::vector<vkw::DepthImage2DArrayView const*> shadowMapAttachmentViews{};
-    for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i){
-        shadowMapAttachmentViews.emplace_back(&shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), i, 1, mapping));
+    vkw::DepthStencilImage2DArray shadowMap{device.getAllocator(), createInfo, VK_FORMAT_D32_SFLOAT, shadowMapSize,
+                                            shadowMapSize, TestApp::SHADOW_CASCADES_COUNT, 1,
+                                            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
+    std::vector<vkw::DepthImage2DArrayView const *> shadowMapAttachmentViews{};
+    for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+        shadowMapAttachmentViews.emplace_back(
+                &shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), i, 1, mapping));
     }
-    auto& shadowMapSampledView = shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, TestApp::SHADOW_CASCADES_COUNT, mapping);
+    auto &shadowMapSampledView = shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0,
+                                                                        TestApp::SHADOW_CASCADES_COUNT, mapping);
 
     std::vector<vkw::FrameBuffer> shadowBuffers{};
-    for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
-        shadowBuffers.emplace_back(device, shadowRenderPass, VkExtent2D{shadowMapSize, shadowMapSize}, *shadowMapAttachmentViews.at(i));
+    for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+        shadowBuffers.emplace_back(device, shadowRenderPass, VkExtent2D{shadowMapSize, shadowMapSize},
+                                   *shadowMapAttachmentViews.at(i));
     }
 
-    auto cubeTexture = loadTexture("image.png", device);
-    auto& cubeTextureView = cubeTexture.getView<vkw::ColorImageView>(device, cubeTexture.format(), mapping);
+    TestApp::TextureLoader textureLoader{device, "./"};
+    auto cubeTexture = textureLoader.loadTexture("image");
+    auto &cubeTextureView = cubeTexture.getView<vkw::ColorImageView>(device, cubeTexture.format(), mapping);
 
     VkSamplerCreateInfo samplerCI{};
     samplerCI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -377,22 +277,22 @@ int main() {
     TestApp::CubePool cubePool{device, cubeCount};
 
 
-    auto* uBufMapped = uBuf.map();
-    auto* uShadowGlobal = shadowProjBuf.map();
+    auto *uBufMapped = uBuf.map();
+    auto *uShadowGlobal = shadowProjBuf.map();
 
 
-    setShadowMapUniform(window.camera(),shadowProjector, glm::vec3{myUniform.lightVec});
+    setShadowMapUniform(window.camera(), shadowProjector, glm::vec3{myUniform.lightVec});
 
 
     memcpy(uShadowGlobal, &shadowProjector, sizeof(shadowProjector));
 
 
     std::vector<TestApp::Cube> cubes{};
-    cubes.emplace_back(cubePool, glm::vec3{500.0f, -500.0f, 500.0f}, glm::vec3{1000.0f}, glm::vec3{0.0f});
-    for(int i = 0; i < cubeCount - 1; ++i) {
-        float scale_mag = (float)(rand() % 5) + 1.0f;
-        glm::vec3 pos = glm::vec3((float)(rand() % 1000), (float)(rand() % 1000), (float)(rand() % 1000));
-        glm::vec3 rotate = glm::vec3((float)(rand() % 1000), (float)(rand() % 1000), (float)(rand() % 1000));
+    cubes.emplace_back(cubePool, glm::vec3{500.0f, -500.0f, 500.0f}, glm::vec3{1000.0f}, glm::vec3{0.0f}).makeStatic();
+    for (int i = 0; i < cubeCount - 1; ++i) {
+        float scale_mag = (float) (rand() % 5) + 1.0f;
+        glm::vec3 pos = glm::vec3((float) (rand() % 1000), (float) (rand() % 1000), (float) (rand() % 1000));
+        glm::vec3 rotate = glm::vec3((float) (rand() % 1000), (float) (rand() % 1000), (float) (rand() % 1000));
         auto scale = glm::vec3(scale_mag);
         cubes.emplace_back(cubePool, pos, scale, rotate);
     }
@@ -400,61 +300,77 @@ int main() {
 
     //cubes.emplace_back(cubePool, glm::vec3{10.0f, 2.0f, 10.0f}, glm::vec3{1.0f}, glm::vec3{0.0f});
 
-    vkw::DescriptorSetLayout cubeLightDescriptorLayout{device, {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                                                              vkw::DescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                                              vkw::DescriptorSetLayoutBinding{2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                                                vkw::DescriptorSetLayoutBinding{3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}};
-    vkw::DescriptorSetLayout cubeShadowDescriptorLayout{device, {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}};
+    vkw::DescriptorSetLayout cubeLightDescriptorLayout{device, {vkw::DescriptorSetLayoutBinding{0,
+                                                                                                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                                                vkw::DescriptorSetLayoutBinding{1,
+                                                                                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                                                vkw::DescriptorSetLayoutBinding{2,
+                                                                                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                                                vkw::DescriptorSetLayoutBinding{3,
+                                                                                                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}};
+    vkw::DescriptorSetLayout cubeShadowDescriptorLayout{device, {vkw::DescriptorSetLayoutBinding{0,
+                                                                                                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}};
 
-    auto cubeVertShader = loadShader<vkw::VertexShader>(device, "triangle.vert.spv");
-    auto cubeShadowShader = loadShader<vkw::VertexShader>(device, "shadow.vert.spv");
-    auto cubeShadowShowShader = loadShader<vkw::FragmentShader>(device, "shadow.frag.spv");
-    auto cubeFragShader = loadShader<vkw::FragmentShader>(device, "triangle.frag.spv");
+    TestApp::ShaderLoader shaderLoader{device, "./"};
+    auto cubeVertShader = shaderLoader.loadVertexShader("triangle");
+    auto cubeShadowShader = shaderLoader.loadVertexShader("shadow");
+    auto cubeShadowShowShader = shaderLoader.loadFragmentShader("shadow");
+    auto cubeFragShader = shaderLoader.loadFragmentShader("triangle");
 
     vkw::PipelineLayout lightLayout{device, cubeLightDescriptorLayout};
-    vkw::PipelineLayout shadowLayout{device, cubeShadowDescriptorLayout, {{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(uint32_t)}}};
+    vkw::PipelineLayout shadowLayout{device, cubeShadowDescriptorLayout,
+                                     {{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(uint32_t)}}};
 
     vkw::GraphicsPipelineCreateInfo lightCreateInfo{lightRenderPass, 0, lightLayout};
     vkw::GraphicsPipelineCreateInfo shadowShowCreateInfo{lightRenderPass, 0, shadowLayout};
-    auto& vertexInputState = TestApp::CubePool::geometryInputState();
+    auto &vertexInputState = TestApp::CubePool::geometryInputState();
 
-    for(int i = 0; i < vertexInputState.totalBindings(); ++i){
+    for (int i = 0; i < vertexInputState.totalBindings(); ++i) {
         auto binding = vertexInputState.binding(i);
-        std::cout << "Binding #" << binding.binding << ": rate=" << (binding.inputRate == VK_VERTEX_INPUT_RATE_VERTEX ? "per_vertex" : "per_instance")
-        << ", stride=" << binding.stride << std::endl;
+        std::cout << "Binding #" << binding.binding << ": rate="
+                  << (binding.inputRate == VK_VERTEX_INPUT_RATE_VERTEX ? "per_vertex" : "per_instance")
+                  << ", stride=" << binding.stride << std::endl;
     }
 
-    for(int i = 0; i < vertexInputState.totalAttributes(); ++i){
+    for (int i = 0; i < vertexInputState.totalAttributes(); ++i) {
         auto attribute = vertexInputState.attribute(i);
-        std::cout << "Attribute #" << i << ": location=" << attribute.location << ", binding=" << attribute.binding << ", offset=" <<
-        attribute.offset << std::endl;
+        std::cout << "Attribute #" << i << ": location=" << attribute.location << ", binding=" << attribute.binding
+                  << ", offset=" <<
+                  attribute.offset << std::endl;
     }
 
     lightCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
     lightCreateInfo.addVertexShader(cubeVertShader);
     lightCreateInfo.addFragmentShader(cubeFragShader);
     lightCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
-    lightCreateInfo.addRasterizationState(vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE});
+    lightCreateInfo.addRasterizationState(
+            vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
+                                              VK_FRONT_FACE_COUNTER_CLOCKWISE});
     vkw::GraphicsPipeline lightCubePipeline{device, lightCreateInfo};
 
     shadowShowCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
     shadowShowCreateInfo.addVertexShader(cubeShadowShader);
     shadowShowCreateInfo.addFragmentShader(cubeShadowShowShader);
     shadowShowCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
-    shadowShowCreateInfo.addRasterizationState(vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE});
+    shadowShowCreateInfo.addRasterizationState(
+            vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
+                                              VK_FRONT_FACE_COUNTER_CLOCKWISE});
     vkw::GraphicsPipeline shadowShowPipeline{device, shadowShowCreateInfo};
 
     vkw::GraphicsPipelineCreateInfo shadowCreateInfo{shadowRenderPass, 0, shadowLayout};
 
     shadowCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
     shadowCreateInfo.addVertexShader(cubeShadowShader);
-    shadowCreateInfo.addRasterizationState(vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 2.0f, 0.0f, 6.0f});
+    shadowCreateInfo.addRasterizationState(
+            vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
+                                              VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 2.0f, 0.0f, 6.0f});
     shadowCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
 
     vkw::GraphicsPipeline shadowCubePipeline{device, shadowCreateInfo};
 
-    vkw::DescriptorPool descriptorPool{device, 2, {VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,.descriptorCount=3},
-                                                   VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,.descriptorCount=2}}};
+    vkw::DescriptorPool descriptorPool{device, 2,
+                                       {VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=3},
+                                        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount=2}}};
 
     vkw::DescriptorSet shadowSet{descriptorPool, cubeShadowDescriptorLayout};
     shadowSet.write(0, shadowProjBuf);
@@ -472,6 +388,9 @@ int main() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
+    TestApp::GUI gui{device, lightRenderPass, 0, shaderLoader, textureLoader};
+
+    window.setContext(gui);
 
     // 13. render on screen in a loop
 
@@ -503,8 +422,8 @@ int main() {
 
         tStart = std::chrono::high_resolution_clock::now();
         framesCount++;
-        if(framesCount > 100){
-            fps = (float)framesCount / elapsedTime;
+        if (framesCount > 100) {
+            fps = (float) framesCount / elapsedTime;
             std::cout << "FPS: " << fps << std::endl;
             auto camPos = window.camera().position();
             std::cout << "x:" << camPos.x << " y:" << camPos.y << " z:" << camPos.z << std::endl;
@@ -513,6 +432,7 @@ int main() {
         }
 
         window.update(deltaTime);
+        gui.update();
 
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
@@ -530,14 +450,13 @@ int main() {
             mySwapChain->acquireNextImage(presentComplete, 1000);
 
 
-
             myUniform.perspective = window.camera().projection();
             myUniform.cameraSpace = window.camera().cameraSpace();
             //myUniform.lightVec.x = glm::cos(totalTime);
             //myUniform.lightVec.y = -1.0f;
             //myUniform.lightVec.z = glm::sin(totalTime);
             glm::normalize(myUniform.lightVec);
-            setShadowMapUniform(window.camera(),shadowProjector, glm::vec3{myUniform.lightVec});
+            setShadowMapUniform(window.camera(), shadowProjector, glm::vec3{myUniform.lightVec});
             memcpy(uBufMapped, &myUniform, sizeof(myUniform));
             memcpy(uShadowGlobal, &shadowProjector, sizeof(shadowProjector));
             uBuf.flush();
@@ -570,21 +489,21 @@ int main() {
 
             threads.clear();
 
-            for(int i = 0; i < thread_count;++i){
-                threads.emplace_back([&cubes, i, per_thread, deltaTime](){
-                    for(int j = per_thread * i; j < std::min(per_thread * (i + 1), cubes.size()); ++j)
-                        if(j != 0)
-                            cubes.at(j).update(deltaTime);
+            for (int i = 0; i < thread_count; ++i) {
+                threads.emplace_back([&cubes, i, per_thread, deltaTime]() {
+                    for (int j = per_thread * i; j < std::min(per_thread * (i + 1), cubes.size()); ++j)
+                        cubes.at(j).update(deltaTime);
 
                 });
             }
 
-            for(auto& thread: threads)
+            for (auto &thread: threads)
                 thread.join();
 
 
-            for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
-                commandBuffer.beginRenderPass(shadowRenderPass, shadowBuffers.at(i), shadowBuffers.at(i).getFullRenderArea(), false,
+            for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+                commandBuffer.beginRenderPass(shadowRenderPass, shadowBuffers.at(i),
+                                              shadowBuffers.at(i).getFullRenderArea(), false,
                                               1, values.data() + 1);
 
                 commandBuffer.setViewports({viewport}, 0);
@@ -603,7 +522,8 @@ int main() {
             }
 
 
-            commandBuffer.beginRenderPass(lightRenderPass, currentFrameBuffer, currentFrameBuffer.getFullRenderArea(), false,
+            commandBuffer.beginRenderPass(lightRenderPass, currentFrameBuffer, currentFrameBuffer.getFullRenderArea(),
+                                          false,
                                           values.size(), values.data());
             viewport.height = currentFrameBuffer.getFullRenderArea().extent.height;
             viewport.width = currentFrameBuffer.getFullRenderArea().extent.width;
@@ -618,6 +538,8 @@ int main() {
             commandBuffer.bindDescriptorSets(lightLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, lightSet, 0);
             cubePool.bindGeometry(commandBuffer);
             cubePool.drawGeometry(commandBuffer);
+
+            gui.draw(commandBuffer);
 #if 0
             viewport.y = currentFrameBuffer.getFullRenderArea().extent.height / 2.0f;
 
@@ -658,8 +580,9 @@ int main() {
                 framebuffers.clear();
 
                 for (auto &view: swapChainImageViews) {
-                    framebuffers.emplace_back(device, lightRenderPass, VkExtent2D{view.get().image()->rawExtents().width,
-                                                                                  view.get().image()->rawExtents().height},
+                    framebuffers.emplace_back(device, lightRenderPass,
+                                              VkExtent2D{view.get().image()->rawExtents().width,
+                                                         view.get().image()->rawExtents().height},
                                               vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
                 }
 
