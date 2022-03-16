@@ -6,6 +6,7 @@
 #include <vkw/Queue.hpp>
 #include <vkw/CommandPool.hpp>
 #include <vkw/CommandBuffer.hpp>
+#include <cstring>
 
 bool TestApp::AssetImporterBase::try_open(const std::string &filename) const {
     std::ifstream is(filename, std::ios::binary | std::ios::in | std::ios::ate);

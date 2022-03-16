@@ -7,6 +7,7 @@
 #include "vkw/Queue.hpp"
 #include "vkw/CommandPool.hpp"
 #include "vkw/CommandBuffer.hpp"
+#include <cstring>
 
 namespace TestApp {
 
