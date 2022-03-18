@@ -62,11 +62,12 @@ set(GLFW_LIBRARY glfw)
 
 add_executable(TestApp main.cpp)
 include_directories(source)
+include_directories(source/common)
 add_subdirectory(external)
 add_subdirectory(source)
 
 
-target_link_libraries(TestApp TEST_OBJECTS -L${RENDERER_LIB_DIR} ${RENDERER_LIB})
+target_link_libraries(TestApp RenderKit)
 
 
 include(cmake/compile_shaders.cmake)

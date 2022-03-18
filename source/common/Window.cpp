@@ -13,6 +13,7 @@ namespace TestApp {
         glfwSetKeyCallback(m_window, key_callback);
         glfwSetCursorPosCallback(m_window, cursor_position_callback);
         glfwSetMouseButtonCallback(m_window, mouse_button_callback);
+        glfwSetCharCallback(m_window, character_callback);
 
     }
 

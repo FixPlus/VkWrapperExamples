@@ -32,11 +32,11 @@ namespace TestApp {
 
         }
 
-        void update(float deltaTime) {
-            m_camera.update(deltaTime);
+        void update() {
+            m_camera.update(clock().frameTime());
         }
 
-        SceneCameraT const &camera() {
+        SceneCameraT &camera() {
             m_camera.setMatrices();
             return m_camera;
         }
@@ -44,6 +44,8 @@ namespace TestApp {
     protected:
         void keyInput(int key, int scancode, int action, int mods) override {
             WindowIO::keyInput(key, scancode, action, mods);
+            if(guiWantCaptureKeyboard())
+                return;
 
             if (action == GLFW_PRESS)
                 keyDown(key, mods);
@@ -55,6 +57,8 @@ namespace TestApp {
 
         void mouseMove(double xpos, double ypos, double xdelta, double ydelta) override {
             WindowIO::mouseMove(xpos, ypos, xdelta, ydelta);
+            if(guiWantCaptureMouse())
+                return;
 
             if (cursorDisabled())
                 m_camera.rotate(xdelta, ydelta, 0.0f);
@@ -63,6 +67,7 @@ namespace TestApp {
 
     private:
         void keyDown(int key, int mods) {
+
             switch (key) {
                 case GLFW_KEY_W:
                     m_camera.keys.up = true;
@@ -75,14 +80,6 @@ namespace TestApp {
                     break;
                 case GLFW_KEY_D:
                     m_camera.keys.right = true;
-                    break;
-                case GLFW_KEY_N:
-                    m_camera.moveSplitLambda(-0.05f);
-                    std::cout << "lambda: " << m_camera.splitLambda() << std::endl;
-                    break;
-                case GLFW_KEY_M:
-                    m_camera.moveSplitLambda(+0.05f);
-                    std::cout << "lambda: " << m_camera.splitLambda() << std::endl;
                     break;
                 case GLFW_KEY_C:
                     toggleCursor();
@@ -101,6 +98,7 @@ namespace TestApp {
         }
 
         void keyUp(int key, int mods) {
+
             switch (key) {
                 case GLFW_KEY_W:
                     m_camera.keys.up = false;

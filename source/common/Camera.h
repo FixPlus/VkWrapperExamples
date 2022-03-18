@@ -103,7 +103,7 @@ namespace TestApp{
             return m_far_plane;
         }
 
-        /** Here child classes can update their state during frame time. */
+        /** Here child classes can push their state during frame time. */
         virtual void update(float deltaTime) { setMatrices();};
 
     private:
@@ -133,6 +133,11 @@ namespace TestApp{
         void moveSplitLambda(float deltaLambda){
             m_split_lambda = std::clamp(m_split_lambda + deltaLambda, 0.0f, 1.0f);
         }
+
+        void setSplitLambda(float lambda){
+            m_split_lambda = std::clamp(lambda, 0.0f, 1.0f);
+        }
+
         void update(float deltaTime) override{
             float cascadeSplits[Cascades];
 

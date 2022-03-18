@@ -36,7 +36,8 @@ float textureProj(vec4 shadowCoord, vec2 off, uint cascadeIndex)
         float dist = texture( shadowMaps, vec3(shadowCoord.st + off, cascadeIndex)).r;
         if ( shadowCoord.w > 0.0 && dist < shadowCoord.z )
         {
-            shadow = 0.3;
+            //float shadowFactor =  1.0f - (shadowCoord.z - dist);
+            shadow = 0.3f;//shadowFactor * 0.3f + (1.0f - shadowFactor) * 1.0f;
         }
     }
     return shadow;
@@ -51,7 +52,7 @@ float filterPCF(vec4 sc, uint cascadeIndex)
 
     float shadowFactor = 0.0;
     int count = 0;
-    int range = 1;
+    int range = 3;
 
     for (int x = -range; x <= range; x++)
     {

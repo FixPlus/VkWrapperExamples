@@ -143,8 +143,10 @@ namespace TestApp {
         static void pollEvents() {
             initImpl();
             glfwPollEvents();
-            for (auto &window: m_windowMap)
+            for (auto &window: m_windowMap) {
                 window.second->onPollEvents();
+                window.second->m_clock.frame();
+            }
         }
 
         static vkw::Instance
@@ -156,6 +158,8 @@ namespace TestApp {
         virtual void mouseMove(double xpos, double ypos, double xdelta, double ydelta) {};
 
         virtual void mouseInput(int button, int action, int mods) {}
+
+        virtual void charInput(unsigned int codepoint) {}
 
         virtual void onPollEvents() {};
 
@@ -176,6 +180,11 @@ namespace TestApp {
 
         static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
             m_windowMap.at(window)->mouseInput(button, action, mods);
+        }
+
+        static void character_callback(GLFWwindow* window, unsigned int codepoint)
+        {
+            m_windowMap.at(window)->charInput(codepoint);
         }
 
         static void initImpl();

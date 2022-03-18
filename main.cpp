@@ -31,8 +31,6 @@
 #include <Surface.hpp>
 #include <thread>
 
-#define STB_IMAGE_IMPLEMENTATION
-
 #include "external/stb_image.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -42,6 +40,62 @@
 #include "CubeGeometry.h"
 #include "AssetImport.h"
 #include "GUI.h"
+
+
+using namespace TestApp;
+
+class GUI : public GUIFrontEnd, public GUIBackend {
+public:
+    GUI(TestApp::Window& window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, ShaderLoader const &shaderLoader,
+        TextureLoader const &textureLoader)
+            : GUIBackend(device, pass, subpass, shaderLoader, textureLoader),
+              m_window(window){
+        ImGui::SetCurrentContext(context());
+        auto &io = ImGui::GetIO();
+
+        ImGuiStyle &style = ImGui::GetStyle();
+        style.Colors[ImGuiCol_TitleBg] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(1.0f, 0.0f, 0.0f, 0.1f);
+        style.Colors[ImGuiCol_MenuBarBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_Header] = ImVec4(0.8f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_HeaderActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.8f);
+        style.Colors[ImGuiCol_CheckMark] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
+        style.Colors[ImGuiCol_SliderGrab] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
+        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(1.0f, 1.0f, 1.0f, 0.1f);
+        style.Colors[ImGuiCol_FrameBgActive] = ImVec4(1.0f, 1.0f, 1.0f, 0.2f);
+        style.Colors[ImGuiCol_Button] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.6f);
+        style.Colors[ImGuiCol_ButtonActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
+
+        m_updateFontTexture();
+
+        io.DisplaySize = {800, 600};
+    }
+
+    std::function<void(void)> customGui = [](){};
+
+protected:
+    void gui() const override{
+        ImGui::SetNextWindowSize({300.0f, 100.0f}, ImGuiCond_Once);
+        ImGui::Begin("Hello");
+        static std::string buf;
+        buf.resize(10);
+        ImGui::InputText("<- type here", buf.data(), buf.size());
+        ImGui::Text("FPS: %.2f", m_window.get().clock().fps());
+        ImGui::End();
+
+        customGui();
+    }
+
+private:
+    std::reference_wrapper<TestApp::Window> m_window;
+
+};
+
 
 struct GlobalUniform {
     glm::mat4 perspective;
@@ -297,9 +351,6 @@ int main() {
         cubes.emplace_back(cubePool, pos, scale, rotate);
     }
 
-
-    //cubes.emplace_back(cubePool, glm::vec3{10.0f, 2.0f, 10.0f}, glm::vec3{1.0f}, glm::vec3{0.0f});
-
     vkw::DescriptorSetLayout cubeLightDescriptorLayout{device, {vkw::DescriptorSetLayoutBinding{0,
                                                                                                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                                                 vkw::DescriptorSetLayoutBinding{1,
@@ -324,20 +375,6 @@ int main() {
     vkw::GraphicsPipelineCreateInfo lightCreateInfo{lightRenderPass, 0, lightLayout};
     vkw::GraphicsPipelineCreateInfo shadowShowCreateInfo{lightRenderPass, 0, shadowLayout};
     auto &vertexInputState = TestApp::CubePool::geometryInputState();
-
-    for (int i = 0; i < vertexInputState.totalBindings(); ++i) {
-        auto binding = vertexInputState.binding(i);
-        std::cout << "Binding #" << binding.binding << ": rate="
-                  << (binding.inputRate == VK_VERTEX_INPUT_RATE_VERTEX ? "per_vertex" : "per_instance")
-                  << ", stride=" << binding.stride << std::endl;
-    }
-
-    for (int i = 0; i < vertexInputState.totalAttributes(); ++i) {
-        auto attribute = vertexInputState.attribute(i);
-        std::cout << "Attribute #" << i << ": location=" << attribute.location << ", binding=" << attribute.binding
-                  << ", offset=" <<
-                  attribute.offset << std::endl;
-    }
 
     lightCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
     lightCreateInfo.addVertexShader(cubeVertShader);
@@ -388,21 +425,21 @@ int main() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
-    TestApp::GUI gui{device, lightRenderPass, 0, shaderLoader, textureLoader};
+    GUI gui{window, device, lightRenderPass, 0, shaderLoader, textureLoader};
 
     window.setContext(gui);
 
+    gui.customGui = [&window](){
+        ImGui::SetNextWindowSize({300, 200}, ImGuiCond_FirstUseEver);
+        ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoResize);
+        static float splitLambda = 0.5f;
+        ImGui::SliderFloat("Split lambda", &splitLambda, 0.0f, 1.0f);
+        window.camera().setSplitLambda(splitLambda);
+        ImGui::End();
+    };
+
     // 13. render on screen in a loop
 
-    uint32_t framesTotal = 0;
-    uint32_t framesCount = 0;
-    double elapsedTime = 0.0;
-    double totalTime = 0.0;
-    double fps = 0.0;
-    std::chrono::time_point<std::chrono::high_resolution_clock,
-            std::chrono::duration<double>> tStart, tFinish;
-
-    tStart = std::chrono::high_resolution_clock::now();
     myUniform.perspective = window.camera().projection();
 
     constexpr const int thread_count = 12;
@@ -410,29 +447,13 @@ int main() {
     threads.reserve(thread_count);
 
     while (!window.shouldClose()) {
-        framesTotal++;
 
         TestApp::Window::pollEvents();
 
-        tFinish = std::chrono::high_resolution_clock::now();
 
-        double deltaTime = std::chrono::duration<double, std::milli>(tFinish - tStart).count() / 1000.0;
-        elapsedTime += deltaTime;
-        totalTime += deltaTime;
-
-        tStart = std::chrono::high_resolution_clock::now();
-        framesCount++;
-        if (framesCount > 100) {
-            fps = (float) framesCount / elapsedTime;
-            std::cout << "FPS: " << fps << std::endl;
-            auto camPos = window.camera().position();
-            std::cout << "x:" << camPos.x << " y:" << camPos.y << " z:" << camPos.z << std::endl;
-            framesCount = 0;
-            elapsedTime = 0;
-        }
-
-        window.update(deltaTime);
-        gui.update();
+        window.update();
+        gui.frame();
+        gui.push();
 
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
@@ -489,6 +510,8 @@ int main() {
 
             threads.clear();
 
+            auto deltaTime = window.clock().frameTime();
+
             for (int i = 0; i < thread_count; ++i) {
                 threads.emplace_back([&cubes, i, per_thread, deltaTime]() {
                     for (int j = per_thread * i; j < std::min(per_thread * (i + 1), cubes.size()); ++j)
@@ -540,17 +563,6 @@ int main() {
             cubePool.drawGeometry(commandBuffer);
 
             gui.draw(commandBuffer);
-#if 0
-            viewport.y = currentFrameBuffer.getFullRenderArea().extent.height / 2.0f;
-
-            commandBuffer.setViewports({viewport}, 0);
-            commandBuffer.setScissors({scissor}, 0);
-
-            commandBuffer.bindGraphicsPipeline(shadowShowPipeline);
-            commandBuffer.bindDescriptorSets(shadowLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowSet, 0);
-            cubePool.bindGeometry(commandBuffer);
-            cubePool.drawGeometry(commandBuffer);
-#endif
             commandBuffer.endRenderPass();
             commandBuffer.end();
 
@@ -585,8 +597,6 @@ int main() {
                                                          view.get().image()->rawExtents().height},
                                               vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
                 }
-
-                //std::cout << "Window resized" << std::endl;
                 continue;
             } else {
                 throw;
