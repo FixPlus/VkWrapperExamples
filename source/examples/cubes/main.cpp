@@ -31,7 +31,7 @@
 #include <Surface.hpp>
 #include <thread>
 
-#include "external/stb_image.h"
+#include "stb_image.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -40,16 +40,17 @@
 #include "CubeGeometry.h"
 #include "AssetImport.h"
 #include "GUI.h"
-
+#include "AssetPath.inc"
 
 using namespace TestApp;
 
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
-    GUI(TestApp::Window& window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, ShaderLoader const &shaderLoader,
+    GUI(TestApp::Window &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
+        ShaderLoader const &shaderLoader,
         TextureLoader const &textureLoader)
             : GUIBackend(device, pass, subpass, shaderLoader, textureLoader),
-              m_window(window){
+              m_window(window) {
         ImGui::SetCurrentContext(context());
         auto &io = ImGui::GetIO();
 
@@ -76,10 +77,10 @@ public:
         io.DisplaySize = {800, 600};
     }
 
-    std::function<void(void)> customGui = [](){};
+    std::function<void(void)> customGui = []() {};
 
 protected:
-    void gui() const override{
+    void gui() const override {
         ImGui::SetNextWindowSize({300.0f, 100.0f}, ImGuiCond_Once);
         ImGui::Begin("Hello");
         static std::string buf;
@@ -307,7 +308,7 @@ int main() {
                                    *shadowMapAttachmentViews.at(i));
     }
 
-    TestApp::TextureLoader textureLoader{device, "./"};
+    TestApp::TextureLoader textureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
     auto cubeTexture = textureLoader.loadTexture("image");
     auto &cubeTextureView = cubeTexture.getView<vkw::ColorImageView>(device, cubeTexture.format(), mapping);
 
@@ -362,7 +363,7 @@ int main() {
     vkw::DescriptorSetLayout cubeShadowDescriptorLayout{device, {vkw::DescriptorSetLayoutBinding{0,
                                                                                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}};
 
-    TestApp::ShaderLoader shaderLoader{device, "./"};
+    TestApp::ShaderLoader shaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
     auto cubeVertShader = shaderLoader.loadVertexShader("triangle");
     auto cubeShadowShader = shaderLoader.loadVertexShader("shadow");
     auto cubeShadowShowShader = shaderLoader.loadFragmentShader("shadow");
@@ -429,7 +430,7 @@ int main() {
 
     window.setContext(gui);
 
-    gui.customGui = [&window](){
+    gui.customGui = [&window]() {
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_FirstUseEver);
         ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoResize);
         static float splitLambda = 0.5f;

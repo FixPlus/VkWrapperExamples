@@ -3,6 +3,10 @@ project(TestApp)
 
 set(CMAKE_CXX_STANDARD 20)
 
+if(NOT DEFINED RENDERER_INSTALL_DIR)
+    message(FATAL_ERROR "'RENDERER_INSTALL_DIR' is not set. Add -DRENDERER_INSTALL_DIR=path/to/VkRenderer/install")
+endif()
+
 IF(WIN32)
     IF (NOT Vulkan_FOUND)
         if(DEFINED ENV{VK_SDK_PATH})
@@ -51,8 +55,8 @@ set(RENDERER_LIB_DIR ${RENDERER_INSTALL_DIR}/lib)
 set(RENDERER_INCLUDE_DIR ${RENDERER_INSTALL_DIR}/include)
 include_directories(${RENDERER_INCLUDE_DIR})
 include_directories(${RENDERER_INCLUDE_DIR}/vkw)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../glm)
 include_directories(external)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 find_library(RENDERER_LIB NAMES VkWrapper.a libVkWrapper libVkWrapper.so PATHS ${RENDERER_LIB_DIR} REQUIRED)
 message(STATUS ${RENDERER_LIB})
 
@@ -60,16 +64,18 @@ message(STATUS ${RENDERER_LIB})
 find_package(glfw3 3.3 REQUIRED)
 set(GLFW_LIBRARY glfw)
 
-add_executable(TestApp main.cpp)
 include_directories(source)
 include_directories(source/common)
 add_subdirectory(external)
 add_subdirectory(source)
 
 
-target_link_libraries(TestApp RenderKit)
-
-
 include(cmake/compile_shaders.cmake)
 
-compileShaders(${CMAKE_CURRENT_SOURCE_DIR}/source/shaders ${CMAKE_CURRENT_BINARY_DIR} TestApp .)
+set(EXAMPLE_ASSET_PATH "./data")
+
+configure_file(source/common/AssetPath.inc.in AssetPath.inc)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source/data/shaders)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source/data/textures)
+compileShaders(${CMAKE_CURRENT_SOURCE_DIR}/source/shaders ${CMAKE_CURRENT_BINARY_DIR}/source/data/shaders RenderKit .)
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source/data DESTINATION .)

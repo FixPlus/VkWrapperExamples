@@ -9,12 +9,12 @@
 #include <cstring>
 
 bool TestApp::AssetImporterBase::try_open(const std::string &filename) const {
-    std::ifstream is(filename, std::ios::binary | std::ios::in | std::ios::ate);
+    std::ifstream is(m_root + filename, std::ios::binary | std::ios::in | std::ios::ate);
     return is.is_open();
 }
 
 std::vector<char> TestApp::AssetImporterBase::read_binary(const std::string &filename) const {
-    std::ifstream is(filename, std::ios::binary | std::ios::in | std::ios::ate);
+    std::ifstream is(m_root + filename, std::ios::binary | std::ios::in | std::ios::ate);
 
     if (is.is_open()) {
         size_t size = is.tellg();
