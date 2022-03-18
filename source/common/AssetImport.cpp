@@ -1,6 +1,6 @@
 #include "AssetImport.h"
 #include <fstream>
-#include "stb_image.h"
+#include "tiny_gltf/stb_image.h"
 #include <set>
 #include <vkw/Buffer.hpp>
 #include <vkw/Queue.hpp>

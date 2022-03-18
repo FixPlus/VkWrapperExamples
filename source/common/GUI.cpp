@@ -57,6 +57,8 @@ namespace TestApp {
         state.alphaBlendOp = VK_BLEND_OP_ADD;
 
         createInfo.addBlendState(state, 0);
+        createInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
+        createInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
 
         return {device, createInfo};
     }

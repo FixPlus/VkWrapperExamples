@@ -34,6 +34,7 @@ namespace TestApp {
 
         void update() {
             m_camera.update(clock().frameTime());
+            m_camera.setMatrices();
         }
 
         SceneCameraT &camera() {
@@ -44,7 +45,7 @@ namespace TestApp {
     protected:
         void keyInput(int key, int scancode, int action, int mods) override {
             WindowIO::keyInput(key, scancode, action, mods);
-            if(guiWantCaptureKeyboard())
+            if (guiWantCaptureKeyboard())
                 return;
 
             if (action == GLFW_PRESS)
@@ -57,7 +58,7 @@ namespace TestApp {
 
         void mouseMove(double xpos, double ypos, double xdelta, double ydelta) override {
             WindowIO::mouseMove(xpos, ypos, xdelta, ydelta);
-            if(guiWantCaptureMouse())
+            if (guiWantCaptureMouse())
                 return;
 
             if (cursorDisabled())

@@ -6,16 +6,16 @@
 #include "vkw/Queue.hpp"
 #include "vkw/CommandPool.hpp"
 #include "vkw/CommandBuffer.hpp"
+#include "Utils.h"
 
 namespace TestApp{
-    SwapChainImpl::SwapChainImpl(vkw::Device &device, vkw::Surface &surface) :
+    SwapChainImpl::SwapChainImpl(vkw::Device &device, vkw::Surface &surface, bool createDepthBuffer) :
     vkw::SwapChain(device, compileInfo(device, surface)),
-    m_surface(surface) {
+    m_surface(surface), m_images(retrieveImages()) {
 
-            auto images = retrieveImages();
             std::vector<VkImageMemoryBarrier> transitLayouts;
 
-            for (auto &image: images) {
+            for (auto &image: m_images) {
                 VkImageMemoryBarrier transitLayout{};
                 transitLayout.image = image;
                 transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -51,6 +51,20 @@ namespace TestApp{
             queue->submit(commandBuffer, {}, {}, {}, &fence);
             fence.wait();
 
+            VkComponentMapping mapping;
+            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            for (auto &image: m_images) {
+                m_image_views.emplace_back(image.getView<vkw::ColorImageView>(device, image.format(), 0, 1, mapping));
+            }
+
+            auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
+
+            m_depth.emplace(TestApp::createDepthStencilImage(device, extents.width, extents.height));
+            m_depth_view.emplace(m_depth->getView<vkw::DepthImageView>(device, mapping, m_depth->format()));
     }
 
     VkSwapchainCreateInfoKHR SwapChainImpl::compileInfo(vkw::Device &device, vkw::Surface &surface) {
