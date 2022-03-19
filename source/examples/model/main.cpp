@@ -15,7 +15,7 @@ using namespace TestApp;
 
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
-    GUI(TestApp::Window &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
+    GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
         ShaderLoader const &shaderLoader,
         TextureLoader const &textureLoader)
             : GUIBackend(device, pass, subpass, shaderLoader, textureLoader),
@@ -50,19 +50,23 @@ public:
 
 protected:
     void gui() const override {
-        ImGui::SetNextWindowSize({300.0f, 100.0f}, ImGuiCond_Once);
-        ImGui::Begin("Hello");
-        static std::string buf;
-        buf.resize(10);
-        ImGui::InputText("<- type here", buf.data(), buf.size());
+        ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("FPS: %.2f", m_window.get().clock().fps());
+        auto &camera = m_window.get().camera();
+        auto pos = camera.position();
+        ImGui::Text("X: %.2f, Y: %.2f, Z: %.2f,", pos.x, pos.y, pos.z);
+        ImGui::Text("(%.2f,%.2f)", camera.phi(), camera.psi());
+
+        ImGui::SliderFloat("Cam rotate inertia", &camera.rotateInertia, 0.1f, 5.0f);
+        ImGui::SliderFloat("Mouse sensitivity", &m_window.get().mouseSensitivity, 1.0f, 10.0f);
+
         ImGui::End();
 
         customGui();
     }
 
 private:
-    std::reference_wrapper<TestApp::Window> m_window;
+    std::reference_wrapper<TestApp::SceneProjector> m_window;
 
 };
 
@@ -114,6 +118,21 @@ private:
 
 
 };
+
+std::vector<std::filesystem::path> listAvailableModels(std::filesystem::path const &root) {
+    if (!exists(root))
+        return {};
+    std::vector<std::filesystem::path> ret{};
+    for (const auto &entry: std::filesystem::directory_iterator(root)) {
+        auto &entry_path = entry.path();
+        if (entry_path.has_extension()) {
+            if (entry_path.extension() == ".gltf" || entry_path.extension() == ".glb") {
+                ret.emplace_back(entry_path);
+            }
+        }
+    }
+    return ret;
+}
 
 int main() {
     TestApp::SceneProjector window{800, 600, "Model"};
@@ -167,19 +186,52 @@ int main() {
 
     auto globalState = GlobalLayout{device, window.camera()};
 
-    GLTFModel model{device, shaderLoader, "model.gltf"};
+    auto modelList = listAvailableModels("data/models");
+    std::vector<std::string> modelListString{};
+    std::vector<const char *> modelListCstr{};
+    std::transform(modelList.begin(), modelList.end(), std::back_inserter(modelListString),
+                   [](std::filesystem::path const &path) {
+                       return path.filename().string();
+                   });
+    std::transform(modelListString.begin(), modelListString.end(), std::back_inserter(modelListCstr),
+                   [](std::string const &name) {
+                       return name.c_str();
+                   });
+    if (modelList.empty()) {
+        std::cout << "No GLTF model files found in data/models" << std::endl;
+        return 0;
+    }
+
+    GLTFModel model{device, shaderLoader, modelList.front()};
+
     model.setPipelinePool(lightPass, 0, globalState.layout());
 
     auto instance = model.createNewInstance();
 
-    gui.customGui = [&instance]() {
-        ImGui::SetNextWindowSize({300.0f, 100.0f}, ImGuiCond_Once);
-        ImGui::Begin("Model", nullptr, ImGuiWindowFlags_NoResize);
+    gui.customGui = [&instance, &model, &modelList, &modelListCstr, &device, &shaderLoader, &lightPass, &globalState, &window]() {
+        //ImGui::SetNextWindowSize({400.0f, 150.0f}, ImGuiCond_Once);
+        ImGui::Begin("Model", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
         static float x, y, z;
+
+        static int current_model = 0;
+
         ImGui::SliderFloat("x", &x, -180.0f, 180.0f);
         ImGui::SliderFloat("y", &y, -180.0f, 180.0f);
         ImGui::SliderFloat("z", &z, -180.0f, 180.0f);
         instance.setRotation(x, y, z);
+
+        if (ImGui::Combo("models", &current_model, modelListCstr.data(), modelListCstr.size())) {
+            {
+                // hack to get instance destroyed
+                auto dummy = std::move(instance);
+            }
+            model = GLTFModel(device, shaderLoader, modelList.at(current_model));
+            model.setPipelinePool(lightPass, 0, globalState.layout());
+            instance = model.createNewInstance();
+
+        }
+
+
         ImGui::End();
     };
 

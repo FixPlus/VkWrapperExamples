@@ -1,25 +1,25 @@
 #include "Camera.h"
 
 
-namespace TestApp{
+namespace TestApp {
 
 
     void Camera::m_set_matrix() {
         m_view = glm::mat4(1.0f);
 
         m_view = glm::rotate(m_view, glm::radians(m_Psi),
-                           glm::vec3(1.0f, 0.0f, 0.0f));
+                             glm::vec3(1.0f, 0.0f, 0.0f));
         m_view = glm::rotate(m_view, glm::radians(m_Phi),
-                           glm::vec3(0.0f, 1.0f, 0.0f));
+                             glm::vec3(0.0f, 1.0f, 0.0f));
         m_view = glm::rotate(m_view, glm::radians(m_Tilt),
-                                   glm::vec3(0.0f, 0.0f, 1.0f));
+                             glm::vec3(0.0f, 0.0f, 1.0f));
 
         m_view = glm::translate(m_view, -m_position);
         m_projection = glm::perspective(m_fov, m_ratio, m_near_plane, m_far_plane);
         m_projection[1][1] *= -1.0f;
     }
 
-    glm::vec3 Camera::viewDirection() const{
+    glm::vec3 Camera::viewDirection() const {
 
         glm::vec3 camFront;
         camFront.x =
@@ -61,5 +61,17 @@ namespace TestApp{
             m_velocity -= glm::vec3(0.0f, 1.0f, 0.0f) * acceleration;
 
         move(m_velocity * deltaTime);
+
+        targetPsi = std::clamp(targetPsi, -89.0f, 89.0f);
+
+        float deltaPhi = targetPhi - phi();
+        float deltaPsi = targetPsi - psi();
+
+        float rotPhi = deltaPhi * deltaTime * 100.0f / rotateInertia;
+        float rotPsi = deltaPsi * deltaTime * 100.0f / rotateInertia;
+
+        auto circles = rotate(rotPhi, rotPsi, 0.0f);
+
+        targetPhi = targetPhi - static_cast<float>(circles) * 360.0f;
     }
 }

@@ -17,6 +17,7 @@
 #include <DescriptorSet.hpp>
 #include <DescriptorPool.hpp>
 #include <Sampler.hpp>
+#include <iostream>
 
 namespace TestApp {
 
@@ -144,6 +145,7 @@ namespace TestApp {
             return m_layout;
         };
     private:
+        friend class MaterialPool;
 
         vkw::DescriptorSet m_descriptor;
         std::reference_wrapper<vkw::DescriptorSetLayout const> m_layout;
@@ -155,7 +157,19 @@ namespace TestApp {
                 m_material_descriptor_pool(device, maxMaterials,
                                            {VkDescriptorPoolSize{.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount=maxMaterials}}),
                 m_descriptor_layout(device,
-                                    {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}) {
+                                    vkw::DescriptorSetLayoutBindingConstRefArray{vkw::DescriptorSetLayoutBinding{0,
+                                                                                                                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}) {
+        }
+
+        MaterialPool &operator=(MaterialPool &&another) noexcept {
+            m_materials = std::move(another.m_materials);
+            m_material_descriptor_pool = std::move(another.m_material_descriptor_pool);
+            m_descriptor_layout = std::move(another.m_descriptor_layout);
+            for (auto &material: m_materials) {
+                material.second.m_layout = m_descriptor_layout;
+            }
+
+            return *this;
         }
 
         Material const &material(MaterialInfo info) {

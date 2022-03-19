@@ -47,7 +47,7 @@ using namespace TestApp;
 
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
-    GUI(TestApp::Window &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
+    GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
         ShaderLoader const &shaderLoader,
         TextureLoader const &textureLoader)
             : GUIBackend(device, pass, subpass, shaderLoader, textureLoader),
@@ -82,22 +82,25 @@ public:
 
 protected:
     void gui() const override {
-        ImGui::SetNextWindowSize({300.0f, 100.0f}, ImGuiCond_Once);
-        ImGui::Begin("Hello");
-        static std::string buf;
-        buf.resize(10);
-        ImGui::InputText("<- type here", buf.data(), buf.size());
+        ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("FPS: %.2f", m_window.get().clock().fps());
+        auto &camera = m_window.get().camera();
+        auto pos = camera.position();
+        ImGui::Text("X: %.2f, Y: %.2f, Z: %.2f,", pos.x, pos.y, pos.z);
+        ImGui::Text("(%.2f,%.2f)", camera.phi(), camera.psi());
+
+        ImGui::SliderFloat("Cam rotate inertia", &camera.rotateInertia, 0.1f, 5.0f);
+        ImGui::SliderFloat("Mouse sensitivity", &m_window.get().mouseSensitivity, 1.0f, 10.0f);
+
         ImGui::End();
 
         customGui();
     }
 
 private:
-    std::reference_wrapper<TestApp::Window> m_window;
+    std::reference_wrapper<TestApp::SceneProjector> m_window;
 
 };
-
 
 struct GlobalUniform {
     glm::mat4 perspective;
@@ -136,7 +139,7 @@ int main() {
     // 1. Create Instance and Window
 
 
-    TestApp::SceneProjector window{800, 600, "Hello, Boez!"};
+    TestApp::SceneProjector window{800, 600, "Cubes"};
 
     vkw::Library vulkanLib{};
 

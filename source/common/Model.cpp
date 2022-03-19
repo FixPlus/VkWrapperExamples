@@ -656,6 +656,10 @@ TestApp::PipelinePool::pipeline(TestApp::PipelineDesc desc) {
     createInfo.addVertexInputState(inputState);
     createInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, true});
 
+    vkw::RasterizationStateCreateInfo rasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE};
+
+    createInfo.addRasterizationState(rasterizationStateCreateInfo);
+
     auto &ret = m_pipeline.emplace(desc, std::pair<vkw::GraphicsPipeline, vkw::PipelineLayout>{
             vkw::GraphicsPipeline{m_device, createInfo}, std::move(layout)}).first->second;
 

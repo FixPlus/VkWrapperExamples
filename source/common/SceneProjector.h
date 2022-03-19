@@ -42,6 +42,8 @@ namespace TestApp {
             return m_camera;
         }
 
+        float mouseSensitivity = 1.0f;
+
     protected:
         void keyInput(int key, int scancode, int action, int mods) override {
             WindowIO::keyInput(key, scancode, action, mods);
@@ -61,8 +63,11 @@ namespace TestApp {
             if (guiWantCaptureMouse())
                 return;
 
-            if (cursorDisabled())
-                m_camera.rotate(xdelta, ydelta, 0.0f);
+            if (cursorDisabled()) {
+                m_camera.targetPhi += xdelta * mouseSensitivity;
+                m_camera.targetPsi += ydelta * mouseSensitivity;
+            }
+
         };
 
 
