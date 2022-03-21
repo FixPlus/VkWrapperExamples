@@ -24,7 +24,6 @@ public:
     struct UBO {
         glm::vec4 waves[4];
         glm::vec4 deepWaterColor = glm::vec4(0.0f, 0.01f, 0.3f, 1.0f);
-        glm::vec4 skyColor = glm::vec4(0.3f, 0.3f, 0.9f, 1.0f);
         float time = 0.0f;
     } ubo;
 

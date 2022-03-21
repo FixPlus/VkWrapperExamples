@@ -12,6 +12,7 @@
 #include "Model.h"
 #include "GlobalLayout.h"
 #include "WaterSurface.h"
+#include "SkyBox.h"
 
 using namespace TestApp;
 
@@ -217,6 +218,7 @@ int main() {
 
     auto globalState = GlobalLayout{device, window.camera()};
     auto waves = WaterSurface(device, lightPass, 0, globalState.layout(), shaderLoader);
+    auto skybox = SkyBox{device, lightPass, 0, globalState, shaderLoader};
 
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
     auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
@@ -224,7 +226,7 @@ int main() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
-    gui.customGui = [&waves]() {
+    gui.customGui = [&waves, &globalState]() {
         ImGui::Begin("Waves", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
         static float dirs[4] = {30.0f, 50.0f, 270.0f, 60.0f};
@@ -251,7 +253,13 @@ int main() {
         ImGui::Text("Total tiles: %d", waves.totalTiles());
 
         ImGui::ColorEdit4("Deep water color", &waves.ubo.deepWaterColor.x);
-        ImGui::ColorEdit4("Sky color", &waves.ubo.skyColor.x);
+
+
+        ImGui::End();
+
+        ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::ColorEdit4("Sky color", &globalState.ubo.skyColor.x);
+        ImGui::ColorEdit4("Light color", &globalState.ubo.lightColor.x);
 
         ImGui::End();
     };
@@ -324,6 +332,8 @@ int main() {
 
         commandBuffer.setViewports({viewport}, 0);
         commandBuffer.setScissors({scissor}, 0);
+
+        skybox.draw(commandBuffer);
 
         waves.draw(commandBuffer, globalState);
 

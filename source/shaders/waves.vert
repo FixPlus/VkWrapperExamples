@@ -13,16 +13,17 @@ layout (location = 4) out vec4 outLightDir;
 layout (location = 5) out vec4 outWorldPos;
 layout (location = 6) out vec2 outGridPos;
 
-layout (set = 0,binding = 0) uniform MaBoi{
+layout (set = 0,binding = 0) uniform Globals{
     mat4 perspective;
     mat4 cameraSpace;
     vec4 lightDir;
-} maBoi;
+    vec4 skyColor;
+    vec4 lightColor;
+} globals;
 
 layout (set = 1, binding = 0) uniform Waves{
     vec4 waves[4];
     vec4 deepWaterColor;
-    vec4 skyColor;
     float time;
 }waves;
 
@@ -102,9 +103,9 @@ void main()
     outColor = vec3(0.0f, 0.1f, 0.7f);
 
     outUV = uv;
-    outLightDir = maBoi.lightDir;
+    outLightDir = globals.lightDir;
     outNormal = normal;
     outWorldPos = position;
-    outViewPos = inverse(maBoi.cameraSpace) * vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    gl_Position = maBoi.perspective * maBoi.cameraSpace * position;
+    outViewPos = inverse(globals.cameraSpace) * vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    gl_Position = globals.perspective * globals.cameraSpace * position;
 }

@@ -10,10 +10,17 @@ layout (location = 6) in vec2 inGridPos;
 
 layout (location = 0) out vec4 outFragColor;
 
+layout (set = 0,binding = 0) uniform Globals{
+    mat4 perspective;
+    mat4 cameraSpace;
+    vec4 lightDir;
+    vec4 skyColor;
+    vec4 lightColor;
+} globals;
+
 layout (set = 1, binding = 0) uniform Waves{
     vec4 waves[4];
     vec4 deepWaterColor;
-    vec4 skyColor;
     float time;
 }waves;
 
@@ -25,7 +32,6 @@ layout (push_constant) uniform PushConstants {
 } pushConstants;
 
 
-const vec4 lightColor = vec4(1.0f, 0.9f, 0.6f, 0.0f);
 void main(){
 
     vec3 tanget = vec3(1.0f, 0.0, 0.0f);
@@ -64,8 +70,9 @@ void main(){
     float diffuse = dot(-inLightDir, vec4(normal, 0.0f));
     vec4 cameraDir = inWorldPos - inViewPos;
     vec4 reflectDir = vec4(reflect(normalize(cameraDir).xyz, normal), 0.0f);
-    float angle = clamp(dot(normalize(cameraDir).xyz, -normal), 0.0f, 1.0f);
-    vec4 baseColor = waves.deepWaterColor * angle + waves.skyColor * (1.0f - angle);
+    float angle = clamp(dot(normalize(cameraDir).xyz, normal), 0.0f, 1.0f);
+    angle = pow(angle, 1.0f / 2.0f);
+    vec4 baseColor = waves.deepWaterColor * angle + globals.skyColor * (1.0f - angle);
 
     float reflect = clamp(dot(normalize(reflectDir), -normalize(inLightDir)), 0.05f, 1.0f);
     reflect -= 0.05f;
@@ -75,6 +82,6 @@ void main(){
     diffuse = diffuse * 0.4f + 0.4f;
     outFragColor = baseColor;
     outFragColor *= diffuse;
-    outFragColor += reflect * lightColor;
+    outFragColor += reflect * globals.lightColor;
 
 }

@@ -14,7 +14,10 @@ public:
         glm::mat4 perspective;
         glm::mat4 cameraSpace;
         glm::vec4 lightVec = {-1.0f, -1.0f, -1.0f, 0.0f};
-    };
+        glm::vec4 skyColor = {0.8f, 0.8f, 0.9f, 1.0f};
+        glm::vec4 lightColor = {0.95f, 0.9f, 0.6f, 1.0f};
+    } ubo;
+
 
     GlobalLayout(vkw::Device &device, TestApp::Camera const &camera) :
             m_layout(device, {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}),
@@ -27,11 +30,11 @@ public:
     }
 
     void update() {
-        m_buffer.perspective = m_camera.get().projection();
-        m_buffer.cameraSpace = m_camera.get().cameraSpace();
+        ubo.perspective = m_camera.get().projection();
+        ubo.cameraSpace = m_camera.get().cameraSpace();
         auto *mapped = m_uniform.map();
 
-        *mapped = m_buffer;
+        *mapped = ubo;
 
         m_uniform.flush();
 
@@ -51,7 +54,7 @@ public:
     }
 
 private:
-    Uniform m_buffer{};
+
     vkw::DescriptorSetLayout m_layout;
     vkw::DescriptorPool m_pool;
     vkw::DescriptorSet m_set;

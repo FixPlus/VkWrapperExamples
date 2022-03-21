@@ -89,11 +89,11 @@ public:
     }
 
     void update() {
-        m_buffer.perspective = m_camera.get().projection();
-        m_buffer.cameraSpace = m_camera.get().cameraSpace();
+        ubo.perspective = m_camera.get().projection();
+        ubo.cameraSpace = m_camera.get().cameraSpace();
         auto *mapped = m_uniform.map();
 
-        *mapped = m_buffer;
+        *mapped = ubo;
 
         m_uniform.flush();
 
@@ -109,7 +109,7 @@ public:
     }
 
 private:
-    GlobalUniform m_buffer{};
+    GlobalUniform ubo{};
     vkw::DescriptorSetLayout m_layout;
     vkw::DescriptorPool m_pool;
     vkw::DescriptorSet m_set;
