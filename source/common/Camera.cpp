@@ -32,6 +32,73 @@ namespace TestApp {
         return camFront;
     }
 
+    static bool intersects(float scope1begin, float scope1end,float scope2begin, float scope2end){
+        if(scope1begin < scope2begin){
+            return scope1end > scope2begin;
+        } else{
+            return scope1begin < scope2end;
+        }
+    }
+    bool Camera::offBounds(glm::vec3 cubeBegin, glm::vec3 cubeEnd) const{
+
+        glm::vec4 temp;
+        glm::vec3 min, max;
+
+        temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeBegin.y, cubeBegin.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(temp);
+        max = glm::vec3(temp);
+
+        temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeBegin.y, cubeBegin.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
+        max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
+
+        temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeEnd.y, cubeBegin.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
+        max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
+
+        temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeBegin.y, cubeEnd.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
+        max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
+
+        temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeEnd.y, cubeBegin.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
+        max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
+
+        temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeBegin.y, cubeEnd.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
+        max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
+
+        temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeEnd.y, cubeEnd.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
+        max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
+
+        temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeEnd.y, cubeEnd.z, 1.0f);
+
+        temp /= temp.w;
+        min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
+        max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
+
+
+
+        return !intersects(-1.0f, 1.0f, min.x, max.x) ||
+                !intersects(-1.0f, 1.0f, min.y, max.y) ||
+                !intersects(0.0f, 1.0f, min.z, max.z);
+
+    }
     void ControlledCamera::update(float deltaTime) {
         float currentSpeed = glm::length(m_velocity);
 

@@ -107,6 +107,7 @@ namespace TestApp {
             return m_far_plane;
         }
 
+        bool offBounds(glm::vec3 cubeBegin, glm::vec3 cubeEnd) const;
         /** Here child classes can push their state during frame time. */
         virtual void update(float deltaTime) { setMatrices(); };
 
