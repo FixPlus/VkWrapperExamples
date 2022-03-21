@@ -256,6 +256,9 @@ int main() {
         gui.push();
         globalState.update();
 
+        if(window.minimized())
+            continue;
+
         try {
             mySwapChain.get()->acquireNextImage(presentComplete, fence, 1000);
         } catch (vkw::VulkanError &e) {

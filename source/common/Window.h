@@ -83,6 +83,10 @@ namespace TestApp {
             return glfwWindowShouldClose(m_window);
         }
 
+        bool minimized() const{
+            return glfwGetWindowAttrib(m_window, GLFW_ICONIFIED);
+        }
+
         void close() const {
             glfwSetWindowShouldClose(m_window, true);
         }
