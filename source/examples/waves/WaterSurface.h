@@ -27,7 +27,7 @@ public:
         float time = 0.0f;
     } ubo;
 
-    int cascades = 4;
+    int cascades = 7;
 
 
     WaterSurface(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
@@ -50,15 +50,23 @@ private:
     m_compile_pipeline(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::ShaderLoader &loader);
 
 
-    vkw::IndexBuffer<VK_INDEX_TYPE_UINT32> const &m_full_tile(uint32_t innerCascade);
+    enum class ConnectSide {
+        NORTH = 0,
+        EAST = 1,
+        SOUTH = 2,
+        WEST = 3,
+        NO_CONNECT = 4
+    };
+
+    static void m_addConnectingEdge(ConnectSide side, std::vector<uint32_t> &indices);
+
+    vkw::IndexBuffer<VK_INDEX_TYPE_UINT32> const &m_full_tile(ConnectSide side);
 
     static vkw::Sampler m_create_sampler(vkw::Device &device);
 
-    vkw::VertexBuffer<PrimitiveAttrs> m_buffer;
-    std::map<uint32_t, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_inner_tiles;
-    std::map<uint32_t, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_full_tiles;
 
-    std::map<std::tuple<int, uint32_t, uint32_t>, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_border_tiles;
+    vkw::VertexBuffer<PrimitiveAttrs> m_buffer;
+    std::map<int, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_full_tiles;
 
     vkw::UniformBuffer<UBO> m_ubo;
     UBO *m_ubo_mapped;

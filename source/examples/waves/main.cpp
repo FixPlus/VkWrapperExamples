@@ -218,6 +218,16 @@ int main() {
 
     auto globalState = GlobalLayout{device, window.camera()};
     auto waves = WaterSurface(device, lightPass, 0, globalState.layout(), shaderLoader);
+
+    waves.ubo.waves[0].w = 0.180f;
+    waves.ubo.waves[1].w = 0.108f;
+    waves.ubo.waves[2].w = 0.412f;
+    waves.ubo.waves[3].w = 0.041f;
+
+    window.camera().set(glm::vec3{0.0f, 25.0f, 0.0f});
+    window.camera().setOrientation(172.0f, 15.0f, 0.0f);
+
+
     auto skybox = SkyBox{device, lightPass, 0, globalState, shaderLoader};
 
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
@@ -229,15 +239,21 @@ int main() {
     gui.customGui = [&waves, &globalState]() {
         ImGui::Begin("Waves", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
-        static float dirs[4] = {30.0f, 50.0f, 270.0f, 60.0f};
-        static float wavenums[4] = {1.0f, 10.0f, 0.1f, 3.0f};
-
+        static float dirs[4] = {33.402f, 103.918f, 68.66f, 50.103f};
+        static float wavenums[4] = {28.709f, 22.041f, 10.245f, 2.039f};
+        static bool firstSet = true;
         for (int i = 0; i < 4; ++i) {
             std::string header = "Wave #" + std::to_string(i);
+            if (firstSet) {
+                waves.ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
+                waves.ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
+
+            }
             if (ImGui::TreeNode(header.c_str())) {
                 if (ImGui::SliderFloat("Direction", dirs + i, 0.0f, 360.0f)) {
                     waves.ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
                     waves.ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
+
                 }
 
                 if (ImGui::SliderFloat("Wavelength", wavenums + i, 0.5f, 100.0f)) {
@@ -249,6 +265,9 @@ int main() {
             }
 
         }
+
+        firstSet = false;
+
         ImGui::SliderInt("Tile cascades", &waves.cascades, 1, 7);
         ImGui::Text("Total tiles: %d", waves.totalTiles());
 
@@ -260,6 +279,8 @@ int main() {
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::ColorEdit4("Sky color", &globalState.ubo.skyColor.x);
         ImGui::ColorEdit4("Light color", &globalState.ubo.lightColor.x);
+        if (ImGui::SliderFloat3("Light direction", &globalState.ubo.lightVec.x, -1.0f, 1.0f))
+            globalState.ubo.lightVec = glm::normalize(globalState.ubo.lightVec);
 
         ImGui::End();
     };

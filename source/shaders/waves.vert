@@ -43,14 +43,12 @@ void main()
     outGridPos = gridPos;
     vec4 position = vec4(vec3(localPos.x, 0.0f,localPos.y) + vec3(translate.x, 0.0f, translate.y), 1.0f);
     float height = 0.0f;
-    vec3 tanget = vec3(1.0f, 0.0, 0.0f);
+    vec3 tangent = vec3(1.0f, 0.0, 0.0f);
     vec3 binormal = vec3(0.0f, 0.0f, 1.0f);
 
 
 
     for(int i = 0; i < 4; ++i){
-        if(pushConstants.waveEnable[i] == 0.0f)
-            continue;
         float lambda = length(waves.waves[i].xy);
         if(lambda == 0.0f)
             continue;
@@ -68,12 +66,12 @@ void main()
 
         position += vec4(cos(f) * dx, sin(f), cos(f) * dy, 0.0f) * waveAmp;
 
-        tanget += vec3(1.0f - dx * dx * steepness * sin(f), dx * steepness * cos(f), -dx * dy * steepness * sin(f));
-        binormal += vec3(- dx * dy * steepness * sin(f), dy * steepness * cos(f), 1.0f - dy * dy * steepness * sin(f));
+        tangent += vec3(- dx * dx * steepness * sin(f), dx * steepness * cos(f), -dx * dy * steepness * sin(f));
+        binormal += vec3(- dx * dy * steepness * sin(f), dy * steepness * cos(f), - dy * dy * steepness * sin(f));
 
     }
 
-    vec3 normal = normalize(cross(tanget, binormal));
+    vec3 normal = normalize(cross( binormal, tangent));
 
     vec2 uv = localPos / NET_SIZE;
 

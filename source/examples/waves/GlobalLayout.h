@@ -13,9 +13,9 @@ public:
     struct Uniform {
         glm::mat4 perspective;
         glm::mat4 cameraSpace;
-        glm::vec4 lightVec = {-1.0f, -1.0f, -1.0f, 0.0f};
-        glm::vec4 skyColor = {0.8f, 0.8f, 0.9f, 1.0f};
-        glm::vec4 lightColor = {0.95f, 0.9f, 0.6f, 1.0f};
+        glm::vec4 lightVec = glm::normalize(glm::vec4{-0.37, 0.37, -0.85, 0.0f});
+        glm::vec4 skyColor = glm::vec4{158.0f, 146.0f, 144.0f, 255.0f} / 255.0f;
+        glm::vec4 lightColor = glm::vec4{244.0f, 218.0f, 62.0f, 255.0f} / 255.0f;
     } ubo;
 
 

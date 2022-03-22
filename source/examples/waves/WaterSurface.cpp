@@ -33,6 +33,23 @@ WaterSurface::WaterSurface(vkw::Device &device, vkw::RenderPass &pass, uint32_t 
                                  (float) j * TILE_SIZE / (float) (TILE_DIM));
             attrs.push_back(attr);
         }
+
+    for (int j = 0; j <= TILE_DIM; ++j) {
+        PrimitiveAttrs attr{};
+        float connectVertexPos = ((float) (j) + 0.5f) * TILE_SIZE / (float) (TILE_DIM);
+        // North Connect vertices
+        attr.pos = glm::vec3(connectVertexPos, 0.0f, TILE_SIZE);
+        attrs.push_back(attr);
+        // East Connect vertices
+        attr.pos = glm::vec3(TILE_SIZE, 0.0f, connectVertexPos);
+        attrs.push_back(attr);
+        // South Connect vertices
+        attr.pos = glm::vec3(connectVertexPos, 0.0f, 0.0f);
+        attrs.push_back(attr);
+        // West Connect vertices
+        attr.pos = glm::vec3(0.0f, 0.0f, connectVertexPos);
+        attrs.push_back(attr);
+    }
     m_buffer = TestApp::createStaticBuffer<vkw::VertexBuffer<PrimitiveAttrs>, PrimitiveAttrs>(device, attrs.begin(),
                                                                                               attrs.end());
 }
@@ -58,11 +75,24 @@ void WaterSurface::draw(vkw::CommandBuffer &buffer, GlobalLayout const &globalLa
     for (int k = 0; k < cascades; ++k)
         for (int i = -2; i < 2; ++i)
             for (int j = -2; j < 2; ++j) {
+                ConnectSide cside = ConnectSide::NO_CONNECT;
 
                 // Discard 'inner' tiles
                 if (k != 0 && ((i == 0 || i == -1) && (j == 0 || j == -1)))
                     continue;
+                if (k != 0) {
+                    if ((i == -1 || i == 0))
+                        if (j == 1)
+                            cside = ConnectSide::SOUTH;
+                        else if (j == -2)
+                            cside = ConnectSide::NORTH;
 
+                    if ((j == -1 || j == 0))
+                        if (i == 1)
+                            cside = ConnectSide::WEST;
+                        else if (i == -2)
+                            cside = ConnectSide::EAST;
+                }
                 auto scale = static_cast<float>(1u << k);
                 glm::vec3 tileTranslate =
                         glm::vec3(center.x, 0.0f, center.z) + glm::vec3(i * TILE_SIZE, 0.0f, j * TILE_SIZE) * scale;
@@ -78,17 +108,12 @@ void WaterSurface::draw(vkw::CommandBuffer &buffer, GlobalLayout const &globalLa
                                                                                                             2.0f}))
                     continue;
 
-                auto &indexBuffer = m_full_tile(0);
+
+                auto &indexBuffer = m_full_tile(cside);
 
                 constants.translate = glm::vec2(tileTranslate.x, tileTranslate.z);
                 constants.scale = scale;
 
-                auto cellSize = TILE_SIZE / TILE_DIM * scale;
-
-                for (int wave = 0; wave < 4; ++wave) {
-                    auto wavelength = glm::length(glm::vec2(ubo.waves[wave].x, ubo.waves[wave].y));
-                    constants.waveEnable[wave] = glm::clamp(wavelength / 2.0f - cellSize, 0.0f, 1.0f);
-                }
                 buffer.bindIndexBuffer(indexBuffer, 0);
 
                 buffer.pushConstants(m_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, constants);
@@ -122,28 +147,40 @@ WaterSurface::m_compile_pipeline(vkw::Device &device, vkw::RenderPass &pass, uin
 }
 
 
-vkw::IndexBuffer<VK_INDEX_TYPE_UINT32> const &WaterSurface::m_full_tile(uint32_t innerCascade) {
-    if (m_full_tiles.contains(innerCascade))
-        return m_full_tiles.at(innerCascade);
-    uint32_t cascadeSparsity = (1u << innerCascade);
-    uint32_t cascadeDim = TILE_DIM / cascadeSparsity;
-    if (cascadeDim < 4u)
-        throw std::runtime_error("Too small cascade dimension(" + std::to_string(cascadeDim) + "). Cascade index: " +
-                                 std::to_string(innerCascade));
+vkw::IndexBuffer<VK_INDEX_TYPE_UINT32> const &WaterSurface::m_full_tile(ConnectSide side) {
+    int iside = static_cast<int>(side);
+    if (m_full_tiles.contains(iside))
+        return m_full_tiles.at(iside);
 
     std::vector<uint32_t> indices;
-    indices.reserve((cascadeDim) * (cascadeDim) * 6u);
-    for (int i = 0; i < cascadeDim; ++i)
-        for (int j = 0; j < cascadeDim; ++j) {
-            indices.push_back(cascadeSparsity * i + cascadeSparsity * (TILE_DIM + 1) * j);
-            indices.push_back(cascadeSparsity * (i + 1) + cascadeSparsity * (TILE_DIM + 1) * j);
-            indices.push_back(cascadeSparsity * i + cascadeSparsity * (TILE_DIM + 1) * (j + 1));
-            indices.push_back(cascadeSparsity * (i + 1) + cascadeSparsity * (TILE_DIM + 1) * (j + 1));
-            indices.push_back(cascadeSparsity * i + cascadeSparsity * (TILE_DIM + 1) * (j + 1));
-            indices.push_back(cascadeSparsity * (i + 1) + cascadeSparsity * (TILE_DIM + 1) * j);
-        }
 
-    return m_full_tiles.emplace(innerCascade,
+    indices.reserve((TILE_DIM) * (TILE_DIM) * 6u);
+
+
+    for (int i = 0; i < TILE_DIM; ++i) {
+        if (i == 0 && side == ConnectSide::WEST)
+            continue;
+        if (i == TILE_DIM - 1 && side == ConnectSide::EAST)
+            continue;
+        for (int j = 0; j < TILE_DIM; ++j) {
+            if (j == TILE_DIM - 1 && side == ConnectSide::NORTH)
+                continue;
+            if (j == 0 && side == ConnectSide::SOUTH)
+                continue;
+            indices.push_back(i + (TILE_DIM + 1) * j);
+            indices.push_back((i + 1) + (TILE_DIM + 1) * j);
+            indices.push_back(i + (TILE_DIM + 1) * (j + 1));
+            indices.push_back((i + 1) + (TILE_DIM + 1) * (j + 1));
+            indices.push_back(i + (TILE_DIM + 1) * (j + 1));
+            indices.push_back((i + 1) + (TILE_DIM + 1) * j);
+        }
+    }
+
+    if (side != ConnectSide::NO_CONNECT) {
+        m_addConnectingEdge(side, indices);
+    }
+
+    return m_full_tiles.emplace(iside,
                                 TestApp::createStaticBuffer<vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>, uint32_t>(m_device,
                                                                                                               indices.begin(),
                                                                                                               indices.end())).first->second;
@@ -163,4 +200,74 @@ vkw::Sampler WaterSurface::m_create_sampler(vkw::Device &device) {
 
     return vkw::Sampler{device, createInfo};
 
+}
+
+void WaterSurface::m_addConnectingEdge(WaterSurface::ConnectSide side, std::vector<uint32_t> &indices) {
+
+    assert(side != ConnectSide::NO_CONNECT && "side must be valid connect side");
+
+    int iside = static_cast<int>(side);
+
+    const int connectVerticesOffset = (TILE_DIM + 1) * (TILE_DIM + 1);
+
+    for (int i = 0; i < TILE_DIM; ++i) {
+        int offset = connectVerticesOffset + i * 4 + iside;
+        switch (side) {
+            case ConnectSide::NORTH:
+                indices.push_back(i + (TILE_DIM + 1) * (TILE_DIM - 1));
+                indices.push_back(offset);
+                indices.push_back(i + (TILE_DIM + 1) * TILE_DIM);
+
+
+                indices.push_back(i + (TILE_DIM + 1) * (TILE_DIM - 1));
+                indices.push_back(i + 1 + (TILE_DIM + 1) * (TILE_DIM - 1));
+                indices.push_back(offset);
+
+                indices.push_back(i + 1 + (TILE_DIM + 1) * (TILE_DIM - 1));
+                indices.push_back(i + 1 + (TILE_DIM + 1) * TILE_DIM);
+                indices.push_back(offset);
+                break;
+            case ConnectSide::SOUTH:
+                indices.push_back(i + (TILE_DIM + 1) * 1);
+                indices.push_back(i + (TILE_DIM + 1) * 0);
+                indices.push_back(offset);
+
+                indices.push_back(i + (TILE_DIM + 1) * 1);
+                indices.push_back(offset);
+                indices.push_back(i + 1 + (TILE_DIM + 1) * 1);
+
+
+                indices.push_back(i + 1 + (TILE_DIM + 1) * 1);
+                indices.push_back(offset);
+                indices.push_back(i + 1 + (TILE_DIM + 1) * 0);
+                break;
+            case ConnectSide::EAST:
+                indices.push_back(TILE_DIM - 1 + (TILE_DIM + 1) * i);
+                indices.push_back(TILE_DIM + (TILE_DIM + 1) * i);
+                indices.push_back(offset);
+
+                indices.push_back(TILE_DIM - 1 + (TILE_DIM + 1) * i);
+                indices.push_back(offset);
+                indices.push_back(TILE_DIM - 1 + (TILE_DIM + 1) * (i + 1));
+
+                indices.push_back(TILE_DIM - 1 + (TILE_DIM + 1) * (i + 1));
+                indices.push_back(offset);
+                indices.push_back(TILE_DIM + (TILE_DIM + 1) * (i + 1));
+                break;
+            case ConnectSide::WEST:
+                indices.push_back(1 + (TILE_DIM + 1) * i);
+                indices.push_back(offset);
+                indices.push_back(0 + (TILE_DIM + 1) * i);
+
+
+                indices.push_back(1 + (TILE_DIM + 1) * i);
+                indices.push_back(1 + (TILE_DIM + 1) * (i + 1));
+                indices.push_back(offset);
+
+                indices.push_back(1 + (TILE_DIM + 1) * (i + 1));
+                indices.push_back(0 + (TILE_DIM + 1) * (i + 1));
+                indices.push_back(offset);
+                break;
+        }
+    }
 }
