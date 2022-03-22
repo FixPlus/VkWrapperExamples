@@ -14,8 +14,8 @@
 
 class WaterSurface {
 public:
-    static constexpr uint32_t TILE_DIM = 128;
-    static constexpr float TILE_SIZE = 10.0f;
+    static constexpr uint32_t TILE_DIM = 64;
+    static constexpr float TILE_SIZE = 20.0f;
     struct PrimitiveAttrs
             : public vkw::AttributeBase<vkw::VertexAttributeType::VEC3F> {
         glm::vec3 pos;
@@ -28,6 +28,9 @@ public:
     } ubo;
 
     int cascades = 7;
+    bool wireframe = false;
+    float tileScale = 1.0f;
+    float elevationScale = 0.1f;
 
 
     WaterSurface(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
@@ -47,7 +50,8 @@ public:
 
 private:
     vkw::GraphicsPipeline
-    m_compile_pipeline(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::ShaderLoader &loader);
+    m_compile_pipeline(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::ShaderLoader &loader,
+                       bool wireframe);
 
 
     enum class ConnectSide {
@@ -75,6 +79,7 @@ private:
     vkw::VertexShader m_vertex_shader;
     vkw::FragmentShader m_fragment_shader;
     vkw::GraphicsPipeline m_pipeline;
+    vkw::GraphicsPipeline m_wireframe_pipeline;
     vkw::DescriptorPool m_pool;
     vkw::DescriptorSet m_set;
     vkw::Sampler m_sampler;

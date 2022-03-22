@@ -25,13 +25,6 @@ layout (set = 1, binding = 0) uniform Waves{
 }waves;
 
 
-layout (push_constant) uniform PushConstants {
-    vec2 translate;
-    float scale;
-    float waveEnable[4];
-} pushConstants;
-
-
 void main(){
 
     vec3 normal = normalize( inNormal );

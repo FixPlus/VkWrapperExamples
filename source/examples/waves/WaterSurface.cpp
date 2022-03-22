@@ -6,12 +6,12 @@ WaterSurface::WaterSurface(vkw::Device &device, vkw::RenderPass &pass, uint32_t 
         : m_descriptor_layout(device,
                               {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}),
           m_pipeline_layout(device, {globalLayout, m_descriptor_layout},
-                            {VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT &
-                                                             VK_SHADER_STAGE_FRAGMENT_BIT, .offset=0, .size=
+                            {VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=
                             sizeof(glm::vec2) + sizeof(float) + 4 * sizeof(int)}}),
           m_vertex_shader(loader.loadVertexShader("waves")),
           m_fragment_shader(loader.loadFragmentShader("waves")),
-          m_pipeline(m_compile_pipeline(device, pass, subpass, loader)),
+          m_pipeline(m_compile_pipeline(device, pass, subpass, loader, false)),
+          m_wireframe_pipeline(m_compile_pipeline(device, pass, subpass, loader, true)),
           m_pool(device, 1,
                  {VkDescriptorPoolSize{.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=1}}),
           m_set(m_pool, m_descriptor_layout),
@@ -61,7 +61,12 @@ void WaterSurface::draw(vkw::CommandBuffer &buffer, GlobalLayout const &globalLa
         float waveEnable[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
     } constants;
-    buffer.bindGraphicsPipeline(m_pipeline);
+
+    if (wireframe)
+        buffer.bindGraphicsPipeline(m_wireframe_pipeline);
+    else
+        buffer.bindGraphicsPipeline(m_pipeline);
+
     buffer.bindDescriptorSets(m_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS, globalLayout.set(), 0);
     buffer.bindDescriptorSets(m_pipeline_layout, VK_PIPELINE_BIND_POINT_GRAPHICS, m_set, 1);
     buffer.bindVertexBuffer(m_buffer, 0, 0);
@@ -71,6 +76,8 @@ void WaterSurface::draw(vkw::CommandBuffer &buffer, GlobalLayout const &globalLa
     glm::vec3 center = globalLayout.camera().position();
 
     m_totalTiles = 0;
+
+    float elevationFactor = 1.0f + glm::abs(center.y) * elevationScale;
 
     for (int k = 0; k < cascades; ++k)
         for (int i = -2; i < 2; ++i)
@@ -93,7 +100,7 @@ void WaterSurface::draw(vkw::CommandBuffer &buffer, GlobalLayout const &globalLa
                         else if (i == -2)
                             cside = ConnectSide::EAST;
                 }
-                auto scale = static_cast<float>(1u << k);
+                auto scale = static_cast<float>(1u << k) * elevationFactor * tileScale;
                 glm::vec3 tileTranslate =
                         glm::vec3(center.x, 0.0f, center.z) + glm::vec3(i * TILE_SIZE, 0.0f, j * TILE_SIZE) * scale;
 
@@ -126,7 +133,7 @@ void WaterSurface::draw(vkw::CommandBuffer &buffer, GlobalLayout const &globalLa
 
 vkw::GraphicsPipeline
 WaterSurface::m_compile_pipeline(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-                                 TestApp::ShaderLoader &loader) {
+                                 TestApp::ShaderLoader &loader, bool wireframe) {
     vkw::GraphicsPipelineCreateInfo createInfo{pass, subpass, m_pipeline_layout};
 #if 1
     static vkw::VertexInputStateCreateInfo<vkw::per_vertex<PrimitiveAttrs, 0>> vertexInputStateCreateInfo{};
@@ -138,7 +145,8 @@ WaterSurface::m_compile_pipeline(vkw::Device &device, vkw::RenderPass &pass, uin
     createInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
     vkw::DepthTestStateCreateInfo depthTestStateCreateInfo{VK_COMPARE_OP_LESS, true};
     createInfo.addDepthTestState(depthTestStateCreateInfo);
-    vkw::RasterizationStateCreateInfo rasterizationStateCreateInfo{false, false, VK_POLYGON_MODE_FILL,
+    vkw::RasterizationStateCreateInfo rasterizationStateCreateInfo{false, false, wireframe ? VK_POLYGON_MODE_LINE
+                                                                                           : VK_POLYGON_MODE_FILL,
                                                                    VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE};
     createInfo.addRasterizationState(rasterizationStateCreateInfo);
 

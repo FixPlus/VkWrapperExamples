@@ -73,102 +73,12 @@ private:
 
 };
 
-class WaveMap : public vkw::ColorImage2D {
-public:
-    struct Pixel {
-        unsigned char r;
-        unsigned char g;
-        unsigned char b;
-        unsigned char a;
-
-    };
-
-    WaveMap(vkw::Device &device, uint32_t dim = 2048) :
-            vkw::ColorImage2D(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY},
-                              VK_FORMAT_R8G8B8A8_UNORM, dim, dim, 1,
-                              VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
-                              VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
-        vkw::Buffer<Pixel> staging{device, dim * dim, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                   VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}};
-
-        auto *mapped = staging.map();
-
-        for (int i = 0; i < dim; ++i) {
-            for (int j = 0; j < dim; ++j) {
-                mapped[i * dim + j].r = static_cast<unsigned char>((glm::sin(i * 0.003f + j * 0.003f) + 1.0f) * 127.0f);
-                glm::vec2 gradient = glm::vec2{glm::cos(i * 0.003f + j * 0.003f) * 0.003f * 127.0f,
-                                               glm::cos(i * 0.003f + j * 0.003f) * 0.003f * 127.0f};
-                mapped[i * dim + j].g = gradient.x;
-                mapped[i * dim + j].b = gradient.y;
-
-            }
-        }
-        staging.flush();
-
-        VkImageMemoryBarrier transitLayout{};
-        transitLayout.image = *this;
-        transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        transitLayout.pNext = nullptr;
-        transitLayout.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        transitLayout.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        transitLayout.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        transitLayout.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        transitLayout.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        transitLayout.subresourceRange.baseArrayLayer = 0;
-        transitLayout.subresourceRange.baseMipLevel = 0;
-        transitLayout.subresourceRange.layerCount = 1;
-        transitLayout.subresourceRange.levelCount = 1;
-        transitLayout.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-        transitLayout.srcAccessMask = 0;
-
-        VkImageMemoryBarrier transitLayout2{};
-        transitLayout2.image = *this;
-        transitLayout2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        transitLayout2.pNext = nullptr;
-        transitLayout2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        transitLayout2.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        transitLayout2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        transitLayout2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        transitLayout2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        transitLayout2.subresourceRange.baseArrayLayer = 0;
-        transitLayout2.subresourceRange.baseMipLevel = 0;
-        transitLayout2.subresourceRange.layerCount = 1;
-        transitLayout2.subresourceRange.levelCount = 1;
-        transitLayout2.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-        transitLayout2.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-
-        auto queue = device.getTransferQueue();
-        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
-        auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
-
-        transferCommand.begin(0);
-        transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                           {transitLayout});
-        VkBufferImageCopy region{};
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.baseArrayLayer = 0;
-        region.imageSubresource.layerCount = 1;
-        region.imageSubresource.mipLevel = 0;
-        region.imageExtent = VkExtent3D{dim, dim, 1};
-
-        transferCommand.copyBufferToImage(staging, *this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {region});
-
-        transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                           {transitLayout2});
-        transferCommand.end();
-
-        queue->submit(transferCommand);
-        queue->waitIdle();
-
-    }
-};
-
 int main() {
     TestApp::SceneProjector window{800, 600, "Waves"};
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, false);
+    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, true);
 
     auto devs = renderInstance.enumerateAvailableDevices();
 
@@ -181,6 +91,9 @@ int main() {
     }
 
     deviceDesc.enableExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    // to support wireframe display
+    deviceDesc.enableFeature(vkw::feature::fillModeNonSolid{});
 
     deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
 
@@ -208,8 +121,6 @@ int main() {
     auto shaderLoader = ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
     auto textureLoader = TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
 
-    auto randomTexture = WaveMap{device, 2048};
-
 
     GUI gui = GUI{window, device, lightPass, 0, shaderLoader, textureLoader};
 
@@ -222,7 +133,10 @@ int main() {
     waves.ubo.waves[0].w = 0.180f;
     waves.ubo.waves[1].w = 0.108f;
     waves.ubo.waves[2].w = 0.412f;
-    waves.ubo.waves[3].w = 0.041f;
+    waves.ubo.waves[3].w = 0.16f;
+
+    waves.ubo.waves[2].z = 0.01f;
+    waves.ubo.waves[3].z = 0.01f;
 
     window.camera().set(glm::vec3{0.0f, 25.0f, 0.0f});
     window.camera().setOrientation(172.0f, 15.0f, 0.0f);
@@ -261,14 +175,18 @@ int main() {
                     waves.ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
                 }
                 ImGui::SliderFloat("Steepness", &waves.ubo.waves[i].w, 0.0f, 1.0f);
+                ImGui::SliderFloat("Steepness decay factor", &waves.ubo.waves[i].z, 0.0f, 1.0f);
                 ImGui::TreePop();
             }
 
         }
 
         firstSet = false;
-
+        ImGui::Checkbox("wireframe", &waves.wireframe);
         ImGui::SliderInt("Tile cascades", &waves.cascades, 1, 7);
+        ImGui::SliderFloat("Tile scale", &waves.tileScale, 0.1f, 10.0f);
+        ImGui::SliderFloat("Elevation scale", &waves.elevationScale, 0.0f, 1.0f);
+
         ImGui::Text("Total tiles: %d", waves.totalTiles());
 
         ImGui::ColorEdit4("Deep water color", &waves.ubo.deepWaterColor.x);
