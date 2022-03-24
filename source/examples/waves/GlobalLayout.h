@@ -6,47 +6,34 @@
 #include <vkw/DescriptorSet.hpp>
 #include <vkw/DescriptorPool.hpp>
 #include <common/Camera.h>
+#include "RenderEngine/RecordingState.h"
 
 
 class GlobalLayout {
 public:
-    struct Uniform {
-        glm::mat4 perspective;
-        glm::mat4 cameraSpace;
+
+    struct LightUniform {
         glm::vec4 lightVec = glm::normalize(glm::vec4{-0.37, 0.37, -0.85, 0.0f});
         glm::vec4 skyColor = glm::vec4{158.0f, 146.0f, 144.0f, 255.0f} / 255.0f;
         glm::vec4 lightColor = glm::vec4{244.0f, 218.0f, 62.0f, 255.0f} / 255.0f;
-    } ubo;
+    } light;
 
+    GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera) :
+            m_camera_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="perspective",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1),
+            m_light_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="sunlight",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, pass, subpass, 1),
+            m_camera(camera),
+            m_light(device, m_light_layout, light),
+            m_camera_projection(device, m_camera_projection_layout){
+    }
 
-    GlobalLayout(vkw::Device &device, TestApp::Camera const &camera) :
-            m_layout(device, {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}),
-            m_pool(device, 1, {VkDescriptorPoolSize{.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=1}}),
-            m_set(m_pool, m_layout),
-            m_uniform(device,
-                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-            m_camera(camera) {
-        m_set.write(0, m_uniform);
+    void bind(RenderEngine::GraphicsRecordingState& state) const{
+        state.setProjection(m_camera_projection);
+        state.setLighting(m_light);
     }
 
     void update() {
-        ubo.perspective = m_camera.get().projection();
-        ubo.cameraSpace = m_camera.get().cameraSpace();
-        auto *mapped = m_uniform.map();
-
-        *mapped = ubo;
-
-        m_uniform.flush();
-
-        m_uniform.unmap();
-    }
-
-    vkw::DescriptorSet const &set() const {
-        return m_set;
-    }
-
-    vkw::DescriptorSetLayout const &layout() const {
-        return m_layout;
+        m_light.update(light);
+        m_camera_projection.update(m_camera);
     }
 
     TestApp::Camera const &camera() const {
@@ -55,11 +42,57 @@ public:
 
 private:
 
-    vkw::DescriptorSetLayout m_layout;
-    vkw::DescriptorPool m_pool;
-    vkw::DescriptorSet m_set;
+
+
+
+
+    RenderEngine::ProjectionLayout m_camera_projection_layout;
+    struct CameraProjection: public RenderEngine::Projection{
+        struct ProjectionUniform {
+            glm::mat4 perspective;
+            glm::mat4 cameraSpace;
+        } ubo;
+
+        CameraProjection(vkw::Device& device, RenderEngine::ProjectionLayout& layout): RenderEngine::Projection(layout),uniform(device,
+                                                                                                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                                                                                                           mapped(uniform.map()){
+            set().write(0, uniform);
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        void update(TestApp::Camera const& camera){
+            ubo.perspective = camera.projection();
+            ubo.cameraSpace = camera.cameraSpace();
+            *mapped = ubo;
+            uniform.flush();
+        }
+        vkw::UniformBuffer<ProjectionUniform> uniform;
+        ProjectionUniform* mapped;
+    } m_camera_projection;
+
+    RenderEngine::LightingLayout m_light_layout;
+    struct Light: public RenderEngine::Lighting{
+
+
+        Light(vkw::Device& device, RenderEngine::LightingLayout& layout, LightUniform const& ubo): RenderEngine::Lighting(layout), uniform(device,
+                                                                                                                               VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+        mapped(uniform.map()){
+            set().write(0, uniform);
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        void update(LightUniform const& ubo){
+            *mapped = ubo;
+            uniform.flush();
+        }
+        vkw::UniformBuffer<LightUniform> uniform;
+        LightUniform* mapped;
+    }m_light;
     std::reference_wrapper<TestApp::Camera const> m_camera;
-    vkw::UniformBuffer<Uniform> m_uniform;
+
+
 
 
 };

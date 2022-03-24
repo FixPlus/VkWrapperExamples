@@ -9,21 +9,16 @@ layout (location = 0) out vec3 outColor;
 layout (location = 1) out vec2 outUV;
 layout (location = 2) out vec3 outNormal;
 layout (location = 3) out vec4 outViewPos;
-layout (location = 4) out vec4 outLightDir;
 layout (location = 5) out vec4 outWorldPos;
 layout (location = 6) out vec2 outGridPos;
 
-layout (set = 0,binding = 0) uniform Globals{
+layout (set = 1,binding = 0) uniform Globals{
     mat4 perspective;
     mat4 cameraSpace;
-    vec4 lightDir;
-    vec4 skyColor;
-    vec4 lightColor;
 } globals;
 
-layout (set = 1, binding = 0) uniform Waves{
+layout (set = 0, binding = 0) uniform Waves{
     vec4 waves[4]; /* xy - wave vector, z - steepnees decay factor, w - steepness */
-    vec4 deepWaterColor;
     float time;
 }waves;
 
@@ -105,7 +100,6 @@ void main()
     outColor = vec3(0.0f, 0.1f, 0.7f);
 
     outUV = uv;
-    outLightDir = globals.lightDir;
     outNormal = normal;
     outWorldPos = position;
     outViewPos = inverse(globals.cameraSpace) * vec4(0.0f, 0.0f, 0.0f, 1.0f);

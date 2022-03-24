@@ -14,7 +14,7 @@
 #include <GLFW/glfw3native.h>
 #include <chrono>
 
-namespace TestApp {
+namespace RenderEngine {
 
     class FrameClock {
     public:

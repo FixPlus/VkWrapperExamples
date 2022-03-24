@@ -1,35 +1,28 @@
 #include "SkyBox.h"
 #include "vkw/CommandBuffer.hpp"
 
+static vkw::NullVertexInputState skybox_state{};
 
-SkyBox::SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpass, const GlobalLayout &globalLayout,
-               const TestApp::ShaderLoader &loader) :
+SkyBox::SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpass) :
         m_device(device),
-        m_global_layout(globalLayout),
-        m_vertexShader(loader.loadVertexShader("skybox")),
-        m_fragmentShader(loader.loadFragmentShader("skybox")),
-        m_pipelineLayout(device, globalLayout.layout()),
-        m_pipeline(m_compile_pipeline(pass, subpass)) {
-
+        m_geometry_layout(device, RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&skybox_state,.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, .maxGeometries=1}),
+        m_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, 1),
+        m_material_layout(device, RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="skybox",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},.maxMaterials=1}),
+        m_lighting_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, pass, subpass, 1),
+        m_geometry(m_geometry_layout),
+        m_projection(m_projection_layout),
+        m_lighting(m_lighting_layout),
+        m_material(device, m_material_layout)
+{
 }
 
-vkw::GraphicsPipeline SkyBox::m_compile_pipeline(vkw::RenderPass const &pass, uint32_t subpass) {
+void SkyBox::draw(RenderEngine::GraphicsRecordingState &buffer) {
 
-    vkw::GraphicsPipelineCreateInfo createInfo{pass, subpass, m_pipelineLayout};
-
-    createInfo.addVertexShader(m_vertexShader);
-    createInfo.addFragmentShader(m_fragmentShader);
-
-    createInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
-    createInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
-
-
-    return {m_device, createInfo};
-}
-
-void SkyBox::draw(vkw::CommandBuffer &buffer) {
-    buffer.bindGraphicsPipeline(m_pipeline);
-    buffer.bindDescriptorSets(m_pipelineLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, m_global_layout.get().set(), 0);
-    buffer.draw(3, 1);
+    buffer.setGeometry(m_geometry);
+    buffer.setProjection(m_projection);
+    buffer.setMaterial(m_material);
+    buffer.setLighting(m_lighting);
+    buffer.bindPipeline();
+    buffer.commands().draw(3, 1);
 
 }

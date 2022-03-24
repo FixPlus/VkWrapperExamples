@@ -13,7 +13,7 @@
 #include <AssetImport.h>
 #include <vkw/Sampler.hpp>
 #include <set>
-#include <Window.h>
+#include <RenderEngine/Window/Window.h>
 
 namespace TestApp {
 
@@ -36,7 +36,7 @@ namespace TestApp {
         ImGuiContext *m_context;
     };
 
-    class WindowIO : virtual public Window {
+    class WindowIO : virtual public RenderEngine::Window {
     public:
 
         WindowIO() : Window(0, 0, "") {}

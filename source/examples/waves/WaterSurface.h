@@ -11,11 +11,10 @@
 #include "common/AssetImport.h"
 #include "GlobalLayout.h"
 #include "vkw/Sampler.hpp"
+#include "RenderEngine/RecordingState.h"
 
-class WaterSurface {
+class WaterSurface: public RenderEngine::GeometryLayout{
 public:
-    static constexpr uint32_t TILE_DIM = 64;
-    static constexpr float TILE_SIZE = 20.0f;
     struct PrimitiveAttrs
             : public vkw::AttributeBase<vkw::VertexAttributeType::VEC3F> {
         glm::vec3 pos;
@@ -23,37 +22,34 @@ public:
 
     struct UBO {
         glm::vec4 waves[4];
-        glm::vec4 deepWaterColor = glm::vec4(0.0f, 0.01f, 0.3f, 1.0f);
         float time = 0.0f;
-    } ubo;
+    };
+
+    static constexpr uint32_t TILE_DIM = 64;
+    static constexpr float TILE_SIZE = 20.0f;
+
+    struct UBO ubo;
 
     int cascades = 7;
     bool wireframe = false;
     float tileScale = 1.0f;
     float elevationScale = 0.1f;
 
-
-    WaterSurface(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-                 vkw::DescriptorSetLayout const &globalLayout, TestApp::ShaderLoader &loader);
-
     void update(float deltaTime) {
         ubo.time += deltaTime;
-        *m_ubo_mapped = ubo;
-        m_ubo.flush();
+        *m_geometry.m_ubo_mapped = ubo;
+        m_geometry.m_ubo.flush();
     }
+
+    WaterSurface(vkw::Device& device);
+
+    void draw(RenderEngine::GraphicsRecordingState &buffer, GlobalLayout const &globalLayout);
 
     int totalTiles() const {
         return m_totalTiles;
     }
 
-    void draw(vkw::CommandBuffer &buffer, GlobalLayout const &globalLayout);
-
 private:
-    vkw::GraphicsPipeline
-    m_compile_pipeline(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::ShaderLoader &loader,
-                       bool wireframe);
-
-
     enum class ConnectSide {
         NORTH = 0,
         EAST = 1,
@@ -66,26 +62,46 @@ private:
 
     vkw::IndexBuffer<VK_INDEX_TYPE_UINT32> const &m_full_tile(ConnectSide side);
 
-    static vkw::Sampler m_create_sampler(vkw::Device &device);
-
-
-    vkw::VertexBuffer<PrimitiveAttrs> m_buffer;
-    std::map<int, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_full_tiles;
-
-    vkw::UniformBuffer<UBO> m_ubo;
-    UBO *m_ubo_mapped;
-    vkw::DescriptorSetLayout m_descriptor_layout;
-    vkw::PipelineLayout m_pipeline_layout;
-    vkw::VertexShader m_vertex_shader;
-    vkw::FragmentShader m_fragment_shader;
-    vkw::GraphicsPipeline m_pipeline;
-    vkw::GraphicsPipeline m_wireframe_pipeline;
-    vkw::DescriptorPool m_pool;
-    vkw::DescriptorSet m_set;
-    vkw::Sampler m_sampler;
-    std::reference_wrapper<vkw::Device> m_device;
+    struct Geometry: public RenderEngine::Geometry{
+        vkw::UniformBuffer<UBO> m_ubo;
+        UBO *m_ubo_mapped;
+        Geometry(vkw::Device& device, WaterSurface& surface);
+    } m_geometry;
 
     int m_totalTiles = 0;
+    vkw::VertexBuffer<PrimitiveAttrs> m_buffer;
+    std::map<int, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_full_tiles;
+    std::reference_wrapper<vkw::Device> m_device;
+
+};
+
+
+class WaterMaterial: public RenderEngine::MaterialLayout{
+public:
+    WaterMaterial(vkw::Device& device, bool wireframe = false): RenderEngine::MaterialLayout(device, RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="flat", .setBindings={vkw::DescriptorSetLayoutBinding{0,
+                                                                                                                                                                                                                                                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},.rasterizationState={VK_FALSE, VK_FALSE, wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL}, .depthTestState=vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, true},.maxMaterials=1}),
+                                        m_material(device, *this){
+
+    };
+
+    glm::vec4 deepWaterColor = glm::vec4(0.0f, 0.01f, 0.3f, 1.0f);
+
+    RenderEngine::Material const& get() const{
+        return m_material;
+    }
+
+    void update() {
+        *m_material.m_mapped = deepWaterColor;
+        m_material.m_buffer.map();
+    }
+
+private:
+    struct Material : public RenderEngine::Material{
+        vkw::UniformBuffer<glm::vec4> m_buffer;
+        glm::vec4* m_mapped;
+        Material(vkw::Device& device, WaterMaterial& waterMaterial);
+    }m_material;
+
 };
 
 #endif //TESTAPP_WATERSURFACE_H

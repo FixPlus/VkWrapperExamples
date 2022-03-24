@@ -1,7 +1,7 @@
 #ifndef TESTAPP_SCENEPROJECTOR_H
 #define TESTAPP_SCENEPROJECTOR_H
 
-#include "Window.h"
+#include "RenderEngine/Window/Window.h"
 #include "Camera.h"
 #include <iostream>
 #include "GUI.h"

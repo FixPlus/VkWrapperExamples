@@ -1,6 +1,6 @@
 #include "Window.h"
 
-namespace TestApp {
+namespace RenderEngine {
 
     std::map<GLFWwindow*, Window*> Window::m_windowMap{};
 

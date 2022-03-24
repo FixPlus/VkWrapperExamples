@@ -73,12 +73,32 @@ private:
 
 };
 
+class MyShaderLoader: public RenderEngine::ShaderLoaderInterface,  public TestApp::ShaderLoader{
+public:
+    MyShaderLoader(vkw::Device& device, std::string shaderLoadPath): TestApp::ShaderLoader(device, shaderLoadPath){
+
+    }
+    vkw::VertexShader const& loadVertexShader(RenderEngine::GeometryLayout const& geometry, RenderEngine::ProjectionLayout const& projection) override{
+        auto fullShaderName = geometry.description().shaderSubstageName + "_" + projection.description().shaderSubstageName;
+        return m_vertexShaders.emplace_back(TestApp::ShaderLoader::loadVertexShader(fullShaderName));
+    };
+
+    vkw::FragmentShader const& loadFragmentShader(RenderEngine::MaterialLayout const& material, RenderEngine::LightingLayout const& lighting) override{
+        auto fullShaderName = material.description().shaderSubstageName + "_" + lighting.description().shaderSubstageName;
+        return m_fragmentShaders.emplace_back(TestApp::ShaderLoader::loadFragmentShader(fullShaderName));
+    };
+private:
+    std::vector<vkw::VertexShader> m_vertexShaders;
+    std::vector<vkw::FragmentShader> m_fragmentShaders;
+
+};
+
 int main() {
     TestApp::SceneProjector window{800, 600, "Waves"};
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, true);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, true);
 
     auto devs = renderInstance.enumerateAvailableDevices();
 
@@ -109,6 +129,7 @@ int main() {
                                                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     std::vector<vkw::FrameBuffer> framebuffers;
 
+    VkPushConstantRange constant;
     for (auto &attachment: mySwapChain->attachments()) {
         framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
                                                 vkw::Image2DArrayViewConstRefArray{attachment,
@@ -118,17 +139,19 @@ int main() {
     auto queue = device.getGraphicsQueue();
     auto fence = vkw::Fence{device};
 
-    auto shaderLoader = ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
+    auto shaderLoader = MyShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
     auto textureLoader = TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
-
+    auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
 
     GUI gui = GUI{window, device, lightPass, 0, shaderLoader, textureLoader};
 
 
     window.setContext(gui);
 
-    auto globalState = GlobalLayout{device, window.camera()};
-    auto waves = WaterSurface(device, lightPass, 0, globalState.layout(), shaderLoader);
+    auto globalState = GlobalLayout{device, lightPass, 0, window.camera()};
+    auto waves = WaterSurface(device);
+    auto waveMaterial = WaterMaterial{device};
+    auto waveMaterialWireframe = WaterMaterial{device, true};
 
     waves.ubo.waves[0].w = 0.180f;
     waves.ubo.waves[1].w = 0.108f;
@@ -142,15 +165,18 @@ int main() {
     window.camera().setOrientation(172.0f, 15.0f, 0.0f);
 
 
-    auto skybox = SkyBox{device, lightPass, 0, globalState, shaderLoader};
+    auto skybox = SkyBox{device, lightPass, 0};
 
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
     auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
+    auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
 
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
-    gui.customGui = [&waves, &globalState]() {
+    skybox.lightColor = globalState.light.skyColor;
+
+    gui.customGui = [&waves, &globalState, &skybox, &waveMaterial, &waveMaterialWireframe]() {
         ImGui::Begin("Waves", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
         static float dirs[4] = {33.402f, 103.918f, 68.66f, 50.103f};
@@ -189,16 +215,18 @@ int main() {
 
         ImGui::Text("Total tiles: %d", waves.totalTiles());
 
-        ImGui::ColorEdit4("Deep water color", &waves.ubo.deepWaterColor.x);
+        if(ImGui::ColorEdit4("Deep water color", &waveMaterial.deepWaterColor.x))
+            waveMaterialWireframe.deepWaterColor = waveMaterial.deepWaterColor;
 
 
         ImGui::End();
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::ColorEdit4("Sky color", &globalState.ubo.skyColor.x);
-        ImGui::ColorEdit4("Light color", &globalState.ubo.lightColor.x);
-        if (ImGui::SliderFloat3("Light direction", &globalState.ubo.lightVec.x, -1.0f, 1.0f))
-            globalState.ubo.lightVec = glm::normalize(globalState.ubo.lightVec);
+        if(ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x))
+            skybox.lightColor = globalState.light.skyColor;
+        ImGui::ColorEdit4("Light color", &globalState.light.lightColor.x);
+        if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
+            globalState.light.lightVec = glm::normalize(globalState.light.lightVec);
 
         ImGui::End();
     };
@@ -216,7 +244,10 @@ int main() {
         gui.frame();
         gui.push();
         globalState.update();
+        skybox.update();
         waves.update(window.clock().frameTime());
+        waveMaterial.update();
+        waveMaterialWireframe.update();
 
         if (window.minimized())
             continue;
@@ -261,6 +292,7 @@ int main() {
         scissor.offset.y = 0;
 
 
+        recorder.reset();
         commandBuffer.begin(0);
         auto currentImage = mySwapChain->currentImage();
 
@@ -272,9 +304,16 @@ int main() {
         commandBuffer.setViewports({viewport}, 0);
         commandBuffer.setScissors({scissor}, 0);
 
-        skybox.draw(commandBuffer);
+        skybox.draw(recorder);
 
-        waves.draw(commandBuffer, globalState);
+        globalState.bind(recorder);
+
+        if(waves.wireframe)
+            recorder.setMaterial(waveMaterialWireframe.get());
+        else
+            recorder.setMaterial(waveMaterial.get());
+
+        waves.draw(recorder, globalState);
 
         gui.draw(commandBuffer);
 
