@@ -41,11 +41,6 @@ public:
     }
 
 private:
-
-
-
-
-
     RenderEngine::ProjectionLayout m_camera_projection_layout;
     struct CameraProjection: public RenderEngine::Projection{
         struct ProjectionUniform {
@@ -91,10 +86,6 @@ private:
         LightUniform* mapped;
     }m_light;
     std::reference_wrapper<TestApp::Camera const> m_camera;
-
-
-
-
 };
 
 

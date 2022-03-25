@@ -18,6 +18,7 @@
 #include <DescriptorPool.hpp>
 #include <Sampler.hpp>
 #include <iostream>
+#include <RenderEngine/Pipelines/PipelinePool.h>
 
 namespace TestApp {
 
@@ -41,6 +42,8 @@ namespace TestApp {
         glm::vec4 weight;
     };
 
+    class ModelMaterial;
+
     struct Primitive {
         uint32_t firstIndex;
         uint32_t indexCount;
@@ -54,6 +57,8 @@ namespace TestApp {
             glm::vec3 center;
             float radius;
         } dimensions;
+
+        ModelMaterial const *material = nullptr;
 
         void setDimensions(glm::vec3 min, glm::vec3 max);
     };
@@ -75,13 +80,13 @@ namespace TestApp {
         std::string name_;
 
     public:
-        MeshBase(vkw::Device &device, tinygltf::Model const &model,
-                 tinygltf::Mesh const &mesh, MeshCreateFlags flags = 0);
+        MeshBase(vkw::Device &device, tinygltf::Model const &model, tinygltf::Mesh const &mesh,
+                 std::vector<ModelMaterial> const &materials, MeshCreateFlags flags = 0);
 
-        void bindBuffers(vkw::CommandBuffer &commandBuffer) const;
+        void bindBuffers(RenderEngine::GraphicsRecordingState &recorder) const;
 
         /** bindBuffers must be called before executing this method */
-        void drawPrimitive(vkw::CommandBuffer &commandBuffer, int index) const;
+        void drawPrimitive(RenderEngine::GraphicsRecordingState &recorder, int index) const;
 
         size_t primitiveCount() const { return primitives_.size(); };
 
@@ -110,22 +115,6 @@ namespace TestApp {
     };
 #endif
 
-    class ShaderPool {
-    public:
-        ShaderPool(RenderEngine::ShaderImporter &loader) : m_loader(loader) {}
-
-        vkw::VertexShader const &vertexShader(std::string const &name);
-
-        vkw::FragmentShader const &fragmentShader(std::string const &name);
-
-
-    private:
-        std::map<std::string, vkw::VertexShader> m_v_shaders{};
-        std::map<std::string, vkw::FragmentShader> m_f_shaders{};
-
-        std::reference_wrapper<RenderEngine::ShaderImporter> m_loader;
-    };
-
     struct MaterialInfo {
         vkw::ColorImage2D *colorMap;
         vkw::Sampler const *sampler;
@@ -133,116 +122,68 @@ namespace TestApp {
         auto operator<=>(MaterialInfo const &another) const = default;
     };
 
-    class Material {
+    class ModelMaterialLayout : public RenderEngine::MaterialLayout {
     public:
-        Material(MaterialInfo info, vkw::DescriptorPool &pool, vkw::DescriptorSetLayout const &layout);
+        explicit ModelMaterialLayout(vkw::Device &device);
 
-        vkw::DescriptorSet const &set() const {
-            return m_descriptor;
-        };
-
-        vkw::DescriptorSetLayout const &layout() const {
-            return m_layout;
-        };
     private:
-        friend class MaterialPool;
-
-        vkw::DescriptorSet m_descriptor;
-        std::reference_wrapper<vkw::DescriptorSetLayout const> m_layout;
     };
 
-    class MaterialPool {
+    class ModelMaterial : public RenderEngine::Material {
     public:
-        MaterialPool(vkw::Device &device, uint32_t maxMaterials) :
-                m_material_descriptor_pool(device, maxMaterials,
-                                           {VkDescriptorPoolSize{.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount=maxMaterials}}),
-                m_descriptor_layout(device,
-                                    vkw::DescriptorSetLayoutBindingConstRefArray{vkw::DescriptorSetLayoutBinding{0,
-                                                                                                                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}) {
+        ModelMaterial(vkw::Device &device, ModelMaterialLayout &layout, MaterialInfo info);
+
+        MaterialInfo const &info() const {
+            return m_info;
         }
 
-        MaterialPool &operator=(MaterialPool &&another) noexcept {
-            m_materials = std::move(another.m_materials);
-            m_material_descriptor_pool = std::move(another.m_material_descriptor_pool);
-            m_descriptor_layout = std::move(another.m_descriptor_layout);
-            for (auto &material: m_materials) {
-                material.second.m_layout = m_descriptor_layout;
-            }
-
-            return *this;
-        }
-
-        Material const &material(MaterialInfo info) {
-            if (m_materials.contains(info))
-                return m_materials.at(info);
-            else
-                return m_materials.emplace(info, Material{info, m_material_descriptor_pool,
-                                                          m_descriptor_layout}).first->second;
-        }
-
-        vkw::DescriptorSetLayout const &layout() const {
-            return m_descriptor_layout;
-        };
     private:
-        std::map<MaterialInfo, Material> m_materials{};
-        vkw::DescriptorPool m_material_descriptor_pool;
-        vkw::DescriptorSetLayout m_descriptor_layout;
+        MaterialInfo m_info;
+    };
+
+    class ModelGeometryLayout : public RenderEngine::GeometryLayout {
+    public:
+        explicit ModelGeometryLayout(vkw::Device &device);
+
+    };
+
+    class ModelGeometry : public RenderEngine::Geometry {
+    public:
+        struct Data {
+            glm::mat4 transform = glm::mat4(1.0f);
+        } data;
+
+        ModelGeometry(vkw::Device &device, ModelGeometryLayout &layout);
+
+        void update();
+
+    private:
+        vkw::UniformBuffer<Data> m_ubo;
+        Data *m_mapped;
     };
 
     class MMesh;
 
-    struct PipelineDesc {
-        Material const *material;
-        MMesh const *mesh;
-
-        auto operator<=>(PipelineDesc const &another) const = default;
-    };
-
-    class PipelinePool {
-    public:
-        explicit PipelinePool(vkw::Device &device, vkw::DescriptorSetLayout const &globalLayout,
-                              vkw::RenderPass &renderPass, uint32_t subpass, ShaderPool &shaderPool);
-
-        std::pair<std::reference_wrapper<vkw::GraphicsPipeline>, std::reference_wrapper<vkw::PipelineLayout>>
-        pipeline(PipelineDesc desc);
-
-    private:
-        std::reference_wrapper<vkw::RenderPass> m_pass;
-        std::reference_wrapper<ShaderPool> m_shaderPool;
-        uint32_t m_subpass;
-        std::reference_wrapper<vkw::Device> m_device;
-        std::reference_wrapper<vkw::DescriptorSetLayout const> m_globalLayout;
-        std::map<PipelineDesc, std::pair<vkw::GraphicsPipeline, vkw::PipelineLayout>> m_pipeline;
-
-    };
-
     class MMesh : public MeshBase {
-        std::vector<std::reference_wrapper<Material const>> m_materials;
-        vkw::DescriptorPool m_instance_pool;
-        std::map<size_t, vkw::DescriptorSet> m_instances{};
-        vkw::DescriptorSetLayout m_instance_layout;
+
+        std::map<size_t, ModelGeometry> m_instances{};
+
     public:
         struct InstanceData {
             glm::mat4 transform = glm::mat4(1.0f);
         };
 
         MMesh(vkw::Device &device, tinygltf::Model const &model,
-              tinygltf::Node const &node, std::vector<std::reference_wrapper<Material const>> materials,
+              tinygltf::Node const &node, const std::vector<ModelMaterial> &materials,
               uint32_t maxInstances);
 
+        void draw(RenderEngine::GraphicsRecordingState &recorder, size_t instanceId) const;
 
-        vkw::DescriptorSet const &instanceSet(size_t instanceId) const {
-            return m_instances.at(instanceId);
-        }
+        ModelGeometry const &instance(size_t id) const;
 
-        vkw::DescriptorSetLayout const &instanceLayout() const {
-            return m_instance_layout;
-        }
+        ModelGeometry &instance(size_t id);
 
-        void draw(vkw::CommandBuffer &buffer, PipelinePool &pool, size_t instanceId) const;
-
-        void addNewInstance(size_t instanceId,
-                            vkw::UniformBuffer<InstanceData> const &instanceBuffer);
+        ModelGeometry &addNewInstance(size_t instanceId, ModelGeometryLayout &layout, vkw::Device &device);
 
         void eraseInstance(size_t instanceId);
 
@@ -257,28 +198,21 @@ namespace TestApp {
 
         std::string name;
 
-
-
         // this fields are used to store initial data of a Node
         // and not used by actual instances
 
-        MMesh::InstanceData initialData{};
+        ModelGeometry::Data initialData{};
 
-        // And this array stores actual instance data
-
-        // TODO: uniform buffer must not be here, bit rather near mesh
-
-        std::map<size_t, std::pair<MMesh::InstanceData, vkw::UniformBuffer<MMesh::InstanceData>>>
-                instanceBuffers;
+        std::map<uint32_t, ModelGeometry::Data> instanceBuffers;
     };
 
     class GLTFModelInstance;
 
     class GLTFModel {
-        MaterialPool materials;
-        std::optional<PipelinePool> m_pipelinePool{};
-        ShaderPool m_shaderPool;
-        std::vector<MaterialInfo> m_material_infos;
+        ModelMaterialLayout materialLayout;
+        ModelGeometryLayout geometryLayout;
+        std::vector<ModelMaterial> materials;
+
         std::vector<vkw::ColorImage2D> textures;
         std::vector<std::shared_ptr<MNode>> rootNodes;
         std::vector<std::shared_ptr<MNode>> linearNodes;
@@ -302,15 +236,13 @@ namespace TestApp {
 
         void setRootMatrix(glm::mat4 transform, size_t id);
 
-        void drawInstance(vkw::CommandBuffer &recorder, vkw::DescriptorSet const &globalSet, size_t id);
+        void drawInstance(RenderEngine::GraphicsRecordingState &recorder, size_t id);
 
     public:
 
-        GLTFModel(vkw::Device &renderer, RenderEngine::ShaderImporter &loader, std::filesystem::path const &path);
+        GLTFModel(vkw::Device &renderer, std::filesystem::path const &path);
 
         GLTFModelInstance createNewInstance();
-
-        void setPipelinePool(vkw::RenderPass &pass, uint32_t subpass, vkw::DescriptorSetLayout const &globalLayout);
 
         friend class GLTFModelInstance;
     };
@@ -319,9 +251,13 @@ namespace TestApp {
         GLTFModel *model_;
         std::optional<size_t> id_;
 
+
         GLTFModelInstance(GLTFModel *model, size_t id) : model_(model), id_(id) {}
 
     public:
+        glm::vec3 rotation = glm::vec3{0.0f};
+        glm::vec3 scale = glm::vec3{1.0f};
+
         GLTFModelInstance(GLTFModelInstance const &another) = delete;
 
         GLTFModelInstance(GLTFModelInstance &&another) noexcept {
@@ -339,10 +275,10 @@ namespace TestApp {
             return *this;
         }
 
-        void setRotation(float x, float y, float z);
+        void update();
 
-        void draw(vkw::CommandBuffer &recorder, vkw::DescriptorSet const &globalSet) {
-            model_->drawInstance(recorder, globalSet, id_.value());
+        void draw(RenderEngine::GraphicsRecordingState &recorder) {
+            model_->drawInstance(recorder, id_.value());
         };
 
         ~GLTFModelInstance();

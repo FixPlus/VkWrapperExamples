@@ -15,19 +15,18 @@ layout (location = 1) out vec2 outUV;
 layout (location = 2) out vec4 outColor;
 
 
-layout (set = 0, binding = 0) uniform Camera{
+layout (set = 1, binding = 0) uniform Camera{
     mat4 perspective;
     mat4 cameraSpace;
-    vec4 lightDir;
 } camera;
 
-layout (set = 1, binding = 0) uniform PrimitiveTransform{
+layout (set = 0, binding = 0) uniform PrimitiveTransform{
     mat4 local;
 } transform;
 
 void main() {
     mat4 localCameraSpace = camera.cameraSpace * transform.local;
-    outNormal = vec3(transform.local * vec4(inNormal, 0.0));
+    outNormal = normalize(vec3(transform.local * vec4(inNormal, 0.0)));
 
     outColor = inColor;
     outUV = inUV;

@@ -71,53 +71,97 @@ private:
 
 };
 
-struct GlobalUniform {
-    glm::mat4 perspective;
-    glm::mat4 cameraSpace;
-    glm::vec4 lightVec = {-1.0f, -1.0f, -1.0f, 0.0f};
-} myUniform;
-
 class GlobalLayout {
 public:
-    GlobalLayout(vkw::Device &device, TestApp::Camera const &camera) :
-            m_layout(device, {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}),
-            m_pool(device, 1, {VkDescriptorPoolSize{.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=1}}),
-            m_set(m_pool, m_layout),
-            m_uniform(device,
-                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-            m_camera(camera) {
-        m_set.write(0, m_uniform);
+
+    struct LightUniform {
+        glm::vec4 lightVec = glm::normalize(glm::vec4{-0.37, 0.37, -0.85, 0.0f});
+        glm::vec4 skyColor = glm::vec4{158.0f, 146.0f, 144.0f, 255.0f} / 255.0f;
+        glm::vec4 lightColor = glm::vec4{244.0f, 218.0f, 62.0f, 255.0f} / 255.0f;
+    } light;
+
+    GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera) :
+            m_camera_projection_layout(device,
+                                       RenderEngine::SubstageDescription{.shaderSubstageName="perspective", .setBindings={
+                                               vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                       1),
+            m_light_layout(device,
+                           RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlight", .setBindings={
+                                   vkw::DescriptorSetLayoutBinding{0,
+                                                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass},
+                           1),
+            m_camera(camera),
+            m_light(device, m_light_layout, light),
+            m_camera_projection(device, m_camera_projection_layout) {
+    }
+
+    void bind(RenderEngine::GraphicsRecordingState &state) const {
+        state.setProjection(m_camera_projection);
+        state.setLighting(m_light);
     }
 
     void update() {
-        ubo.perspective = m_camera.get().projection();
-        ubo.cameraSpace = m_camera.get().cameraSpace();
-        auto *mapped = m_uniform.map();
-
-        *mapped = ubo;
-
-        m_uniform.flush();
-
-        m_uniform.unmap();
+        m_light.update(light);
+        m_camera_projection.update(m_camera);
     }
 
-    vkw::DescriptorSet const &set() const {
-        return m_set;
-    }
-
-    vkw::DescriptorSetLayout const &layout() const {
-        return m_layout;
+    TestApp::Camera const &camera() const {
+        return m_camera.get();
     }
 
 private:
-    GlobalUniform ubo{};
-    vkw::DescriptorSetLayout m_layout;
-    vkw::DescriptorPool m_pool;
-    vkw::DescriptorSet m_set;
+    RenderEngine::ProjectionLayout m_camera_projection_layout;
+
+    struct CameraProjection : public RenderEngine::Projection {
+        struct ProjectionUniform {
+            glm::mat4 perspective;
+            glm::mat4 cameraSpace;
+        } ubo;
+
+        CameraProjection(vkw::Device &device, RenderEngine::ProjectionLayout &layout) : RenderEngine::Projection(
+                layout), uniform(device,
+                                 VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                                                                                        mapped(uniform.map()) {
+            set().write(0, uniform);
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        void update(TestApp::Camera const &camera) {
+            ubo.perspective = camera.projection();
+            ubo.cameraSpace = camera.cameraSpace();
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        vkw::UniformBuffer<ProjectionUniform> uniform;
+        ProjectionUniform *mapped;
+    } m_camera_projection;
+
+    RenderEngine::LightingLayout m_light_layout;
+
+    struct Light : public RenderEngine::Lighting {
+
+
+        Light(vkw::Device &device, RenderEngine::LightingLayout &layout, LightUniform const &ubo)
+                : RenderEngine::Lighting(layout), uniform(device,
+                                                          VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                  mapped(uniform.map()) {
+            set().write(0, uniform);
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        void update(LightUniform const &ubo) {
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        vkw::UniformBuffer<LightUniform> uniform;
+        LightUniform *mapped;
+    } m_light;
+
     std::reference_wrapper<TestApp::Camera const> m_camera;
-    vkw::UniformBuffer<GlobalUniform> m_uniform;
-
-
 };
 
 std::vector<std::filesystem::path> listAvailableModels(std::filesystem::path const &root) {
@@ -140,7 +184,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, false);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, true);
 
     auto devs = renderInstance.enumerateAvailableDevices();
 
@@ -185,7 +229,7 @@ int main() {
 
     window.setContext(gui);
 
-    auto globalState = GlobalLayout{device, window.camera()};
+    auto globalState = GlobalLayout{device, lightPass, 0, window.camera()};
 
     auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
 
@@ -206,32 +250,35 @@ int main() {
         return 0;
     }
 
-    GLTFModel model{device, shaderLoader, modelList.front()};
-
-    model.setPipelinePool(lightPass, 0, globalState.layout());
+    GLTFModel model{device, modelList.front()};
 
     auto instance = model.createNewInstance();
+    instance.update();
 
     gui.customGui = [&instance, &model, &modelList, &modelListCstr, &device, &shaderLoader, &lightPass, &globalState, &window]() {
         //ImGui::SetNextWindowSize({400.0f, 150.0f}, ImGuiCond_Once);
         ImGui::Begin("Model", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
-        static float x, y, z;
 
         static int current_model = 0;
+        bool upd = false;
+        upd = ImGui::SliderFloat("rot x", &instance.rotation.x, -180.0f, 180.0f) | upd;
+        upd = ImGui::SliderFloat("rot y", &instance.rotation.y, -180.0f, 180.0f) | upd;
+        upd = ImGui::SliderFloat("rot z", &instance.rotation.z, -180.0f, 180.0f) | upd;
+        upd = ImGui::SliderFloat("scale x", &instance.scale.x, 0.1f, 10.0f) | upd;
+        upd = ImGui::SliderFloat("scale y", &instance.scale.y, 0.1f, 10.0f) | upd;
+        upd = ImGui::SliderFloat("scale z", &instance.scale.z, 0.1f, 10.0f) | upd;
 
-        ImGui::SliderFloat("x", &x, -180.0f, 180.0f);
-        ImGui::SliderFloat("y", &y, -180.0f, 180.0f);
-        ImGui::SliderFloat("z", &z, -180.0f, 180.0f);
-        instance.setRotation(x, y, z);
+        if (upd)
+            instance.update();
 
         if (ImGui::Combo("models", &current_model, modelListCstr.data(), modelListCstr.size())) {
             {
                 // hack to get instance destroyed
                 auto dummy = std::move(instance);
             }
-            model = GLTFModel(device, shaderLoader, modelList.at(current_model));
-            model.setPipelinePool(lightPass, 0, globalState.layout());
+            model = std::move(GLTFModel(device, modelList.at(current_model)));
             instance = model.createNewInstance();
+            instance.update();
 
         }
 
@@ -317,7 +364,9 @@ int main() {
         commandBuffer.setViewports({viewport}, 0);
         commandBuffer.setScissors({scissor}, 0);
 
-        instance.draw(commandBuffer, globalState.set());
+        globalState.bind(recorder);
+
+        instance.draw(recorder);
 
         gui.draw(recorder);
 

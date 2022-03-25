@@ -10,26 +10,34 @@
 #include <set>
 #include "RenderEngine/Pipelines/PipelineStage.h"
 
-namespace RenderEngine{
+namespace RenderEngine {
 
     class Geometry;
 
-    class GeometryLayout: public PipelineStageLayout{
+    class GeometryLayout : public PipelineStageLayout {
     public:
-        struct CreateInfo{
-            vkw::VertexInputStateCreateInfoBase const* vertexInputState;
+        struct CreateInfo {
+            vkw::VertexInputStateCreateInfoBase const *vertexInputState;
             vkw::InputAssemblyStateCreateInfo inputAssemblyState{};
             SubstageDescription substageDescription;
             uint32_t maxGeometries = 0;
 
         };
-        GeometryLayout(vkw::Device& device, CreateInfo const & createInfo);
 
-        vkw::VertexInputStateCreateInfoBase const* vertexInputState() const{
+        GeometryLayout(vkw::Device &device, CreateInfo const &createInfo);
+
+        GeometryLayout &operator=(GeometryLayout &&another) noexcept {
+            m_vertexInputState = another.m_vertexInputState;
+            m_inputAssemblyState = another.m_inputAssemblyState;
+            PipelineStageLayout::operator=(std::move(another));
+            return *this;
+        }
+
+        vkw::VertexInputStateCreateInfoBase const *vertexInputState() const {
             return &m_vertexInputState;
         }
 
-        vkw::InputAssemblyStateCreateInfo const& inputAssemblyState() const{
+        vkw::InputAssemblyStateCreateInfo const &inputAssemblyState() const {
             return m_inputAssemblyState;
         }
 
@@ -42,12 +50,12 @@ namespace RenderEngine{
 
     class GraphicsRecordingState;
 
-    class Geometry: public PipelineStage<GeometryLayout>{
+    class Geometry : public PipelineStage<GeometryLayout> {
     public:
-        explicit Geometry(GeometryLayout& parent): PipelineStage(parent) {
+        explicit Geometry(GeometryLayout &parent) : PipelineStage(parent) {
         };
 
-        virtual void bind(GraphicsRecordingState& state) const;
+        virtual void bind(GraphicsRecordingState &state) const;
     };
 
 }

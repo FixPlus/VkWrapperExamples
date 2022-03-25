@@ -3,22 +3,21 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include "Utils.h"
 #include <iostream>
+#include <RenderEngine/RecordingState.h>
 
 #define TINYGLTF_IMPLEMENTATION
 
 #include <tiny_gltf/tiny_gltf.h>
 
-namespace Examples {
+static const vkw::VertexInputStateCreateInfo<vkw::per_vertex<TestApp::ModelAttributes, 0>> ModelVertexInputState{};
 
-} // namespace Examples
-
-TestApp::MeshBase::MeshBase(vkw::Device &device,
-                            tinygltf::Model const &model,
-                            tinygltf::Mesh const &mesh, MeshCreateFlags flags) : indexBuffer(device, 1,
-                                                                                             VmaAllocationCreateInfo{}),
-                                                                                 vertexBuffer(device, 1,
-                                                                                              VmaAllocationCreateInfo{}),
-                                                                                 name_(mesh.name) {
+TestApp::MeshBase::MeshBase(vkw::Device &device, tinygltf::Model const &model, tinygltf::Mesh const &mesh,
+                            std::vector<ModelMaterial> const &materials, MeshCreateFlags flags) : indexBuffer(device, 1,
+                                                                                                              VmaAllocationCreateInfo{}),
+                                                                                                  vertexBuffer(device,
+                                                                                                               1,
+                                                                                                               VmaAllocationCreateInfo{}),
+                                                                                                  name_(mesh.name) {
 
     std::vector<AttributeType> attrMapping{};
 
@@ -53,7 +52,9 @@ TestApp::MeshBase::MeshBase(vkw::Device &device,
 
     for (auto &primitive: mesh.primitives) {
 
+
         auto &evalPrimitive = primitives_.emplace_back();
+        evalPrimitive.material = &materials.at(primitive.material);
 
         evalPrimitive.firstVertex = totalVertexCount;
         evalPrimitive.firstIndex = totalIndexCount;
@@ -223,18 +224,21 @@ TestApp::MeshBase::MeshBase(vkw::Device &device,
 
 }
 
-void TestApp::MeshBase::bindBuffers(vkw::CommandBuffer &commandBuffer) const {
-    commandBuffer.bindVertexBuffer(vertexBuffer, 0, 0);
-    commandBuffer.bindIndexBuffer(indexBuffer, 0);
+void TestApp::MeshBase::bindBuffers(RenderEngine::GraphicsRecordingState &recorder) const {
+    recorder.commands().bindVertexBuffer(vertexBuffer, 0, 0);
+    recorder.commands().bindIndexBuffer(indexBuffer, 0);
 }
 
-void TestApp::MeshBase::drawPrimitive(vkw::CommandBuffer &commandBuffer, int index) const {
+void TestApp::MeshBase::drawPrimitive(RenderEngine::GraphicsRecordingState &recorder, int index) const {
     auto &primitive = primitives_.at(index);
+    recorder.setMaterial(*primitive.material);
+    recorder.bindPipeline();
+
     if (primitive.indexCount != 0)
-        commandBuffer.drawIndexed(primitive.indexCount, 1, primitive.firstIndex,
-                                  primitive.firstVertex);
+        recorder.commands().drawIndexed(primitive.indexCount, 1, primitive.firstIndex,
+                                        primitive.firstVertex);
     else
-        commandBuffer.draw(primitive.vertexCount, primitive.firstVertex);
+        recorder.commands().draw(primitive.vertexCount, primitive.firstVertex);
 }
 
 
@@ -247,12 +251,9 @@ void TestApp::Primitive::setDimensions(glm::vec3 min, glm::vec3 max) {
 }
 
 TestApp::MMesh::MMesh(vkw::Device &device, tinygltf::Model const &model,
-                      tinygltf::Node const &node, std::vector<std::reference_wrapper<Material const>> materials,
+                      tinygltf::Node const &node, const std::vector<ModelMaterial> &materials,
                       uint32_t maxInstances)
-        : MeshBase(device, model, model.meshes[node.mesh]),
-          m_materials(std::move(materials)), m_instance_pool(device, maxInstances,
-                                                             {VkDescriptorPoolSize{.type=VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=maxInstances}}),
-          m_instance_layout(device, {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}) {
+        : MeshBase(device, model, model.meshes[node.mesh], materials) {
 
 }
 
@@ -282,39 +283,36 @@ void TestApp::GLTFModel::loadImages(tinygltf::Model &gltfModel) {
     }
 }
 
-void TestApp::MMesh::addNewInstance(
-        size_t instanceId,
-        vkw::UniformBuffer<InstanceData> const &instanceBuffer) {
-
-    auto &desc = m_instances.emplace(instanceId, vkw::DescriptorSet{m_instance_pool, m_instance_layout}).first->second;
-    desc.write(0, instanceBuffer);
+TestApp::ModelGeometry &
+TestApp::MMesh::addNewInstance(size_t instanceId, ModelGeometryLayout &layout, vkw::Device &device) {
+    return m_instances.emplace(instanceId, ModelGeometry{device, layout}).first->second;
 }
 
 void TestApp::MMesh::eraseInstance(size_t instanceId) {
     m_instances.erase(instanceId);
 }
 
-void TestApp::MMesh::draw(vkw::CommandBuffer &buffer, TestApp::PipelinePool &pool, size_t instanceId) const {
-    PipelineDesc desc{};
-    desc.material = &m_materials.front().get();
-    desc.mesh = this;
-    buffer.bindDescriptorSets(pool.pipeline(desc).second, VK_PIPELINE_BIND_POINT_GRAPHICS, m_instances.at(instanceId),
-                              1);
+void TestApp::MMesh::draw(RenderEngine::GraphicsRecordingState &recorder, size_t instanceId) const {
+    recorder.setGeometry(m_instances.at(instanceId));
 
-    bindBuffers(buffer);
+    bindBuffers(recorder);
 
     for (int i = 0; i < primitives_.size(); ++i) {
-        desc.material = &m_materials.at(i).get();
-        buffer.bindGraphicsPipeline(pool.pipeline(desc).first);
-        buffer.bindDescriptorSets(pool.pipeline(desc).second, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                  m_materials.at(i).get().set(), 2);
-        drawPrimitive(buffer, i);
+        drawPrimitive(recorder, i);
     }
 }
 
-TestApp::GLTFModel::GLTFModel(vkw::Device &device, RenderEngine::ShaderImporter &loader,
+const TestApp::ModelGeometry &TestApp::MMesh::instance(size_t id) const {
+    return m_instances.at(id);
+}
+
+TestApp::ModelGeometry &TestApp::MMesh::instance(size_t id) {
+    return m_instances.at(id);
+}
+
+TestApp::GLTFModel::GLTFModel(vkw::Device &device,
                               std::filesystem::path const &path) :
-        renderer_(device), materials(device, 50),
+        renderer_(device),
         sampler(device, VkSamplerCreateInfo{.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext=nullptr,
                 .magFilter=VK_FILTER_LINEAR,
                 .minFilter=VK_FILTER_LINEAR,
@@ -326,7 +324,8 @@ TestApp::GLTFModel::GLTFModel(vkw::Device &device, RenderEngine::ShaderImporter 
                 .minLod=0.0f,
                 .maxLod=1.0f,
         }),
-        m_shaderPool(loader) {
+        materialLayout(device),
+        geometryLayout(device) {
 
     if (!path.has_extension())
         throw std::runtime_error("[MODEL][ERROR] " + path.generic_string() +
@@ -372,6 +371,7 @@ TestApp::GLTFModel::GLTFModel(vkw::Device &device, RenderEngine::ShaderImporter 
 }
 
 void TestApp::GLTFModel::loadMaterials(tinygltf::Model &gltfModel) {
+    uint32_t counter = 0;
     for (tinygltf::Material &mat: gltfModel.materials) {
         MaterialInfo material;
         if (mat.values.find("baseColorTexture") != mat.values.end()) {
@@ -440,7 +440,7 @@ void TestApp::GLTFModel::loadMaterials(tinygltf::Model &gltfModel) {
 
         material.compileDescriptors();
 #endif
-        m_material_infos.push_back(material);
+        materials.emplace_back(renderer_.get(), materialLayout, material);
     }
 }
 
@@ -493,18 +493,8 @@ void TestApp::GLTFModel::loadNode(tinygltf::Model &gltfModel,
     }
 
     if (node.mesh > -1) {
-        std::vector<std::reference_wrapper<Material const>> primitiveMaterials;
-        for (auto &prim: gltfModel.meshes[node.mesh].primitives) {
-            auto matIndex = prim.material;
-            if (matIndex > -1)
-                primitiveMaterials.emplace_back(materials.material(m_material_infos.at(matIndex)));
-            else
-                primitiveMaterials.emplace_back(
-                        materials.material(MaterialInfo{.colorMap = nullptr, .sampler = nullptr})); // default material
-        }
-
         newNode->mesh =
-                std::make_unique<MMesh>(renderer_, gltfModel, node, primitiveMaterials, 10000);
+                std::make_unique<MMesh>(renderer_, gltfModel, node, materials, 10000);
     }
 
     if (parent) {
@@ -527,23 +517,11 @@ TestApp::GLTFModelInstance TestApp::GLTFModel::createNewInstance() {
     instanceCount++;
 
     for (auto &node: linearNodes) {
-        MMesh::InstanceData data = node->initialData;
-
-        VmaAllocationCreateInfo createInfo{};
-        createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        createInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
-        auto[buffer, emplaced] = node->instanceBuffers.emplace(
-                id, std::pair<MMesh::InstanceData, vkw::UniformBuffer<MMesh::InstanceData>>{data,
-                                                                                            vkw::UniformBuffer<MMesh::InstanceData>{
-                                                                                                    renderer_,
-                                                                                                    createInfo}});
-
-        *buffer->second.second.map() = buffer->second.first;
-        buffer->second.second.flush();
-
+        auto &data = node->instanceBuffers.emplace(id, node->initialData).first->second;
         if (node->mesh) {
-            node->mesh->addNewInstance(id, buffer->second.second);
+            auto &geom = node->mesh->addNewInstance(id, geometryLayout, renderer_);
+            geom.data = data;
+            geom.update();
         }
     }
 
@@ -563,22 +541,13 @@ void TestApp::GLTFModel::destroyInstance(size_t id) {
     }
 }
 
-void TestApp::GLTFModel::drawInstance(vkw::CommandBuffer &recorder, vkw::DescriptorSet const &globalSet,
-                                      size_t id) {
+void
+TestApp::GLTFModel::drawInstance(RenderEngine::GraphicsRecordingState &recorder,
+                                 size_t id) {
 
-    bool flag = false;
     for (auto &node: linearNodes) {
         if (node->mesh) {
-            if (!flag) {
-                PipelineDesc desc;
-                desc.mesh = node->mesh.get();
-                desc.material = &materials.material({.colorMap=&textures.front(), .sampler=&sampler});
-                recorder.bindDescriptorSets(m_pipelinePool.value().pipeline(desc).second,
-                                            VK_PIPELINE_BIND_POINT_GRAPHICS, globalSet,
-                                            0);
-                flag = false;
-            }
-            node->mesh->draw(recorder, m_pipelinePool.value(), id);
+            node->mesh->draw(recorder, id);
         }
     }
 }
@@ -588,91 +557,83 @@ TestApp::GLTFModelInstance::~GLTFModelInstance() {
         model_->destroyInstance(id_.value());
 }
 
-void TestApp::GLTFModelInstance::setRotation(float x, float y, float z) {
+void TestApp::GLTFModelInstance::update() {
     auto rot = glm::mat4(1.0f);
-    rot = glm::rotate(rot, glm::radians(x), glm::vec3(1.0f, 0.0f, 0.0f));
-    rot = glm::rotate(rot, glm::radians(y), glm::vec3(0.0f, 1.0f, 0.0f));
-    rot = glm::rotate(rot, glm::radians(z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    rot = glm::rotate(rot, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    rot = glm::rotate(rot, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    rot = glm::rotate(rot, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    rot = glm::scale(rot, scale);
 
     model_->setRootMatrix(rot, id_.value());
 }
 
-TestApp::Material::Material(TestApp::MaterialInfo info, vkw::DescriptorPool &pool,
-                            const vkw::DescriptorSetLayout &layout) : m_descriptor(pool, layout), m_layout(layout) {
-    VkComponentMapping mapping;
-    mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    auto &colorMap = *info.colorMap;
-    auto &colorMapView = colorMap.getView<vkw::ColorImageView>(pool.device(), colorMap.format(), mapping);
-
-    m_descriptor.write(0, colorMapView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
-}
-
-TestApp::PipelinePool::PipelinePool(vkw::Device &device, vkw::DescriptorSetLayout const &globalLayout,
-                                    vkw::RenderPass &renderPass, uint32_t subpass, ShaderPool &shaderPool) : m_device(
-        device),
-                                                                                                             m_globalLayout(
-                                                                                                                     globalLayout),
-                                                                                                             m_pass(renderPass),
-                                                                                                             m_subpass(
-                                                                                                                     subpass),
-                                                                                                             m_shaderPool(
-                                                                                                                     shaderPool) {
-
-}
-
-void TestApp::GLTFModel::setPipelinePool(vkw::RenderPass &pass, uint32_t subpass,
-                                         vkw::DescriptorSetLayout const &globalLayout) {
-    m_pipelinePool.emplace(renderer_, globalLayout, pass, subpass, m_shaderPool);
+static void updateMatricesRecursively(TestApp::ModelGeometry::Data parentData, TestApp::MNode *node, size_t id) {
+    if (!node)
+        return;
+    auto data = node->instanceBuffers.at(id);
+    data.transform = parentData.transform * data.transform;
+    if (node->mesh) {
+        auto &geom = node->mesh->instance(id);
+        geom.data = data;
+        geom.update();
+    }
+    for (auto &child: node->children) {
+        updateMatricesRecursively(data, child.get(), id);
+    }
 }
 
 void TestApp::GLTFModel::setRootMatrix(glm::mat4 transform, size_t id) {
     for (auto &node: rootNodes) {
         auto &buffer = node->instanceBuffers.at(id);
-        buffer.first.transform = transform;
-        *buffer.second.map() = buffer.first;
-        buffer.second.flush();
-        buffer.second.unmap();
+        buffer.transform = transform;
+
+        TestApp::ModelGeometry::Data init{};
+        init.transform = glm::mat4{1.0f};
+        updateMatricesRecursively(init, node.get(), id);
     }
 }
 
-std::pair<std::reference_wrapper<vkw::GraphicsPipeline>, std::reference_wrapper<vkw::PipelineLayout>>
-TestApp::PipelinePool::pipeline(TestApp::PipelineDesc desc) {
-    if (m_pipeline.contains(desc)) {
-        auto &pipe = m_pipeline.at(desc);
+TestApp::ModelMaterialLayout::ModelMaterialLayout(vkw::Device &device) :
+        RenderEngine::MaterialLayout(device,
+                                     RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="pbr", .setBindings={
+                                             vkw::DescriptorSetLayoutBinding{0,
+                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .rasterizationState=vkw::RasterizationStateCreateInfo(
+                                             VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL,
+                                             VK_CULL_MODE_BACK_BIT), .depthTestState=vkw::DepthTestStateCreateInfo(
+                                             VK_COMPARE_OP_LESS, VK_TRUE), .maxMaterials=50}) {
 
-        return {pipe.first, pipe.second};
-    }
-    vkw::PipelineLayout layout{m_device, {desc.mesh->instanceLayout(), desc.material->layout(), m_globalLayout}};
-    vkw::GraphicsPipelineCreateInfo createInfo{m_pass, m_subpass, layout};
-    createInfo.addVertexShader(m_shaderPool.get().vertexShader("model"));
-    createInfo.addFragmentShader(m_shaderPool.get().fragmentShader("model"));
-    createInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
-    createInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
-    vkw::VertexInputStateCreateInfo<vkw::per_vertex<ModelAttributes, 0>> inputState{};
-
-    createInfo.addVertexInputState(inputState);
-    createInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, true});
-
-    vkw::RasterizationStateCreateInfo rasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL,
-                                                                   VK_CULL_MODE_BACK_BIT,
-                                                                   VK_FRONT_FACE_COUNTER_CLOCKWISE};
-
-    createInfo.addRasterizationState(rasterizationStateCreateInfo);
-
-    auto &ret = m_pipeline.emplace(desc, std::pair<vkw::GraphicsPipeline, vkw::PipelineLayout>{
-            vkw::GraphicsPipeline{m_device, createInfo}, std::move(layout)}).first->second;
-
-    return {ret.first, ret.second};
 }
 
-vkw::VertexShader const &TestApp::ShaderPool::vertexShader(std::string const &name) {
-    return m_v_shaders.emplace(name, m_loader.get().loadVertexShader(name)).first->second;
+TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, ModelMaterialLayout &layout, MaterialInfo info)
+        : RenderEngine::Material(layout), m_info(info) {
+    VkComponentMapping mapping{};
+    mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    set().write(0, info.colorMap->getView<vkw::ColorImageView>(device, info.colorMap->format(), mapping),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
+
 }
 
-vkw::FragmentShader const &TestApp::ShaderPool::fragmentShader(std::string const &name) {
-    return m_f_shaders.emplace(name, m_loader.get().loadFragmentShader(name)).first->second;
+TestApp::ModelGeometryLayout::ModelGeometryLayout(vkw::Device &device) :
+        RenderEngine::GeometryLayout(device,
+                                     RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&ModelVertexInputState, .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="model", .setBindings={
+                                             vkw::DescriptorSetLayoutBinding{0,
+                                                                             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .maxGeometries=1000}) {
+
+}
+
+TestApp::ModelGeometry::ModelGeometry(vkw::Device &device, TestApp::ModelGeometryLayout &layout)
+        : RenderEngine::Geometry(layout), m_ubo(device,
+                                                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+          m_mapped(m_ubo.map()) {
+    set().write(0, m_ubo);
+}
+
+void TestApp::ModelGeometry::update() {
+    *m_mapped = data;
+    m_ubo.flush();
 }
