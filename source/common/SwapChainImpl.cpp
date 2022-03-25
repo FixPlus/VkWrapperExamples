@@ -111,7 +111,7 @@ namespace TestApp{
                 }
             }
 
-       swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+       //swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
 
         // Find a supported composite alpha format (not all devices support alpha
         // opaque)

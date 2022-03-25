@@ -12,7 +12,7 @@
 #include <vkw/VertexBuffer.hpp>
 #include <CommandBuffer.hpp>
 #include <Shader.hpp>
-#include <AssetImport.h>
+#include <RenderEngine/AssetImport/AssetImport.h>
 #include <Pipeline.hpp>
 #include <DescriptorSet.hpp>
 #include <DescriptorPool.hpp>
@@ -112,7 +112,7 @@ namespace TestApp {
 
     class ShaderPool {
     public:
-        ShaderPool(ShaderLoader &loader) : m_loader(loader) {}
+        ShaderPool(RenderEngine::ShaderImporter &loader) : m_loader(loader) {}
 
         vkw::VertexShader const &vertexShader(std::string const &name);
 
@@ -123,7 +123,7 @@ namespace TestApp {
         std::map<std::string, vkw::VertexShader> m_v_shaders{};
         std::map<std::string, vkw::FragmentShader> m_f_shaders{};
 
-        std::reference_wrapper<ShaderLoader> m_loader;
+        std::reference_wrapper<RenderEngine::ShaderImporter> m_loader;
     };
 
     struct MaterialInfo {
@@ -306,7 +306,7 @@ namespace TestApp {
 
     public:
 
-        GLTFModel(vkw::Device &renderer, ShaderLoader &loader, std::filesystem::path const &path);
+        GLTFModel(vkw::Device &renderer, RenderEngine::ShaderImporter &loader, std::filesystem::path const &path);
 
         GLTFModelInstance createNewInstance();
 

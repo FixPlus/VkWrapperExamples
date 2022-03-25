@@ -1,5 +1,5 @@
 #include <SceneProjector.h>
-#include <AssetImport.h>
+#include <RenderEngine/AssetImport/AssetImport.h>
 #include <vkw/Library.hpp>
 #include <SwapChainImpl.h>
 #include <vkw/Queue.hpp>
@@ -7,6 +7,7 @@
 #include "Utils.h"
 #include <RenderPassesImpl.h>
 #include <Semaphore.hpp>
+#include <RenderEngine/Shaders/ShaderLoader.h>
 #include "GUI.h"
 #include "AssetPath.inc"
 #include "Model.h"
@@ -19,9 +20,8 @@ using namespace TestApp;
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
     GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-        ShaderLoader const &shaderLoader,
-        TextureLoader const &textureLoader)
-            : GUIBackend(device, pass, subpass, shaderLoader, textureLoader),
+        RenderEngine::TextureLoader const &textureLoader)
+            : GUIBackend(device, pass, subpass, textureLoader),
               m_window(window) {
         ImGui::SetCurrentContext(context());
         auto &io = ImGui::GetIO();
@@ -73,26 +73,6 @@ private:
 
 };
 
-class MyShaderLoader: public RenderEngine::ShaderLoaderInterface,  public TestApp::ShaderLoader{
-public:
-    MyShaderLoader(vkw::Device& device, std::string shaderLoadPath): TestApp::ShaderLoader(device, shaderLoadPath){
-
-    }
-    vkw::VertexShader const& loadVertexShader(RenderEngine::GeometryLayout const& geometry, RenderEngine::ProjectionLayout const& projection) override{
-        auto fullShaderName = geometry.description().shaderSubstageName + "_" + projection.description().shaderSubstageName;
-        return m_vertexShaders.emplace_back(TestApp::ShaderLoader::loadVertexShader(fullShaderName));
-    };
-
-    vkw::FragmentShader const& loadFragmentShader(RenderEngine::MaterialLayout const& material, RenderEngine::LightingLayout const& lighting) override{
-        auto fullShaderName = material.description().shaderSubstageName + "_" + lighting.description().shaderSubstageName;
-        return m_fragmentShaders.emplace_back(TestApp::ShaderLoader::loadFragmentShader(fullShaderName));
-    };
-private:
-    std::vector<vkw::VertexShader> m_vertexShaders;
-    std::vector<vkw::FragmentShader> m_fragmentShaders;
-
-};
-
 int main() {
     TestApp::SceneProjector window{800, 600, "Waves"};
 
@@ -115,8 +95,6 @@ int main() {
     // to support wireframe display
     deviceDesc.enableFeature(vkw::feature::fillModeNonSolid{});
 
-    deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
-
     auto device = vkw::Device{renderInstance, deviceDesc};
 
     auto surface = window.surface(renderInstance);
@@ -129,7 +107,6 @@ int main() {
                                                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     std::vector<vkw::FrameBuffer> framebuffers;
 
-    VkPushConstantRange constant;
     for (auto &attachment: mySwapChain->attachments()) {
         framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
                                                 vkw::Image2DArrayViewConstRefArray{attachment,
@@ -139,11 +116,11 @@ int main() {
     auto queue = device.getGraphicsQueue();
     auto fence = vkw::Fence{device};
 
-    auto shaderLoader = MyShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-    auto textureLoader = TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
+    auto shaderLoader = RenderEngine::ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
+    auto textureLoader = RenderEngine::TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
     auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
 
-    GUI gui = GUI{window, device, lightPass, 0, shaderLoader, textureLoader};
+    GUI gui = GUI{window, device, lightPass, 0, textureLoader};
 
 
     window.setContext(gui);
@@ -215,14 +192,14 @@ int main() {
 
         ImGui::Text("Total tiles: %d", waves.totalTiles());
 
-        if(ImGui::ColorEdit4("Deep water color", &waveMaterial.deepWaterColor.x))
+        if (ImGui::ColorEdit4("Deep water color", &waveMaterial.deepWaterColor.x))
             waveMaterialWireframe.deepWaterColor = waveMaterial.deepWaterColor;
 
 
         ImGui::End();
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        if(ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x))
+        if (ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x))
             skybox.lightColor = globalState.light.skyColor;
         ImGui::ColorEdit4("Light color", &globalState.light.lightColor.x);
         if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
@@ -308,14 +285,14 @@ int main() {
 
         globalState.bind(recorder);
 
-        if(waves.wireframe)
+        if (waves.wireframe)
             recorder.setMaterial(waveMaterialWireframe.get());
         else
             recorder.setMaterial(waveMaterial.get());
 
         waves.draw(recorder, globalState);
 
-        gui.draw(commandBuffer);
+        gui.draw(recorder);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();

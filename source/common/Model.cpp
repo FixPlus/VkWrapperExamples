@@ -257,7 +257,7 @@ TestApp::MMesh::MMesh(vkw::Device &device, tinygltf::Model const &model,
 }
 
 void TestApp::GLTFModel::loadImages(tinygltf::Model &gltfModel) {
-    TextureLoader loader(renderer_, "");
+    RenderEngine::TextureLoader loader(renderer_, "");
 
     for (auto &image: gltfModel.images) {
         unsigned char *imageBuf = image.image.data();
@@ -312,7 +312,8 @@ void TestApp::MMesh::draw(vkw::CommandBuffer &buffer, TestApp::PipelinePool &poo
     }
 }
 
-TestApp::GLTFModel::GLTFModel(vkw::Device &device, ShaderLoader &loader, std::filesystem::path const &path) :
+TestApp::GLTFModel::GLTFModel(vkw::Device &device, RenderEngine::ShaderImporter &loader,
+                              std::filesystem::path const &path) :
         renderer_(device), materials(device, 50),
         sampler(device, VkSamplerCreateInfo{.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext=nullptr,
                 .magFilter=VK_FILTER_LINEAR,
@@ -629,8 +630,8 @@ void TestApp::GLTFModel::setPipelinePool(vkw::RenderPass &pass, uint32_t subpass
 }
 
 void TestApp::GLTFModel::setRootMatrix(glm::mat4 transform, size_t id) {
-    for(auto& node: rootNodes){
-        auto& buffer = node->instanceBuffers.at(id);
+    for (auto &node: rootNodes) {
+        auto &buffer = node->instanceBuffers.at(id);
         buffer.first.transform = transform;
         *buffer.second.map() = buffer.first;
         buffer.second.flush();
@@ -656,7 +657,9 @@ TestApp::PipelinePool::pipeline(TestApp::PipelineDesc desc) {
     createInfo.addVertexInputState(inputState);
     createInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, true});
 
-    vkw::RasterizationStateCreateInfo rasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE};
+    vkw::RasterizationStateCreateInfo rasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL,
+                                                                   VK_CULL_MODE_BACK_BIT,
+                                                                   VK_FRONT_FACE_COUNTER_CLOCKWISE};
 
     createInfo.addRasterizationState(rasterizationStateCreateInfo);
 

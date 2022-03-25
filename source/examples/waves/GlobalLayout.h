@@ -20,7 +20,7 @@ public:
 
     GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera) :
             m_camera_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="perspective",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1),
-            m_light_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="sunlight",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, pass, subpass, 1),
+            m_light_layout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlight",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass}, 1),
             m_camera(camera),
             m_light(device, m_light_layout, light),
             m_camera_projection(device, m_camera_projection_layout){

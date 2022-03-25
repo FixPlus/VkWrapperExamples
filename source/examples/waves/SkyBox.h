@@ -3,7 +3,7 @@
 
 
 #include "GlobalLayout.h"
-#include "common/AssetImport.h"
+#include "RenderEngine/AssetImport/AssetImport.h"
 #include "vkw/Pipeline.hpp"
 #include "RenderEngine/RecordingState.h"
 
@@ -33,16 +33,19 @@ private:
 
     RenderEngine::Geometry m_geometry;
     RenderEngine::Projection m_projection;
-    struct Material: RenderEngine::Material{
+
+    struct Material : RenderEngine::Material {
         vkw::UniformBuffer<glm::vec4> m_buffer;
-        glm::vec4* m_mapped;
-        Material(vkw::Device& device, RenderEngine::MaterialLayout& layout): RenderEngine::Material(layout),
-        m_buffer(device,
-        VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                        m_mapped(m_buffer.map()){
+        glm::vec4 *m_mapped;
+
+        Material(vkw::Device &device, RenderEngine::MaterialLayout &layout) : RenderEngine::Material(layout),
+                                                                              m_buffer(device,
+                                                                                       VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                                                                              m_mapped(m_buffer.map()) {
             set().write(0, m_buffer);
         }
-    }m_material;
+    } m_material;
+
     RenderEngine::Lighting m_lighting;
 
 };

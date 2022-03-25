@@ -34,11 +34,12 @@
 #include "tiny_gltf/stb_image.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <RenderEngine/Shaders/ShaderLoader.h>
 
 #include "SwapChainImpl.h"
 #include "RenderPassesImpl.h"
 #include "CubeGeometry.h"
-#include "AssetImport.h"
+#include "RenderEngine/AssetImport/AssetImport.h"
 #include "GUI.h"
 #include "AssetPath.inc"
 #include "Utils.h"
@@ -48,9 +49,8 @@ using namespace TestApp;
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
     GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-        ShaderLoader const &shaderLoader,
-        TextureLoader const &textureLoader)
-            : GUIBackend(device, pass, subpass, shaderLoader, textureLoader),
+        RenderEngine::TextureLoader const &textureLoader)
+            : GUIBackend(device, pass, subpass, textureLoader),
               m_window(window) {
         ImGui::SetCurrentContext(context());
         auto &io = ImGui::GetIO();
@@ -143,7 +143,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, true);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, true);
 
     std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
                   [](vkw::Instance::extension_const_iterator::value_type const &ext) {
@@ -275,7 +275,7 @@ int main() {
                                    *shadowMapAttachmentViews.at(i));
     }
 
-    TestApp::TextureLoader textureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
+    RenderEngine::TextureLoader textureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
     auto cubeTexture = textureLoader.loadTexture("image");
     auto &cubeTextureView = cubeTexture.getView<vkw::ColorImageView>(device, cubeTexture.format(), mapping);
 
@@ -330,11 +330,12 @@ int main() {
     vkw::DescriptorSetLayout cubeShadowDescriptorLayout{device, {vkw::DescriptorSetLayoutBinding{0,
                                                                                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}};
 
-    TestApp::ShaderLoader shaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-    auto cubeVertShader = shaderLoader.loadVertexShader("triangle");
-    auto cubeShadowShader = shaderLoader.loadVertexShader("shadow");
-    auto cubeShadowShowShader = shaderLoader.loadFragmentShader("shadow");
-    auto cubeFragShader = shaderLoader.loadFragmentShader("triangle");
+    RenderEngine::ShaderImporter shaderImporter{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
+    RenderEngine::ShaderLoader shaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
+    auto cubeVertShader = shaderImporter.loadVertexShader("triangle");
+    auto cubeShadowShader = shaderImporter.loadVertexShader("shadow");
+    auto cubeShadowShowShader = shaderImporter.loadFragmentShader("shadow");
+    auto cubeFragShader = shaderImporter.loadFragmentShader("triangle");
 
     vkw::PipelineLayout lightLayout{device, cubeLightDescriptorLayout};
     vkw::PipelineLayout shadowLayout{device, cubeShadowDescriptorLayout,
@@ -399,7 +400,10 @@ int main() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
-    GUI gui{window, device, lightRenderPass, 0, shaderLoader, textureLoader};
+    auto pipelinePool = RenderEngine::GraphicsPipelinePool{device, shaderLoader};
+    auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
+
+    GUI gui{window, device, lightRenderPass, 0, textureLoader};
 
     window.setContext(gui);
 
@@ -422,12 +426,13 @@ int main() {
 
     while (!window.shouldClose()) {
 
-        TestApp::Window::pollEvents();
+        RenderEngine::Window::pollEvents();
 
 
         window.update();
         gui.frame();
         gui.push();
+        recorder.reset();
 
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
@@ -536,7 +541,7 @@ int main() {
             cubePool.bindGeometry(commandBuffer);
             cubePool.drawGeometry(commandBuffer);
 
-            gui.draw(commandBuffer);
+            gui.draw(recorder);
             commandBuffer.endRenderPass();
             commandBuffer.end();
 

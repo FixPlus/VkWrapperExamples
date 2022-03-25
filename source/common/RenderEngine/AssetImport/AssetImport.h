@@ -7,7 +7,7 @@
 #include <vkw/Image.hpp>
 #include <vkw/Shader.hpp>
 
-namespace TestApp {
+namespace RenderEngine {
 
 
     class AssetImporterBase {
@@ -45,9 +45,9 @@ namespace TestApp {
         std::reference_wrapper<vkw::Device> m_device;
     };
 
-    class ShaderLoader : public AssetImporterBase {
+    class ShaderImporter : public AssetImporterBase {
     public:
-        ShaderLoader(vkw::Device &device, std::string const &rootDirectory) :
+        ShaderImporter(vkw::Device &device, std::string const &rootDirectory) :
                 AssetImporterBase(rootDirectory), m_device(device) {}
 
         vkw::VertexShader loadVertexShader(std::string const &name) const;

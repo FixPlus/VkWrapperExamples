@@ -8,8 +8,14 @@ namespace RenderEngine{
 
     class LightingLayout: public PipelineStageLayout{
     public:
-        LightingLayout(vkw::Device& device, SubstageDescription const& desc, vkw::RenderPass const& pass, uint32_t subpass, uint32_t maxSets = 0):
-                PipelineStageLayout(device, desc, maxSets), m_pass(pass), m_subpass(subpass){}
+        struct CreateInfo{
+            SubstageDescription substageDescription;
+            vkw::RenderPassCRef pass;
+            uint32_t subpass;
+            std::vector<std::pair<VkPipelineColorBlendAttachmentState, uint32_t>> blendStates{};
+        };
+        LightingLayout(vkw::Device& device, CreateInfo const& desc, uint32_t maxSets = 0):
+                PipelineStageLayout(device, desc.substageDescription, maxSets), m_pass(desc.pass), m_subpass(desc.subpass), m_blend_states(desc.blendStates){}
 
         auto const& blendStates() const{
             return m_blend_states;

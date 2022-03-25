@@ -1,5 +1,5 @@
 #include <SceneProjector.h>
-#include <AssetImport.h>
+#include <RenderEngine/AssetImport/AssetImport.h>
 #include <vkw/Library.hpp>
 #include <SwapChainImpl.h>
 #include <vkw/Queue.hpp>
@@ -7,18 +7,19 @@
 #include "Utils.h"
 #include <RenderPassesImpl.h>
 #include <Semaphore.hpp>
+#include <RenderEngine/Shaders/ShaderLoader.h>
 #include "GUI.h"
 #include "AssetPath.inc"
 #include "Model.h"
+#include "RenderEngine/RecordingState.h"
 
 using namespace TestApp;
 
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
     GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-        ShaderLoader const &shaderLoader,
-        TextureLoader const &textureLoader)
-            : GUIBackend(device, pass, subpass, shaderLoader, textureLoader),
+        RenderEngine::TextureLoader const &textureLoader)
+            : GUIBackend(device, pass, subpass, textureLoader),
               m_window(window) {
         ImGui::SetCurrentContext(context());
         auto &io = ImGui::GetIO();
@@ -139,7 +140,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = TestApp::Window::vulkanInstance(vulkanLib, {}, false);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, false);
 
     auto devs = renderInstance.enumerateAvailableDevices();
 
@@ -176,15 +177,18 @@ int main() {
     auto queue = device.getGraphicsQueue();
     auto fence = vkw::Fence{device};
 
-    auto shaderLoader = ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-    auto textureLoader = TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/texture/")};
+    auto shaderLoader = RenderEngine::ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
+    auto textureLoader = RenderEngine::TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/texture/")};
 
-    GUI gui = GUI{window, device, lightPass, 0, shaderLoader, textureLoader};
+    GUI gui = GUI{window, device, lightPass, 0, textureLoader};
 
 
     window.setContext(gui);
 
     auto globalState = GlobalLayout{device, window.camera()};
+
+    auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
+
 
     auto modelList = listAvailableModels("data/models");
     std::vector<std::string> modelListString{};
@@ -238,6 +242,8 @@ int main() {
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
     auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
+    auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
+
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
@@ -255,8 +261,9 @@ int main() {
         gui.frame();
         gui.push();
         globalState.update();
+        recorder.reset();
 
-        if(window.minimized())
+        if (window.minimized())
             continue;
 
         try {
@@ -312,7 +319,7 @@ int main() {
 
         instance.draw(commandBuffer, globalState.set());
 
-        gui.draw(commandBuffer);
+        gui.draw(recorder);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();

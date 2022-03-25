@@ -40,6 +40,11 @@ RenderEngine::GraphicsPipelinePool::pipelineOf(const RenderEngine::GeometryLayou
     if(materialLayout.depthTestState())
         createInfo.addDepthTestState(materialLayout.depthTestState().value());
     createInfo.addRasterizationState(materialLayout.rasterizationState());
+
+    for(auto& blendState: lightingLayout.blendStates()){
+        createInfo.addBlendState(blendState.first, blendState.second);
+    }
+
     createInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
     createInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
 

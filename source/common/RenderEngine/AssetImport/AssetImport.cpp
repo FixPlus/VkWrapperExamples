@@ -8,12 +8,12 @@
 #include <vkw/CommandBuffer.hpp>
 #include <cstring>
 
-bool TestApp::AssetImporterBase::try_open(const std::string &filename) const {
+bool RenderEngine::AssetImporterBase::try_open(const std::string &filename) const {
     std::ifstream is(m_root + filename, std::ios::binary | std::ios::in | std::ios::ate);
     return is.is_open();
 }
 
-std::vector<char> TestApp::AssetImporterBase::read_binary(const std::string &filename) const {
+std::vector<char> RenderEngine::AssetImporterBase::read_binary(const std::string &filename) const {
     std::ifstream is(m_root + filename, std::ios::binary | std::ios::in | std::ios::ate);
 
     if (is.is_open()) {
@@ -36,7 +36,7 @@ std::vector<char> TestApp::AssetImporterBase::read_binary(const std::string &fil
 }
 
 vkw::ColorImage2D
-TestApp::TextureLoader::loadTexture(const std::string &name, VkImageLayout finalLayout, VkImageUsageFlags imageUsage,
+RenderEngine::TextureLoader::loadTexture(const std::string &name, VkImageLayout finalLayout, VkImageUsageFlags imageUsage,
                                     VmaMemoryUsage memUsage) const {
     std::set<std::string> fileExtensions = {"png", "jpg", "jpeg"};
     std::string filename;
@@ -74,7 +74,7 @@ TestApp::TextureLoader::loadTexture(const std::string &name, VkImageLayout final
 }
 
 vkw::ColorImage2D
-TestApp::TextureLoader::loadTexture(const unsigned char *texture, size_t textureWidth, size_t textureHeight,
+RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t textureWidth, size_t textureHeight,
                                     VkImageLayout finalLayout, VkImageUsageFlags imageUsage,
                                     VmaMemoryUsage memUsage) const {
 
@@ -153,13 +153,13 @@ TestApp::TextureLoader::loadTexture(const unsigned char *texture, size_t texture
     return ret;
 }
 
-vkw::VertexShader TestApp::ShaderLoader::loadVertexShader(const std::string &name) const {
+vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(const std::string &name) const {
     std::string filename = name + ".vert.spv";
     auto code = read_binary(filename);
     return {m_device, code.size(), reinterpret_cast<uint32_t *>(code.data())};
 }
 
-vkw::FragmentShader TestApp::ShaderLoader::loadFragmentShader(const std::string &name) const {
+vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(const std::string &name) const {
     std::string filename = name + ".frag.spv";
     auto code = read_binary(filename);
     return {m_device, code.size(), reinterpret_cast<uint32_t *>(code.data())};

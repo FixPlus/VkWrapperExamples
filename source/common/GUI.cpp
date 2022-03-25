@@ -6,45 +6,7 @@ namespace TestApp {
 
     const vkw::VertexInputStateCreateInfo<vkw::per_vertex<GUIBackend::GUIVertex, 0>> GUIBackend::m_vertex_state{};
 
-    GUIBackend::GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-                           ShaderLoader const &shaderLoader, TextureLoader textureLoader) :
-            m_device(device),
-            m_sampler(m_sampler_init(device)),
-            m_font_loader(std::move(textureLoader)),
-            m_vertex_shader(shaderLoader.loadVertexShader("ui")),
-            m_fragment_shader(shaderLoader.loadFragmentShader("ui")),
-            m_descriptorLayout(m_descriptorLayout_init(device)),
-            m_layout(m_layout_init(device)),
-            m_pipeline(m_pipeline_init(device, pass, subpass)),
-            m_vertices(m_create_vertex_buffer(device, 1000)),
-            m_indices(m_create_index_buffer(device, 1000)) {
-        m_vertices_mapped = m_vertices.map();
-        m_indices_mapped = m_indices.map();
-    }
-
-    vkw::DescriptorSetLayout GUIBackend::m_descriptorLayout_init(vkw::Device &device) {
-        vkw::DescriptorSetLayoutBinding textureBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                       VK_SHADER_STAGE_FRAGMENT_BIT};
-        return {device, textureBinding};
-    }
-
-    vkw::PipelineLayout GUIBackend::m_layout_init(vkw::Device &device) {
-        VkPushConstantRange constants{};
-        constants.size = sizeof(glm::vec2) * 2u;
-        constants.offset = 0u;
-        constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        return {device, m_descriptorLayout, {constants}};
-    }
-
-    vkw::GraphicsPipeline GUIBackend::m_pipeline_init(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass) {
-        vkw::GraphicsPipelineCreateInfo createInfo{pass, subpass, m_layout};
-        createInfo.addVertexInputState(m_vertex_state);
-        createInfo.addVertexShader(m_vertex_shader);
-        createInfo.addFragmentShader(m_fragment_shader);
-
-        // TODO: finish pipeline layout definition
-
+    static VkPipelineColorBlendAttachmentState getUIBlendState(){
         VkPipelineColorBlendAttachmentState state{};
         state.blendEnable = VK_TRUE;
         state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
@@ -55,12 +17,26 @@ namespace TestApp {
         state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
         state.alphaBlendOp = VK_BLEND_OP_ADD;
-
-        createInfo.addBlendState(state, 0);
-        createInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
-        createInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
-
-        return {device, createInfo};
+        return state;
+    }
+    GUIBackend::GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, RenderEngine::TextureLoader textureLoader) :
+            m_device(device),
+            m_sampler(m_sampler_init(device)),
+            m_font_loader(std::move(textureLoader)),
+            m_geometryLayout(device,
+                             RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&m_vertex_state, .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="ui", .pushConstants={
+                                     VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0u, .size=
+                                     sizeof(glm::vec2) * 2u}}}, .maxGeometries=1}),
+            m_geometry(m_geometryLayout),
+            m_projectionLayout(device, RenderEngine::SubstageDescription{.shaderSubstageName="flat"}, 1),
+            m_projection(m_projectionLayout),
+            m_materialLayout(device, RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="ui", .setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .maxMaterials=1000}),
+            m_lightingLayout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="flat"},.pass=pass,.subpass=subpass, .blendStates={{getUIBlendState(), 0}}}, 1),
+            m_lighting(m_lightingLayout),
+    m_vertices(m_create_vertex_buffer(device, 1000)),
+    m_indices(m_create_index_buffer(device, 1000)) {
+        m_vertices_mapped = m_vertices.map();
+        m_indices_mapped = m_indices.map();
     }
 
     void GUIBackend::m_updateFontTexture(ImFontAtlas *atlas) {
@@ -71,51 +47,39 @@ namespace TestApp {
         if (!atlas)
             atlas = io.Fonts;
 
-        auto textureID = atlas->TexID;
+        auto textureID = static_cast<TextureView>(atlas->TexID);
 
-        m_used_ids.emplace(textureID);
+        if(m_font_textures.contains(textureID)){
+            m_font_textures.erase(textureID);
+        }
+        if(m_materials.contains(textureID)){
+            m_materials.erase(textureID);
+        }
 
         unsigned char *fontData;
         int texWidth, texHeight;
 
         atlas->GetTexDataAsRGBA32(&fontData, &texWidth, &texHeight);
+        auto fontTexture = m_font_loader.loadTexture(fontData, texWidth,
+                                                     texHeight);
 
-        m_font_textures.erase(textureID);
-        auto &newTexture = m_font_textures.emplace(textureID, m_font_loader.loadTexture(fontData, texWidth,
-                                                                                        texHeight)).first->second;
+
         VkComponentMapping mapping;
         mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-        m_texture_views.erase(textureID);
-        auto *texView = static_cast<vkw::ColorImage2DView const *>(m_texture_views.emplace(textureID,
-                                                                                           &newTexture.getView<vkw::ColorImageView>(
-                                                                                                   m_device,
-                                                                                                   newTexture.format(),
-                                                                                                   mapping)).first->second);
+        TextureView view = &fontTexture.getView<vkw::ColorImageView>(
+                m_device,
+                fontTexture.format(),
+        mapping);
 
-        if (!m_sets.contains(textureID))
-            m_sets.emplace(textureID, m_emplace_set());
+        auto &newTexture = m_font_textures.emplace(view, std::move(fontTexture)).first->second;
 
-        m_sets.at(textureID).write(0, *texView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+        m_materials.emplace(view, Material{m_device, m_materialLayout, *view, m_sampler});
+        atlas->TexID = const_cast<vkw::Image2DView*>(view);
 
-    }
-
-    vkw::DescriptorSet GUIBackend::m_emplace_set() {
-        for (auto &pool: m_pools) {
-            if (pool.currentSetsCount() != pool.maxSets())
-                return vkw::DescriptorSet{pool, m_descriptorLayout};
-        }
-
-        std::vector<VkDescriptorPoolSize> m_sizes{};
-
-        constexpr const uint32_t maxSets = 10u;
-        m_pools.push_back(vkw::DescriptorPool{m_device.get(), maxSets,
-                                              {VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = maxSets}}});
-
-        return vkw::DescriptorSet{m_pools.back(), m_descriptorLayout};
     }
 
     vkw::Sampler GUIBackend::m_sampler_init(vkw::Device &device) {
@@ -191,7 +155,7 @@ namespace TestApp {
         return {device, size, createInfo};
     }
 
-    void GUIBackend::draw(vkw::CommandBuffer &commandBuffer) {
+    void GUIBackend::draw(RenderEngine::GraphicsRecordingState& recorder) {
         ImGui::SetCurrentContext(context());
         auto *imDrawData = ImGui::GetDrawData();
         int32_t vertexOffset = 0;
@@ -203,7 +167,13 @@ namespace TestApp {
 
         ImGuiIO &io = ImGui::GetIO();
 
-        commandBuffer.bindGraphicsPipeline(m_pipeline);
+        auto cachedID = static_cast<TextureView>(io.Fonts->TexID);
+
+        recorder.setGeometry(m_geometry);
+        recorder.setProjection(m_projection);
+        recorder.setLighting(m_lighting);
+        recorder.setMaterial(m_materials.at(cachedID));
+        recorder.bindPipeline();
 
         struct PushConstBlock {
             glm::vec2 scale;
@@ -213,26 +183,21 @@ namespace TestApp {
         pushConstBlock.scale = glm::vec2(2.0f / io.DisplaySize.x, 2.0f / io.DisplaySize.y);
         pushConstBlock.translate = glm::vec2(-1.0f);
 
-        commandBuffer.pushConstants(m_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, pushConstBlock);
+        recorder.pushConstants(pushConstBlock, VK_SHADER_STAGE_VERTEX_BIT, 0);
 
-        commandBuffer.bindVertexBuffer(m_vertices, 0, 0);
-        commandBuffer.bindIndexBuffer(m_indices, 0);
+        recorder.commands().bindVertexBuffer(m_vertices, 0, 0);
+        recorder.commands().bindIndexBuffer(m_indices, 0);
 
-        ImTextureID cachedID = m_sets.begin()->first;
-        auto *descriptor = &m_sets.begin()->second;
-
-        commandBuffer.bindDescriptorSets(m_layout, VK_PIPELINE_BIND_POINT_GRAPHICS, *descriptor, 0);
 
         for (int32_t i = 0; i < imDrawData->CmdListsCount; i++) {
             const ImDrawList *cmd_list = imDrawData->CmdLists[i];
             for (int32_t j = 0; j < cmd_list->CmdBuffer.Size; j++) {
                 const ImDrawCmd *pcmd = &cmd_list->CmdBuffer[j];
-                auto currentTextureID = pcmd->TextureId;
+                auto currentTextureID = static_cast<TextureView>(pcmd->TextureId);
 
                 if (currentTextureID != cachedID) {
-                    descriptor = &m_sets.at(currentTextureID);
+                    recorder.setMaterial(m_materials.at(currentTextureID));
                     cachedID = currentTextureID;
-                    commandBuffer.bindDescriptorSets(m_layout, VK_PIPELINE_BIND_POINT_GRAPHICS, *descriptor, 0);
                 }
 
                 VkRect2D scissorRect;
@@ -240,40 +205,64 @@ namespace TestApp {
                 scissorRect.offset.y = std::max((int32_t) (pcmd->ClipRect.y), 0);
                 scissorRect.extent.width = (uint32_t) (pcmd->ClipRect.z - pcmd->ClipRect.x);
                 scissorRect.extent.height = (uint32_t) (pcmd->ClipRect.w - pcmd->ClipRect.y);
-                commandBuffer.setScissors({scissorRect}, 0);
-                commandBuffer.drawIndexed(pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
+                recorder.commands().setScissors({scissorRect}, 0);
+                recorder.commands().drawIndexed(pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
                 indexOffset += pcmd->ElemCount;
             }
             vertexOffset += cmd_list->VtxBuffer.Size;
         }
     }
 
-    static int glfwToImGuiKeyMap(int key){
+    static int glfwToImGuiKeyMap(int key) {
         switch (key) {
-            case GLFW_KEY_TAB: return ImGuiKey_Tab;
-            case GLFW_KEY_LEFT: return ImGuiKey_LeftArrow;
-            case GLFW_KEY_RIGHT: return ImGuiKey_RightArrow;
-            case GLFW_KEY_UP: return ImGuiKey_UpArrow;
-            case GLFW_KEY_DOWN: return ImGuiKey_DownArrow;
-            case GLFW_KEY_PAGE_UP: return ImGuiKey_PageUp;
-            case GLFW_KEY_PAGE_DOWN: return ImGuiKey_PageDown;
-            case GLFW_KEY_HOME: return ImGuiKey_Home;
-            case GLFW_KEY_END: return ImGuiKey_End;
-            case GLFW_KEY_INSERT: return ImGuiKey_Insert;
-            case GLFW_KEY_DELETE: return ImGuiKey_Delete;
-            case GLFW_KEY_BACKSPACE: return ImGuiKey_Backspace;
-            case GLFW_KEY_SPACE: return ImGuiKey_Space;
-            case GLFW_KEY_ESCAPE: return ImGuiKey_Escape;
-            case GLFW_KEY_ENTER: return ImGuiKey_Enter;
-            case GLFW_KEY_LEFT_SHIFT: return ImGuiKey_LeftShift;
-            case GLFW_KEY_LEFT_CONTROL: return ImGuiKey_LeftCtrl;
-            case GLFW_KEY_LEFT_ALT: return ImGuiKey_LeftAlt;
-            case GLFW_KEY_LEFT_SUPER: return ImGuiKey_LeftSuper;
-            case GLFW_KEY_RIGHT_SHIFT: return ImGuiKey_RightShift;
-            case GLFW_KEY_RIGHT_CONTROL: return ImGuiKey_RightCtrl;
-            case GLFW_KEY_RIGHT_ALT: return ImGuiKey_RightAlt;
-            case GLFW_KEY_RIGHT_SUPER: return ImGuiKey_RightSuper;
-            case GLFW_KEY_MENU: return ImGuiKey_Menu;
+            case GLFW_KEY_TAB:
+                return ImGuiKey_Tab;
+            case GLFW_KEY_LEFT:
+                return ImGuiKey_LeftArrow;
+            case GLFW_KEY_RIGHT:
+                return ImGuiKey_RightArrow;
+            case GLFW_KEY_UP:
+                return ImGuiKey_UpArrow;
+            case GLFW_KEY_DOWN:
+                return ImGuiKey_DownArrow;
+            case GLFW_KEY_PAGE_UP:
+                return ImGuiKey_PageUp;
+            case GLFW_KEY_PAGE_DOWN:
+                return ImGuiKey_PageDown;
+            case GLFW_KEY_HOME:
+                return ImGuiKey_Home;
+            case GLFW_KEY_END:
+                return ImGuiKey_End;
+            case GLFW_KEY_INSERT:
+                return ImGuiKey_Insert;
+            case GLFW_KEY_DELETE:
+                return ImGuiKey_Delete;
+            case GLFW_KEY_BACKSPACE:
+                return ImGuiKey_Backspace;
+            case GLFW_KEY_SPACE:
+                return ImGuiKey_Space;
+            case GLFW_KEY_ESCAPE:
+                return ImGuiKey_Escape;
+            case GLFW_KEY_ENTER:
+                return ImGuiKey_Enter;
+            case GLFW_KEY_LEFT_SHIFT:
+                return ImGuiKey_LeftShift;
+            case GLFW_KEY_LEFT_CONTROL:
+                return ImGuiKey_LeftCtrl;
+            case GLFW_KEY_LEFT_ALT:
+                return ImGuiKey_LeftAlt;
+            case GLFW_KEY_LEFT_SUPER:
+                return ImGuiKey_LeftSuper;
+            case GLFW_KEY_RIGHT_SHIFT:
+                return ImGuiKey_RightShift;
+            case GLFW_KEY_RIGHT_CONTROL:
+                return ImGuiKey_RightCtrl;
+            case GLFW_KEY_RIGHT_ALT:
+                return ImGuiKey_RightAlt;
+            case GLFW_KEY_RIGHT_SUPER:
+                return ImGuiKey_RightSuper;
+            case GLFW_KEY_MENU:
+                return ImGuiKey_Menu;
 #define KEY_ENTRY(X) case GLFW_KEY_ ##X: return ImGuiKey_ ##X;
             KEY_ENTRY(0)
             KEY_ENTRY(1)
@@ -324,21 +313,36 @@ namespace TestApp {
             KEY_ENTRY(F11)
             KEY_ENTRY(F12)
 #undef KEY_ENTRY
-            case GLFW_KEY_APOSTROPHE: return ImGuiKey_Apostrophe;
-            case GLFW_KEY_COMMA: return ImGuiKey_Comma;
-            case GLFW_KEY_MINUS: return ImGuiKey_Minus;
-            case GLFW_KEY_PERIOD: return ImGuiKey_Period;
-            case GLFW_KEY_SLASH: return ImGuiKey_Slash;
-            case GLFW_KEY_BACKSLASH: return ImGuiKey_Backslash;
-            case GLFW_KEY_EQUAL: return ImGuiKey_Equal;
-            case GLFW_KEY_LEFT_BRACKET: return ImGuiKey_LeftBracket;
-            case GLFW_KEY_RIGHT_BRACKET: return ImGuiKey_RightBracket;
-            case GLFW_KEY_GRAVE_ACCENT: return ImGuiKey_GraveAccent;
-            case GLFW_KEY_CAPS_LOCK: return ImGuiKey_CapsLock;
-            case GLFW_KEY_NUM_LOCK: return ImGuiKey_NumLock;
-            case GLFW_KEY_SCROLL_LOCK: return ImGuiKey_ScrollLock;
-            case GLFW_KEY_PRINT_SCREEN: return ImGuiKey_PrintScreen;
-            case GLFW_KEY_PAUSE: return ImGuiKey_Pause;
+            case GLFW_KEY_APOSTROPHE:
+                return ImGuiKey_Apostrophe;
+            case GLFW_KEY_COMMA:
+                return ImGuiKey_Comma;
+            case GLFW_KEY_MINUS:
+                return ImGuiKey_Minus;
+            case GLFW_KEY_PERIOD:
+                return ImGuiKey_Period;
+            case GLFW_KEY_SLASH:
+                return ImGuiKey_Slash;
+            case GLFW_KEY_BACKSLASH:
+                return ImGuiKey_Backslash;
+            case GLFW_KEY_EQUAL:
+                return ImGuiKey_Equal;
+            case GLFW_KEY_LEFT_BRACKET:
+                return ImGuiKey_LeftBracket;
+            case GLFW_KEY_RIGHT_BRACKET:
+                return ImGuiKey_RightBracket;
+            case GLFW_KEY_GRAVE_ACCENT:
+                return ImGuiKey_GraveAccent;
+            case GLFW_KEY_CAPS_LOCK:
+                return ImGuiKey_CapsLock;
+            case GLFW_KEY_NUM_LOCK:
+                return ImGuiKey_NumLock;
+            case GLFW_KEY_SCROLL_LOCK:
+                return ImGuiKey_ScrollLock;
+            case GLFW_KEY_PRINT_SCREEN:
+                return ImGuiKey_PrintScreen;
+            case GLFW_KEY_PAUSE:
+                return ImGuiKey_Pause;
 #define KEY_ENTRY(X) case GLFW_KEY_KP_ ##X: return ImGuiKey_Keypad ##X;
             KEY_ENTRY(0)
             KEY_ENTRY(1)
@@ -351,13 +355,20 @@ namespace TestApp {
             KEY_ENTRY(8)
             KEY_ENTRY(9)
 #undef KEY_ENTRY
-            case GLFW_KEY_KP_DECIMAL: return ImGuiKey_KeypadDecimal;
-            case GLFW_KEY_KP_ADD: return ImGuiKey_KeypadAdd;
-            case GLFW_KEY_KP_EQUAL: return ImGuiKey_KeypadEqual;
-            case GLFW_KEY_KP_SUBTRACT: return ImGuiKey_KeypadSubtract;
-            case GLFW_KEY_KP_DIVIDE: return ImGuiKey_KeypadDivide;
-            case GLFW_KEY_KP_MULTIPLY: return ImGuiKey_KeypadMultiply;
-            case GLFW_KEY_KP_ENTER: return ImGuiKey_KeypadEnter;
+            case GLFW_KEY_KP_DECIMAL:
+                return ImGuiKey_KeypadDecimal;
+            case GLFW_KEY_KP_ADD:
+                return ImGuiKey_KeypadAdd;
+            case GLFW_KEY_KP_EQUAL:
+                return ImGuiKey_KeypadEqual;
+            case GLFW_KEY_KP_SUBTRACT:
+                return ImGuiKey_KeypadSubtract;
+            case GLFW_KEY_KP_DIVIDE:
+                return ImGuiKey_KeypadDivide;
+            case GLFW_KEY_KP_MULTIPLY:
+                return ImGuiKey_KeypadMultiply;
+            case GLFW_KEY_KP_ENTER:
+                return ImGuiKey_KeypadEnter;
             default:
                 return ImGuiKey_None;
         }
@@ -371,19 +382,19 @@ namespace TestApp {
 
         auto down = action == GLFW_PRESS;
 
-        if(imGuiKey != ImGuiKey_None)
+        if (imGuiKey != ImGuiKey_None)
             io.AddKeyEvent(imGuiKey, down);
 
-        if(key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
+        if (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
             io.AddKeyEvent(ImGuiKey_ModShift, down);
 
-        if(key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL)
+        if (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL)
             io.AddKeyEvent(ImGuiKey_ModCtrl, down);
 
-        if(key == GLFW_KEY_LEFT_ALT || key == GLFW_KEY_RIGHT_ALT)
+        if (key == GLFW_KEY_LEFT_ALT || key == GLFW_KEY_RIGHT_ALT)
             io.AddKeyEvent(ImGuiKey_ModAlt, down);
 
-        if(key == GLFW_KEY_LEFT_SUPER || key == GLFW_KEY_RIGHT_SUPER)
+        if (key == GLFW_KEY_LEFT_SUPER || key == GLFW_KEY_RIGHT_SUPER)
             io.AddKeyEvent(ImGuiKey_ModSuper, down);
 
     }
@@ -391,7 +402,7 @@ namespace TestApp {
     void WindowIO::mouseMove(double xpos, double ypos, double xdelta, double ydelta) {
         ImGui::SetCurrentContext(m_context);
         auto &io = ImGui::GetIO();
-        if(cursorDisabled()){
+        if (cursorDisabled()) {
             io.AddMousePosEvent(FLT_MAX, FLT_MAX);
         } else {
             io.AddMousePosEvent(xpos, ypos);
@@ -401,7 +412,7 @@ namespace TestApp {
     void WindowIO::mouseInput(int button, int action, int mods) {
         ImGui::SetCurrentContext(m_context);
         auto &io = ImGui::GetIO();
-        if(!cursorDisabled())
+        if (!cursorDisabled())
             io.AddMouseButtonEvent(button, action == GLFW_PRESS);
     }
 
@@ -431,5 +442,19 @@ namespace TestApp {
         ImGui::SetCurrentContext(m_context);
         auto &io = ImGui::GetIO();
         return io.WantCaptureMouse;
+    }
+
+    GUIBackend::Material::Material(vkw::Device &device, RenderEngine::MaterialLayout &layout,
+                                   const vkw::Image2DView &texture, const vkw::Sampler &sampler): RenderEngine::Material(layout) {
+        auto* pTexture = &texture;
+        if(auto colorTexture = dynamic_cast<const vkw::ColorImageView*>(pTexture)){
+            set().write(0, *colorTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+        } else if(auto depthTexture = dynamic_cast<const vkw::DepthImageView*>(pTexture)){
+            set().write(0, *depthTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+        } else if(auto stencilTexture = dynamic_cast<const vkw::StencilImageView*>(pTexture)){
+            set().write(0, *stencilTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+        } else{
+            throw std::runtime_error("GUI: failed to create Combined Image sampler: broken image view");
+        }
     }
 }

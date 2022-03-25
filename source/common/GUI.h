@@ -10,10 +10,11 @@
 #include <DescriptorPool.hpp>
 #include <map>
 #include <Image.hpp>
-#include <AssetImport.h>
+#include <RenderEngine/AssetImport/AssetImport.h>
 #include <vkw/Sampler.hpp>
 #include <set>
 #include <RenderEngine/Window/Window.h>
+#include <RenderEngine/RecordingState.h>
 
 namespace TestApp {
 
@@ -65,12 +66,12 @@ namespace TestApp {
 
     class GUIBackend : virtual public GUIBase {
     public:
+        using TextureView = vkw::Image2DView const*;
 
-        GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, ShaderLoader const &shaderLoader,
-                   TextureLoader textureLoader);
+        GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, RenderEngine::TextureLoader textureLoader);
 
         /** Records draw commands. */
-        void draw(vkw::CommandBuffer &commandBuffer);
+        void draw(RenderEngine::GraphicsRecordingState& recorder);
 
         /** Fills buffers with content of given context draw data. */
         void push();
@@ -90,21 +91,23 @@ namespace TestApp {
         // keep this in that initialization order
 
         std::reference_wrapper<vkw::Device> m_device;
-        TextureLoader m_font_loader;
-        vkw::VertexShader m_vertex_shader;
-        vkw::FragmentShader m_fragment_shader;
+        RenderEngine::TextureLoader m_font_loader;
 
-        vkw::DescriptorSetLayout m_descriptorLayout;
+        RenderEngine::GeometryLayout m_geometryLayout;
+        RenderEngine::Geometry m_geometry;
 
-        static vkw::DescriptorSetLayout m_descriptorLayout_init(vkw::Device &device);
+        RenderEngine::ProjectionLayout m_projectionLayout;
+        RenderEngine::Projection m_projection;
 
-        vkw::PipelineLayout m_layout;
+        RenderEngine::MaterialLayout m_materialLayout;
 
-        vkw::PipelineLayout m_layout_init(vkw::Device &device);
+        struct Material: public RenderEngine::Material{
+        public:
+            Material(vkw::Device& device, RenderEngine::MaterialLayout& layout, vkw::Image2DView const& texture, vkw::Sampler const& sampler);
+        };
 
-        vkw::GraphicsPipeline m_pipeline;
-
-        vkw::GraphicsPipeline m_pipeline_init(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass);
+        RenderEngine::LightingLayout m_lightingLayout;
+        RenderEngine::Lighting m_lighting;
 
         vkw::Sampler m_sampler;
 
@@ -121,14 +124,9 @@ namespace TestApp {
         ImDrawVert *m_vertices_mapped;
         ImDrawIdx *m_indices_mapped;
 
-        vkw::DescriptorSet m_emplace_set();
+        std::map<TextureView, Material> m_materials{};
 
-        std::vector<vkw::DescriptorPool> m_pools{};
-        std::set<ImTextureID> m_used_ids{};
-        std::map<ImTextureID, vkw::DescriptorSet> m_sets{};
-        std::map<ImTextureID, vkw::Image2DView const *> m_texture_views{};
-
-        std::map<ImTextureID, vkw::ColorImage2D> m_font_textures{};
+        std::map<TextureView, vkw::ColorImage2D> m_font_textures{};
 
     };
 
