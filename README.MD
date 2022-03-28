@@ -11,7 +11,7 @@ Collection of applications using https://github.com/FixPlus/VkWrapper
 Note: you should use those forks, because some needed functionality hasn't got into Khronos yet
 ## Build
 ### 1. Install dependencies
-First, you should download and build SPIRV-Tools and glslang (links are above). Replace glslangValidator inside Vulkan SDK on custom built one. Install SPIRV-Tools somewhere and provide path to it via cmake variable **SPIRV_TOOLS_INTALL_DIR**.
+First, you should download and build SPIRV-Tools and glslang (links are above). Replace glslangValidator inside Vulkan SDK on custom built one. Install SPIRV-Tools somewhere and provide path to it via cmake variable **SPIRV_TOOLS_INSTALL_DIR**.
 ### 2. Download & build project
 ```
 git clone https://github.com/FixPlus/VkWrapperExamples --recursive
