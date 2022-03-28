@@ -3,6 +3,7 @@
 #include "RenderEngine/AssetImport/AssetImport.h"
 #include "RenderEngine/Pipelines/ShaderLoaderInterface.h"
 #include "RenderEngine/Pipelines/PipelinePool.h"
+#include "spirv-tools/linker.hpp"
 
 namespace RenderEngine{
 

@@ -65,11 +65,21 @@ message(STATUS ${RENDERER_LIB})
 find_package(glfw3 3.3 REQUIRED)
 set(GLFW_LIBRARY glfw)
 
+if(NOT SPIRV_TOOLS_INTALL_DIR)
+    message(FATAL_ERROR "Please, specify SPIRV_TOOLS_INTALL_DIR")
+endif()
+
+set(SPIRV-Tools_DIR ${SPIRV_TOOLS_INTALL_DIR}/SPIRV-Tools/cmake)
+set(SPIRV-Tools-opt_DIR ${SPIRV_TOOLS_INTALL_DIR}/SPIRV-Tools-opt/cmake)
+set(SPIRV-Tools-link_DIR ${SPIRV_TOOLS_INTALL_DIR}/SPIRV-Tools-link/cmake)
+
+find_package(SPIRV-Tools REQUIRED)
+find_package(SPIRV-Tools-opt REQUIRED)
+find_package(SPIRV-Tools-link REQUIRED)
 include_directories(source)
 include_directories(source/common)
 add_subdirectory(external)
 add_subdirectory(source)
-
 
 include(cmake/compile_shaders.cmake)
 

@@ -9,15 +9,13 @@ namespace RenderEngine {
 
     vkw::VertexShader const &ShaderLoader::loadVertexShader(RenderEngine::GeometryLayout const &geometry,
                                                             RenderEngine::ProjectionLayout const &projection) {
-        auto fullShaderName =
-                geometry.description().shaderSubstageName + "_" + projection.description().shaderSubstageName;
-        return m_vertexShaders.emplace_back(ShaderImporter::loadVertexShader(fullShaderName));
+
+
+        return m_vertexShaders.emplace_back(ShaderImporter::loadVertexShader(geometry.description().shaderSubstageName, projection.description().shaderSubstageName));
     }
 
     vkw::FragmentShader const &ShaderLoader::loadFragmentShader(RenderEngine::MaterialLayout const &material,
                                                                 RenderEngine::LightingLayout const &lighting) {
-        auto fullShaderName =
-                material.description().shaderSubstageName + "_" + lighting.description().shaderSubstageName;
-        return m_fragmentShaders.emplace_back(ShaderImporter::loadFragmentShader(fullShaderName));
+        return m_fragmentShaders.emplace_back(ShaderImporter::loadFragmentShader(material.description().shaderSubstageName, lighting.description().shaderSubstageName));
     }
 }

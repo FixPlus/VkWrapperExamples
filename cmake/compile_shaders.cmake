@@ -1,11 +1,12 @@
 function(compileShader SHADER_NAME SHADER_DIR OUTPUT_DIR)
 
-    add_custom_target(${SHADER_NAME} ALL COMMAND ${GLSL}  ${SHADER_DIR}/${SHADER_NAME} -o ${OUTPUT_DIR}/${SHADER_NAME}.spv)
+    add_custom_target(${SHADER_NAME} ALL COMMAND ${GLSL} -V --allow-partial-linkage -I${SHADER_DIR} -o ${OUTPUT_DIR}/${SHADER_NAME}.spv ${SHADER_DIR}/${SHADER_NAME})
+    #add_custom_target(${SHADER_NAME} ALL COMMAND ${GLSL} -o ${OUTPUT_DIR}/${SHADER_NAME}.spv ${SHADER_DIR}/${SHADER_NAME})
 
 endfunction(compileShader)
 
 function(compileShaders SHADER_DIR OUTPUT_DIR DEPENDENT_TARGET INSTALL_DIR)
-	find_program(GLSL NAMES glslc.exe glslc PATHS $ENV{VK_SDK_PATH}/Bin $ENV{VULKAN_SDK}/bin)
+	find_program(GLSL NAMES glslangValidator.exe PATHS $ENV{VK_SDK_PATH}/Bin $ENV{VULKAN_SDK}/bin)
 
     if(GLSL-NOTFOUND)
         message("GLSL compiler not found - shader compilation skipped")

@@ -7,33 +7,13 @@
 #include <vkw/CommandPool.hpp>
 #include <vkw/CommandBuffer.hpp>
 #include <cstring>
+#include <iostream>
 
 bool RenderEngine::AssetImporterBase::try_open(const std::string &filename) const {
     std::ifstream is(m_root + filename, std::ios::binary | std::ios::in | std::ios::ate);
     return is.is_open();
 }
 
-std::vector<char> RenderEngine::AssetImporterBase::read_binary(const std::string &filename) const {
-    std::ifstream is(m_root + filename, std::ios::binary | std::ios::in | std::ios::ate);
-
-    if (is.is_open()) {
-        size_t size = is.tellg();
-        is.seekg(0, std::ios::beg);
-
-        std::vector<char> ret{};
-
-        ret.resize(size);
-        is.read(ret.data(), size);
-        is.close();
-
-        if (size == 0)
-            throw std::runtime_error(
-                    "Asset import failed: could not read " + filename);
-
-        return ret;
-    }
-    throw std::runtime_error("Asset import failed: cannot open file '" + filename + "'");
-}
 
 vkw::ColorImage2D
 RenderEngine::TextureLoader::loadTexture(const std::string &name, VkImageLayout finalLayout, VkImageUsageFlags imageUsage,
@@ -155,12 +135,101 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
 
 vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(const std::string &name) const {
     std::string filename = name + ".vert.spv";
-    auto code = read_binary(filename);
-    return {m_device, code.size(), reinterpret_cast<uint32_t *>(code.data())};
+    auto code = read_binary<uint32_t>(filename);
+    std::vector<std::vector<uint32_t> const*> binRefs;
+    binRefs.push_back(&code);
+    try {
+        auto linked = m_link(binRefs);
+        return {m_device, linked.size() * 4u, linked.data()};
+    } catch (std::runtime_error& e){
+        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + filename);
+    }
 }
 
 vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(const std::string &name) const {
     std::string filename = name + ".frag.spv";
-    auto code = read_binary(filename);
-    return {m_device, code.size(), reinterpret_cast<uint32_t *>(code.data())};
+    auto code = read_binary<uint32_t>(filename);
+    std::vector<std::vector<uint32_t> const*> binRefs;
+    binRefs.push_back(&code);
+    try {
+        auto linked = m_link(binRefs);
+        return {m_device, linked.size() * 4u, linked.data()};
+    } catch (std::runtime_error& e){
+        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + filename);
+    }
+}
+
+vkw::VertexShader
+RenderEngine::ShaderImporter::loadVertexShader(const std::string &geometry, const std::string &projection) const {
+    std::string geom_filename = geometry + ".gm.vert.spv";
+    std::string proj_filename = projection + ".pr.vert.spv";
+    std::vector<uint32_t> geometry_code = read_binary<uint32_t>(geom_filename);
+    std::vector<uint32_t> projection_code = read_binary<uint32_t>(proj_filename);
+    std::vector<std::vector<uint32_t> const*> binRefs;
+
+    binRefs.push_back(&geometry_code);
+    binRefs.push_back(&projection_code);
+    binRefs.push_back(&m_general_vert);
+
+    try{
+        auto linked = m_link(binRefs);
+
+        return {m_device, linked.size() * 4u, linked.data()};
+
+    } catch (std::runtime_error& e){
+        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + geom_filename + " and " + proj_filename);
+    }
+}
+
+
+vkw::FragmentShader
+RenderEngine::ShaderImporter::loadFragmentShader(const std::string &material, const std::string &lighting) const {
+    std::string material_filename = material + ".mt.frag.spv";
+    std::string lighting_filename = lighting + ".lt.frag.spv";
+    std::vector<uint32_t> material_code = read_binary<uint32_t>(material_filename);
+    std::vector<uint32_t> lighting_code = read_binary<uint32_t>(lighting_filename);
+    std::vector<std::vector<uint32_t> const*> binRefs;
+
+    binRefs.push_back(&material_code);
+    binRefs.push_back(&lighting_code);
+    binRefs.push_back(&m_general_frag);
+
+    try{
+        auto linked = m_link(binRefs);
+
+        return {m_device, linked.size() * 4u, linked.data()};
+
+    } catch (std::runtime_error& e){
+        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + material_filename + " and " + lighting_filename);
+    }
+}
+
+
+RenderEngine::ShaderImporter::ShaderImporter(vkw::Device &device, std::string const &rootDirectory) :
+        AssetImporterBase(rootDirectory), m_device(device), m_context(SPV_ENV_VULKAN_1_0),
+        m_message_consumer([](spv_message_level_t messageLevel, const char* message, const spv_position_t position, const char*){
+            if(messageLevel == SPV_MSG_ERROR){
+                std::cerr <<"SPIRV-Link failed. Error message:" + std::string(message);
+            }
+        }),
+        m_general_vert(read_binary<uint32_t>("general.vert.spv")),
+        m_general_frag(read_binary<uint32_t>("general.frag.spv")){
+    m_context.SetMessageConsumer(m_message_consumer);
+}
+
+std::vector<uint32_t> RenderEngine::ShaderImporter::m_link(std::vector<std::vector<uint32_t> const*> const& binaries) const{
+    std::vector<uint32_t const*> bin_refs{};
+    std::vector<size_t> bin_sizes{};
+
+    for(int i = 0; i < binaries.size(); ++i){
+        bin_refs.push_back(binaries[i]->data());
+        bin_sizes.push_back(binaries[i]->size());
+    }
+    std::vector<uint32_t> ret{};
+    auto result = spvtools::Link(m_context, bin_refs.data(), bin_sizes.data(), binaries.size(), &ret);
+
+    if(result != SPV_SUCCESS)
+        throw std::runtime_error("SPIRV-Link failed");
+
+    return ret;
 }

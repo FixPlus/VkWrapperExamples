@@ -78,7 +78,7 @@ private:
 class WaterMaterial : public RenderEngine::MaterialLayout {
 public:
     WaterMaterial(vkw::Device &device, bool wireframe = false) : RenderEngine::MaterialLayout(device,
-                                                                                              RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="flat", .setBindings={
+                                                                                              RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="water", .setBindings={
                                                                                                       vkw::DescriptorSetLayoutBinding{
                                                                                                               0,
                                                                                                               VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .rasterizationState={

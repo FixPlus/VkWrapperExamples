@@ -1,26 +1,21 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+#include "GeomProjInterface.h.glsl"
 
 #define NET_SIZE 10.0f
 #define CELL_SIZE 0.1f
 
 layout (location = 0) in vec3 inPos;
 
-layout (location = 0) out vec3 outColor;
-layout (location = 1) out vec2 outUV;
-layout (location = 2) out vec3 outNormal;
-layout (location = 3) out vec4 outViewPos;
-layout (location = 5) out vec4 outWorldPos;
-layout (location = 6) out vec2 outGridPos;
-
-layout (set = 1,binding = 0) uniform Globals{
-    mat4 perspective;
-    mat4 cameraSpace;
-} globals;
-
 layout (set = 0, binding = 0) uniform Waves{
     vec4 waves[4]; /* xy - wave vector, z - steepnees decay factor, w - steepness */
     float time;
 }waves;
+
+layout (set = 1, binding = 0) uniform Camera{
+    mat4 perspective;
+    mat4 cameraSpace;
+} camera;
 
 layout (push_constant) uniform PushConstants {
     vec2 translate;
@@ -28,16 +23,13 @@ layout (push_constant) uniform PushConstants {
     float waveEnable[4];
 } pushConstants;
 
-void main()
-{
-
+WorldVertexInfo Geometry(){
     vec2 localPos = inPos.xz * pushConstants.scale;
 
     vec2 translate = pushConstants.translate;
     vec2 gridPos = localPos + translate;
-    outGridPos = gridPos;
     vec4 position = vec4(vec3(localPos.x, 0.0f,localPos.y) + vec3(translate.x, 0.0f, translate.y), 1.0f);
-    float distance = length(globals.cameraSpace * position);
+    float distance = length(camera.cameraSpace * position);
     float height = 0.0f;
     vec3 tangent = vec3(1.0f, 0.0, 0.0f);
     vec3 binormal = vec3(0.0f, 0.0f, 1.0f);
@@ -50,7 +42,7 @@ void main()
         float steepnessFactor = clamp(1.0f - distance * waves.waves[i].z / ( lambda), 0.0f, 1.0f);
 
         if(lambda == 0.0f || steepnessFactor == 0.0f)
-            continue;
+        continue;
 
         vec2 k = normalize(waves.waves[i].xy) * 2.0f * 3.1415f / lambda;
 
@@ -74,34 +66,11 @@ void main()
 
     vec2 uv = localPos / NET_SIZE;
 
-    #if 0
+    WorldVertexInfo ret;
 
-
-    float height = texture(waveMap, uv).r;
-    float cellUVSize = CELL_SIZE / NET_SIZE;
-
-    float heightXP = texture(waveMap, uv + vec2(cellUVSize, 0)).r;
-    float heightXM = texture(waveMap, uv + vec2(-cellUVSize, 0)).r;
-    float heightYM = texture(waveMap, uv + vec2(0, -cellUVSize)).r;
-    float heightYP = texture(waveMap, uv + vec2(0, cellUVSize)).r;
-
-    float sinXP = (heightXP - height) / cellUVSize;
-    float sinXM = (heightXM - height) / cellUVSize;
-    float sinYP = (heightYP - height) / cellUVSize;
-    float sinYM = (heightYM - height) / cellUVSize;
-
-    float deltaX = sinXP - sinXM;
-    float deltaY = sinYP - sinYM;
-
-    deltaY = deltaX = 0.0f;
-    height = 0.0f;
-    #endif
-
-    outColor = vec3(0.0f, 0.1f, 0.7f);
-
-    outUV = uv;
-    outNormal = normal;
-    outWorldPos = position;
-    outViewPos = inverse(globals.cameraSpace) * vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    gl_Position = globals.perspective * globals.cameraSpace * position;
+    ret.position = vec3(position);
+    ret.color = vec4(0.0f, 0.1f, 0.7f, 1.0f);
+    ret.UVW = vec3(uv, 1.0f);
+    ret.normal = normal;
+    return ret;
 }
