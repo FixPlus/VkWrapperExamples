@@ -26,6 +26,12 @@ namespace RenderEngine {
 
         GeometryLayout(vkw::Device &device, CreateInfo const &createInfo);
 
+        GeometryLayout(GeometryLayout &&another) noexcept:
+                m_inputAssemblyState(another.m_inputAssemblyState),
+                m_vertexInputState(another.m_vertexInputState),
+                PipelineStageLayout(std::move(another)){
+
+        }
         GeometryLayout &operator=(GeometryLayout &&another) noexcept {
             m_vertexInputState = another.m_vertexInputState;
             m_inputAssemblyState = another.m_inputAssemblyState;

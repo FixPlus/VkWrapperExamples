@@ -3,6 +3,7 @@
 
 #include <RenderEngine/Pipelines/PipelinePool.h>
 
+
 namespace RenderEngine{
 
 
@@ -47,32 +48,13 @@ namespace RenderEngine{
         }
 
     private:
-        void m_set_all_sets(){
-            auto& layout = m_current_layout();
-            if(m_geometry->hasSet() && need_update_geometry_set) {
-                m_commandBuffer.get().bindDescriptorSets(layout, VK_PIPELINE_BIND_POINT_GRAPHICS, m_geometry->set(), 0);
-                need_update_geometry_set = false;
-            }
-            if(m_material->hasSet() && need_update_material_set) {
-                m_commandBuffer.get().bindDescriptorSets(layout, VK_PIPELINE_BIND_POINT_GRAPHICS, m_material->set(), 2);
-                need_update_material_set = false;
-            }
-            if(m_projection->hasSet() && need_update_projection_set) {
-                m_commandBuffer.get().bindDescriptorSets(layout, VK_PIPELINE_BIND_POINT_GRAPHICS, m_projection->set(), 1);
-                need_update_projection_set = false;
-            }
-            if(m_lighting->hasSet() && need_update_lighting_set) {
-                m_commandBuffer.get().bindDescriptorSets(layout, VK_PIPELINE_BIND_POINT_GRAPHICS, m_lighting->set(), 3);
-                need_update_lighting_set = false;
-            }
-        }
+        void m_set_all_sets();
         bool m_pipeline_ready() const {
             return m_geometry && m_projection && m_material && m_lighting;
         }
 
-        vkw::PipelineLayout const& m_current_layout() {
-            return m_pool.get().layoutOf(*m_geometry_layout, *m_projection_layout, *m_material_layout, *m_lighting_layout);
-        }
+        vkw::PipelineLayout const& m_current_layout();
+
         Geometry const* m_geometry = nullptr;
         bool need_update_geometry_set = true;
         Projection const* m_projection = nullptr;

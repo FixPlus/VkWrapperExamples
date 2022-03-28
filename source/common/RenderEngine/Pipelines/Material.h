@@ -30,6 +30,10 @@ namespace RenderEngine{
         std::optional<vkw::DepthTestStateCreateInfo> depthTestState() const{
             return m_depthTestState;
         }
+
+        bool depthOnly() const{
+            return m_rasterizationState.operator const VkPipelineRasterizationStateCreateInfo &().rasterizerDiscardEnable == VK_TRUE;
+        }
     private:
         vkw::RasterizationStateCreateInfo m_rasterizationState;
         std::optional<vkw::DepthTestStateCreateInfo> m_depthTestState;

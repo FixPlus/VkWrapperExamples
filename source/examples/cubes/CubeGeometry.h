@@ -8,6 +8,7 @@
 #include <vkw/Common.hpp>
 #include <map>
 #include <vkw/Pipeline.hpp>
+#include <RenderEngine/Pipelines/PipelinePool.h>
 
 namespace TestApp {
 
@@ -43,13 +44,10 @@ namespace TestApp {
             glm::mat4 model;
         };
 
-        void bindGeometry(vkw::CommandBuffer &commandBuffer) const;
 
-        void drawGeometry(vkw::CommandBuffer &commandBuffer) const;
+        void bind(RenderEngine::GraphicsRecordingState &state) const;
 
-        static vkw::VertexInputStateCreateInfoBase const &geometryInputState() {
-            return m_vsci;
-        }
+        void draw(RenderEngine::GraphicsRecordingState &state) const;
 
         virtual ~CubePool() = default;
 
@@ -57,89 +55,37 @@ namespace TestApp {
 
         friend class Cube;
 
-        static std::vector<PerVertex> m_makeCube() {
-            std::vector<PerVertex> ret{};
-            // top
-            ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
-            ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 0.0f}});
-
-
-            ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {0.0f, 1.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, 0.0f, 1.0f}, .uv = {1.0f, 1.0f}});
-
-
-            // bottom
-
-            ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
-
-
-            ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {1.0f, 1.0f}});
-            ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 0.0f, -1.0f}, .uv = {0.0f, 1.0f}});
-
-
-
-            // east
-
-            ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-            ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-            ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {0.0f, 1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-
-
-            // west
-
-            ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-            ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-
-
-            ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {0.0f, -1.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-
-
-            // north
-
-            ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {0.5f, -0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-            ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-
-            ret.push_back({.pos = {0.5f, 0.5f, 0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {0.5f, -0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-            ret.push_back({.pos = {0.5f, 0.5f, -0.5f}, .normal = {1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-
-
-
-            // south
-
-            ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 0.0f}});
-
-
-            ret.push_back({.pos = {-0.5f, 0.5f, 0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 0.0f}});
-            ret.push_back({.pos = {-0.5f, 0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {0.0f, 1.0f}});
-            ret.push_back({.pos = {-0.5f, -0.5f, -0.5f}, .normal = {-1.0f, 0.0f, 0.0f}, .uv = {1.0f, 1.0f}});
-
-
-            return ret;
-        }
-
         static const vkw::VertexInputStateCreateInfo<vkw::per_vertex<PerVertex, 0>, vkw::per_instance<PerInstance, 1>> m_vsci;
 
-        vkw::VertexBuffer<PerVertex> m_vertices;
-        vkw::VertexBuffer<PerInstance> m_instances;
-        PerInstance *m_instance_mapped = nullptr;
+        RenderEngine::GeometryLayout m_geometry_layout;
+
+        struct M_Cube_geometry : public RenderEngine::Geometry {
+
+            M_Cube_geometry(vkw::Device &device, RenderEngine::GeometryLayout &layout, uint32_t maxCubes);
+
+            PerInstance &at(uint32_t index) {
+                return m_instance_mapped[index];
+            }
+
+            PerInstance const &at(uint32_t index) const {
+                return m_instance_mapped[index];
+            }
+
+            void bind(RenderEngine::GraphicsRecordingState &state) const override;
+
+            void flush() {
+                m_instances.flush();
+            }
+
+        private:
+
+            static std::vector<PerVertex> m_makeCube();
+
+            vkw::VertexBuffer<PerVertex> m_vertices;
+            vkw::VertexBuffer<PerInstance> m_instances;
+            PerInstance *m_instance_mapped;
+        } m_geometry;
+
 
         std::map<uint32_t, Cube *> m_cubes{};
         uint32_t m_cubeCount = 0;
@@ -208,7 +154,7 @@ namespace TestApp {
             model.model = glm::rotate(model.model, glm::radians(m_rotate.z), glm::vec3{0.0f, 0.0f, 1.0f});
             model.model = glm::scale(model.model, m_scale);
 
-            m_parent->m_instance_mapped[m_id] = model;
+            m_parent->m_geometry.at(m_id) = model;
         }
 
         friend class CubePool;

@@ -1,21 +1,21 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+#include "MaterialLightingInterface.h.glsl"
+
 #define SHADOW_CASCADES 4
-layout (location = 0) in vec3 inColor;
-layout (location = 1) in vec2 inUV;
-layout (location = 2) in vec3 inNormal;
-layout (location = 3) in vec4 inViewPos;
-layout (location = 4) in vec4 inLightDir;
-layout (location = 5) in vec4 inWorldPos;
 
-layout (location = 0) out vec4 outFragColor;
+layout (set = 3, binding = 0) uniform sampler2DArray shadowMaps;
 
-layout (binding = 1) uniform sampler2D colorMap;
-layout (binding = 2) uniform sampler2DArray shadowMaps;
-
-layout (binding = 3) uniform ShadowSpace{
+layout (set = 3, binding = 1) uniform ShadowSpace{
     mat4 cascades[SHADOW_CASCADES];
     float splits[SHADOW_CASCADES];
 } shadowSpace;
+
+layout (set = 3,binding = 2) uniform Globals{
+    vec4 lightDir;
+    vec4 skyColor;
+    vec4 lightColor;
+} globals;
 
 const mat4 biasMat = mat4(
 0.5, 0.0, 0.0, 0.0,
@@ -24,12 +24,14 @@ const mat4 biasMat = mat4(
 0.5, 0.5, 0.0, 1.0
 );
 
+layout (location = 0) out vec4 outFragColor;
+
 float textureProj(vec4 shadowCoord, vec2 off, uint cascadeIndex)
 {
     float shadow = 1.0;
     if(shadowCoord.x > 1.0f || shadowCoord.x < 0.0f ||
     shadowCoord.y > 1.0f || shadowCoord.y < 0.0f)
-        return shadow;
+    return shadow;
 
     if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 )
     {
@@ -65,24 +67,27 @@ float filterPCF(vec4 sc, uint cascadeIndex)
     }
     return shadowFactor / count;
 }
-void main(){
 
+
+void Lighting(SurfaceInfo surfaceInfo){
     // Get cascade index for the current fragment's view position
     uint cascadeIndex = 0;
+    vec3 inViewPos = surfaceInfo.position - surfaceInfo.cameraOffset;
+
     for(uint i = 0; i < SHADOW_CASCADES - 1; ++i) {
-        if(inViewPos.z > shadowSpace.splits[i]) {
+        if(length(inViewPos) > shadowSpace.splits[i]) {
             cascadeIndex = i + 1;
         }
     }
 
 
     // Depth compare for shadowing
-    vec4 shadowCoord = (biasMat * shadowSpace.cascades[cascadeIndex]) * inWorldPos;
+    vec4 shadowCoord = (biasMat * shadowSpace.cascades[cascadeIndex]) * vec4(surfaceInfo.position, 1.0f);
 
 
     float shadow = filterPCF(shadowCoord / shadowCoord.w, cascadeIndex);
 
-    float diffuse = dot(-inLightDir, vec4(inNormal, 0.0f));
+    float diffuse = dot(globals.lightDir, vec4(surfaceInfo.normal, 0.0f));
 
     // Self-Shadow artifacts elimination
 
@@ -91,11 +96,11 @@ void main(){
         shadow = 0.3f * (1.0f - factor) +  shadow * factor;
     }
     if(diffuse < 0.0f)
-        shadow = 0.3f;
+    shadow = 0.3f;
 
     diffuse = (diffuse + 1.0f) / 2.0f;
     diffuse = diffuse * 0.4f + 0.4f;
-    outFragColor = vec4(inColor, 1.0f) * texture(colorMap, inUV);
+    outFragColor = surfaceInfo.albedo;
     outFragColor *= diffuse * shadow;
 
     #if 0
@@ -113,5 +118,6 @@ void main(){
         outFragColor.rgb *= vec3(1.0f, 1.00f, 0.5f);
         break;
     }
-    #endif
+     #endif
+
 }

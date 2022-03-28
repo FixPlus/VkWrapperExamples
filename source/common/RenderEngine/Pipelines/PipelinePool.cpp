@@ -36,7 +36,11 @@ RenderEngine::GraphicsPipelinePool::pipelineOf(const RenderEngine::GeometryLayou
     createInfo.addInputAssemblyState(geometryLayout.inputAssemblyState());
     createInfo.addVertexInputState(*geometryLayout.vertexInputState());
     createInfo.addVertexShader(m_shaderLoader.get().loadVertexShader(geometryLayout, projectionLayout));
-    createInfo.addFragmentShader(m_shaderLoader.get().loadFragmentShader(materialLayout, lightingLayout));
+
+    if(!materialLayout.depthOnly()) {
+        createInfo.addFragmentShader(m_shaderLoader.get().loadFragmentShader(materialLayout, lightingLayout));
+    }
+
     if(materialLayout.depthTestState())
         createInfo.addDepthTestState(materialLayout.depthTestState().value());
     createInfo.addRasterizationState(materialLayout.rasterizationState());

@@ -102,36 +102,257 @@ private:
 
 };
 
-struct GlobalUniform {
-    glm::mat4 perspective;
-    glm::mat4 cameraSpace;
-    glm::vec4 lightVec = {-1.0f, -1.0f, -1.0f, 0.0f};
-} myUniform;
+class ShadowPass {
+public:
+    struct ShadowMapSpace {
+        glm::mat4 cascades[TestApp::SHADOW_CASCADES_COUNT];
+        float splits[TestApp::SHADOW_CASCADES_COUNT * 4];
+    } shadowMapSpace;
 
-struct ShadowMapSpace {
-    glm::mat4 cascades[TestApp::SHADOW_CASCADES_COUNT];
-    float splits[TestApp::SHADOW_CASCADES_COUNT * 4];
-} shadowMapSpace;
+    ShadowPass(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass) :
+            m_shadow_proj_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="shadow", .setBindings={
+                                         vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}, .pushConstants={
+                                         VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=sizeof(uint32_t)}}},
+                                 1),
+            m_shadow_proj(m_shadow_proj_layout, device),
+            m_shadow_material_layout(device,
+                                     RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="flat"}, .rasterizationState=vkw::RasterizationStateCreateInfo{
+                                             VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
+                                             VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 2.0f, 0.0f,
+                                             6.0f}, .depthTestState=vkw::DepthTestStateCreateInfo(VK_COMPARE_OP_LESS,
+                                                                                                  VK_TRUE), .maxMaterials=1}),
+            m_shadow_material(m_shadow_material_layout),
+            m_shadow_pass_layout(device,
+                                 RenderEngine::LightingLayout::CreateInfo{.substageDescription={.shaderSubstageName="shadow"}, .pass=pass, .subpass=subpass},
+                                 1),
+            m_shadow_pass(m_shadow_pass_layout) {
 
-template<uint32_t Cascades>
-void
-setShadowMapUniform(TestApp::ShadowCascadesCamera<Cascades> const &camera, ShadowMapSpace &ubo, glm::vec3 lightDir) {
-    auto greaterRadius = camera.cascade(Cascades - 1).radius;
-    for (int i = 0; i < Cascades; ++i) {
-        auto cascade = camera.cascade(i);
-        float shadowDepthFactor = 5.0f;
-        auto center = cascade.center;
-        auto shadowDepth = 2000.0f;
-        if (shadowDepth < cascade.radius * shadowDepthFactor)
-            shadowDepth = cascade.radius * shadowDepthFactor;
-        glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f,
-                                    shadowDepth/*cascade.radius * shadowDepthFactor*/);
-        glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (shadowDepth - cascade.radius), center,
-                                       glm::vec3{0.0f, 1.0f, 0.0f});
-        ubo.cascades[i] = proj * lookAt;
-        ubo.splits[i * 4] = cascade.split;
     }
-}
+
+
+    void bind(RenderEngine::GraphicsRecordingState &state) const {
+        state.setProjection(m_shadow_proj);
+        state.setMaterial(m_shadow_material);
+        state.setLighting(m_shadow_pass);
+    }
+
+private:
+    RenderEngine::ProjectionLayout m_shadow_proj_layout;
+
+    struct ShadowProjection : public RenderEngine::Projection {
+        ShadowProjection(RenderEngine::ProjectionLayout &layout, vkw::Device &device) :
+                RenderEngine::Projection(layout),
+                m_ubo(device,
+                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                m_mapped(m_ubo.map()) {
+            set().write(0, m_ubo);
+        }
+
+        template<uint32_t Cascades>
+        void update(TestApp::ShadowCascadesCamera<Cascades> const &camera, glm::vec3 lightDir) {
+            lightDir *= -1.0f;
+            auto greaterRadius = camera.cascade(Cascades - 1).radius;
+            for (int i = 0; i < Cascades; ++i) {
+                auto cascade = camera.cascade(i);
+                float shadowDepthFactor = 5.0f;
+                auto center = cascade.center;
+                auto shadowDepth = 2000.0f;
+                if (shadowDepth < cascade.radius * shadowDepthFactor)
+                    shadowDepth = cascade.radius * shadowDepthFactor;
+                glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f,
+                                            shadowDepth/*cascade.radius * shadowDepthFactor*/);
+                glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (shadowDepth - cascade.radius),
+                                               center,
+                                               glm::vec3{0.0f, 1.0f, 0.0f});
+                m_mapped->cascades[i] = proj * lookAt;
+                m_mapped->splits[i * 4] = cascade.split;
+            }
+            flush();
+        }
+
+        void flush() {
+            m_ubo.flush();
+        }
+
+        vkw::UniformBuffer<ShadowMapSpace> const &ubo() const {
+            return m_ubo;
+        }
+
+    private:
+        vkw::UniformBuffer<ShadowMapSpace> m_ubo;
+        ShadowMapSpace *m_mapped;
+    } m_shadow_proj;
+
+    RenderEngine::MaterialLayout m_shadow_material_layout;
+    RenderEngine::Material m_shadow_material;
+    RenderEngine::LightingLayout m_shadow_pass_layout;
+    RenderEngine::Lighting m_shadow_pass;
+public:
+    ShadowPass::ShadowProjection &projection() {
+        return m_shadow_proj;
+    }
+};
+
+class GlobalLayout {
+public:
+
+    struct LightUniform {
+        glm::vec4 lightVec = glm::normalize(glm::vec4{-0.37, 0.37, -0.85, 0.0f});
+        glm::vec4 skyColor = glm::vec4{158.0f, 146.0f, 144.0f, 255.0f} / 255.0f;
+        glm::vec4 lightColor = glm::vec4{244.0f, 218.0f, 62.0f, 255.0f} / 255.0f;
+    } light;
+
+    GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera,
+                 ::ShadowPass &shadowPass, vkw::Sampler &sampler) :
+            m_camera_projection_layout(device,
+                                       RenderEngine::SubstageDescription{.shaderSubstageName="perspective", .setBindings={
+                                               vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                       1),
+            m_light_layout(device,
+                           RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlightShadowed", .setBindings={
+                                   vkw::DescriptorSetLayoutBinding{0,
+                                                                   VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                   vkw::DescriptorSetLayoutBinding{1,
+                                                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                   vkw::DescriptorSetLayoutBinding{2,
+                                                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass},
+                           1),
+            m_camera(camera),
+            m_light(device, m_light_layout, light, shadowPass, 4, sampler),
+            m_camera_projection(device, m_camera_projection_layout) {
+    }
+
+    void bind(RenderEngine::GraphicsRecordingState &state) const {
+        state.setProjection(m_camera_projection);
+        state.setLighting(m_light);
+    }
+
+    void update() {
+        m_light.update(light);
+        m_camera_projection.update(m_camera);
+    }
+
+    TestApp::Camera const &camera() const {
+        return m_camera.get();
+    }
+
+    vkw::DepthStencilImage2DArray &shaodowCascades() {
+        return m_light.m_shadowCascades;
+    }
+
+    uint32_t shadowTextureSize() const {
+        return 2048;
+    }
+
+private:
+    RenderEngine::ProjectionLayout m_camera_projection_layout;
+
+    struct CameraProjection : public RenderEngine::Projection {
+        struct ProjectionUniform {
+            glm::mat4 perspective;
+            glm::mat4 cameraSpace;
+        } ubo;
+
+        CameraProjection(vkw::Device &device, RenderEngine::ProjectionLayout &layout) : RenderEngine::Projection(
+                layout), uniform(device,
+                                 VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                                                                                        mapped(uniform.map()) {
+            set().write(0, uniform);
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        void update(TestApp::Camera const &camera) {
+            ubo.perspective = camera.projection();
+            ubo.cameraSpace = camera.cameraSpace();
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        vkw::UniformBuffer<ProjectionUniform> uniform;
+        ProjectionUniform *mapped;
+    } m_camera_projection;
+
+    RenderEngine::LightingLayout m_light_layout;
+
+    struct Light : public RenderEngine::Lighting {
+
+
+        Light(vkw::Device &device, RenderEngine::LightingLayout &layout, LightUniform const &ubo, ::ShadowPass &pass,
+              uint32_t cascades, vkw::Sampler &sampler)
+                : RenderEngine::Lighting(layout), uniform(device,
+                                                          VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                  mapped(uniform.map()),
+                  m_shadowCascades{device.getAllocator(),
+                                   VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                                   VK_FORMAT_D32_SFLOAT, 2048,
+                                   2048, TestApp::SHADOW_CASCADES_COUNT, 1,
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT} {
+            VkComponentMapping mapping{};
+            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            set().write(0, m_shadowCascades.getView<vkw::DepthImageView>(device, m_shadowCascades.format(), 0, cascades,
+                                                                         mapping),
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+            set().write(1, pass.projection().ubo());
+            set().write(2, uniform);
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        void update(LightUniform const &ubo) {
+            *mapped = ubo;
+            uniform.flush();
+        }
+
+        vkw::UniformBuffer<LightUniform> uniform;
+        vkw::DepthStencilImage2DArray m_shadowCascades;
+        LightUniform *mapped;
+    } m_light;
+
+    std::reference_wrapper<TestApp::Camera const> m_camera;
+};
+
+class TexturedSurface {
+public:
+    TexturedSurface(vkw::Device &device, RenderEngine::TextureLoader &loader, vkw::Sampler &sampler,
+                    std::string const &imageName) :
+            m_layout(device,
+                     RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="pbr", .setBindings={
+                             vkw::DescriptorSetLayoutBinding{0,
+                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .depthTestState=vkw::DepthTestStateCreateInfo{
+                             VK_COMPARE_OP_LESS, VK_TRUE}, .maxMaterials=1}),
+            m_material(device, m_layout, loader, sampler, imageName) {
+    }
+
+
+    RenderEngine::Material const &get() const {
+        return m_material;
+    }
+
+private:
+    RenderEngine::MaterialLayout m_layout;
+
+    struct M_TexturedSurface : public RenderEngine::Material {
+        M_TexturedSurface(vkw::Device &device, RenderEngine::MaterialLayout &layout,
+                          RenderEngine::TextureLoader &loader, vkw::Sampler &sampler, std::string const &imageName) :
+                RenderEngine::Material(layout), m_texture(loader.loadTexture(imageName)) {
+            VkComponentMapping mapping{};
+            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+            set().write(0, m_texture.getView<vkw::ColorImageView>(device, m_texture.format(), mapping),
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+        }
+
+    private:
+        vkw::ColorImage2D m_texture;
+    } m_material;
+};
 
 int main() {
 
@@ -248,32 +469,13 @@ int main() {
     createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
     createInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
-    vkw::UniformBuffer<GlobalUniform> uBuf{device, createInfo};
 
-    ShadowMapSpace shadowProjector{};
+    auto shadow = ::ShadowPass(device, shadowRenderPass, 0);
 
-    vkw::UniformBuffer<ShadowMapSpace> shadowProjBuf{device, createInfo};
 
     createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     createInfo.requiredFlags = 0;
 
-    constexpr const uint32_t shadowMapSize = 2048;
-    vkw::DepthStencilImage2DArray shadowMap{device.getAllocator(), createInfo, VK_FORMAT_D32_SFLOAT, shadowMapSize,
-                                            shadowMapSize, TestApp::SHADOW_CASCADES_COUNT, 1,
-                                            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
-    std::vector<vkw::DepthImage2DArrayView const *> shadowMapAttachmentViews{};
-    for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
-        shadowMapAttachmentViews.emplace_back(
-                &shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), i, 1, mapping));
-    }
-    auto &shadowMapSampledView = shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0,
-                                                                        TestApp::SHADOW_CASCADES_COUNT, mapping);
-
-    std::vector<vkw::FrameBuffer> shadowBuffers{};
-    for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
-        shadowBuffers.emplace_back(device, shadowRenderPass, VkExtent2D{shadowMapSize, shadowMapSize},
-                                   *shadowMapAttachmentViews.at(i));
-    }
 
     RenderEngine::TextureLoader textureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
     auto cubeTexture = textureLoader.loadTexture("image");
@@ -294,20 +496,30 @@ int main() {
 
     auto textureSampler = vkw::Sampler{device, samplerCI};
 
+    auto globals = GlobalLayout(device, lightRenderPass, 0, window.camera(), shadow, textureSampler);
+
+    auto &shadowMap = globals.shaodowCascades();
+
+    std::vector<vkw::DepthImage2DArrayView const *> shadowMapAttachmentViews{};
+    for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+        shadowMapAttachmentViews.emplace_back(
+                &shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), i, 1, mapping));
+    }
+    auto &shadowMapSampledView = shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0,
+                                                                        TestApp::SHADOW_CASCADES_COUNT, mapping);
+
+    std::vector<vkw::FrameBuffer> shadowBuffers{};
+    for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+        shadowBuffers.emplace_back(device, shadowRenderPass,
+                                   VkExtent2D{globals.shadowTextureSize(), globals.shadowTextureSize()},
+                                   *shadowMapAttachmentViews.at(i));
+    }
+
     constexpr const int cubeCount = 50000;
 
     TestApp::CubePool cubePool{device, cubeCount};
 
-
-    auto *uBufMapped = uBuf.map();
-    auto *uShadowGlobal = shadowProjBuf.map();
-
-
-    setShadowMapUniform(window.camera(), shadowProjector, glm::vec3{myUniform.lightVec});
-
-
-    memcpy(uShadowGlobal, &shadowProjector, sizeof(shadowProjector));
-
+    shadow.projection().update(window.camera(), glm::vec3{globals.light.lightVec});
 
     std::vector<TestApp::Cube> cubes{};
     cubes.emplace_back(cubePool, glm::vec3{500.0f, -500.0f, 500.0f}, glm::vec3{1000.0f}, glm::vec3{0.0f}).makeStatic();
@@ -332,66 +544,8 @@ int main() {
 
     RenderEngine::ShaderImporter shaderImporter{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
     RenderEngine::ShaderLoader shaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-    auto cubeVertShader = shaderImporter.loadVertexShader("triangle");
-    auto cubeShadowShader = shaderImporter.loadVertexShader("shadow");
-    auto cubeShadowShowShader = shaderImporter.loadFragmentShader("shadow");
-    auto cubeFragShader = shaderImporter.loadFragmentShader("triangle");
 
-    vkw::PipelineLayout lightLayout{device, cubeLightDescriptorLayout};
-    vkw::PipelineLayout shadowLayout{device, cubeShadowDescriptorLayout,
-                                     {{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(uint32_t)}}};
-
-    vkw::GraphicsPipelineCreateInfo lightCreateInfo{lightRenderPass, 0, lightLayout};
-    vkw::GraphicsPipelineCreateInfo shadowShowCreateInfo{lightRenderPass, 0, shadowLayout};
-    auto &vertexInputState = TestApp::CubePool::geometryInputState();
-
-    lightCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
-    lightCreateInfo.addVertexShader(cubeVertShader);
-    lightCreateInfo.addFragmentShader(cubeFragShader);
-    lightCreateInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
-    lightCreateInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
-    lightCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
-    lightCreateInfo.addRasterizationState(
-            vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
-                                              VK_FRONT_FACE_COUNTER_CLOCKWISE});
-    vkw::GraphicsPipeline lightCubePipeline{device, lightCreateInfo};
-
-    shadowShowCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
-    shadowShowCreateInfo.addVertexShader(cubeShadowShader);
-    shadowShowCreateInfo.addFragmentShader(cubeShadowShowShader);
-    shadowShowCreateInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
-    shadowShowCreateInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
-    shadowShowCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
-    shadowShowCreateInfo.addRasterizationState(
-            vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
-                                              VK_FRONT_FACE_COUNTER_CLOCKWISE});
-    vkw::GraphicsPipeline shadowShowPipeline{device, shadowShowCreateInfo};
-
-    vkw::GraphicsPipelineCreateInfo shadowCreateInfo{shadowRenderPass, 0, shadowLayout};
-
-    shadowCreateInfo.addVertexInputState(TestApp::CubePool::geometryInputState());
-    shadowCreateInfo.addVertexShader(cubeShadowShader);
-    shadowCreateInfo.addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
-    shadowCreateInfo.addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
-    shadowCreateInfo.addRasterizationState(
-            vkw::RasterizationStateCreateInfo{VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
-                                              VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 2.0f, 0.0f, 6.0f});
-    shadowCreateInfo.addDepthTestState(vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS_OR_EQUAL, true});
-
-    vkw::GraphicsPipeline shadowCubePipeline{device, shadowCreateInfo};
-
-    vkw::DescriptorPool descriptorPool{device, 2,
-                                       {VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount=3},
-                                        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount=2}}};
-
-    vkw::DescriptorSet shadowSet{descriptorPool, cubeShadowDescriptorLayout};
-    shadowSet.write(0, shadowProjBuf);
-    vkw::DescriptorSet lightSet{descriptorPool, cubeLightDescriptorLayout};
-    lightSet.write(0, uBuf);
-    lightSet.write(1, cubeTextureView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textureSampler);
-    lightSet.write(2, shadowMapSampledView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textureSampler);
-    lightSet.write(3, shadowProjBuf);
-
+    auto texturedSurface = TexturedSurface(device, textureLoader, textureSampler, "image");
 
     // 12. create command buffer and sync primitives
 
@@ -418,8 +572,6 @@ int main() {
 
     // 13. render on screen in a loop
 
-    myUniform.perspective = window.camera().projection();
-
     constexpr const int thread_count = 12;
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
@@ -433,6 +585,8 @@ int main() {
         gui.frame();
         gui.push();
         recorder.reset();
+        globals.update();
+        shadow.projection().update(window.camera(), globals.light.lightVec);
 
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
@@ -450,19 +604,6 @@ int main() {
             mySwapChain->acquireNextImage(presentComplete, 1000);
 
 
-            myUniform.perspective = window.camera().projection();
-            myUniform.cameraSpace = window.camera().cameraSpace();
-            //myUniform.lightVec.x = glm::cos(totalTime);
-            //myUniform.lightVec.y = -1.0f;
-            //myUniform.lightVec.z = glm::sin(totalTime);
-            glm::normalize(myUniform.lightVec);
-            setShadowMapUniform(window.camera(), shadowProjector, glm::vec3{myUniform.lightVec});
-            memcpy(uBufMapped, &myUniform, sizeof(myUniform));
-            memcpy(uShadowGlobal, &shadowProjector, sizeof(shadowProjector));
-            uBuf.flush();
-            shadowProjBuf.flush();
-
-
             commandBuffer.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
             auto &currentFrameBuffer = framebuffers.at(mySwapChain->currentImage());
             std::array<VkClearValue, 2> values{};
@@ -473,14 +614,14 @@ int main() {
 
             VkViewport viewport;
 
-            viewport.height = shadowMapSize;
-            viewport.width = shadowMapSize;
+            viewport.height = globals.shadowTextureSize();
+            viewport.width = globals.shadowTextureSize();
             viewport.x = viewport.y = 0.0f;
             viewport.minDepth = 0.0f;
             viewport.maxDepth = 1.0f;
             VkRect2D scissor;
-            scissor.extent.width = shadowMapSize;
-            scissor.extent.height = shadowMapSize;
+            scissor.extent.width = globals.shadowTextureSize();
+            scissor.extent.height = globals.shadowTextureSize();
             scissor.offset.x = 0;
             scissor.offset.y = 0;
 
@@ -511,14 +652,17 @@ int main() {
                 commandBuffer.setViewports({viewport}, 0);
                 commandBuffer.setScissors({scissor}, 0);
 
-                commandBuffer.bindGraphicsPipeline(shadowCubePipeline);
-                commandBuffer.bindDescriptorSets(shadowLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, shadowSet, 0);
-                cubePool.bindGeometry(commandBuffer);
+                shadow.bind(recorder);
+
                 uint32_t id = i;
 
-                commandBuffer.pushConstants(shadowLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, id);
+                cubePool.bind(recorder);
 
-                cubePool.drawGeometry(commandBuffer);
+                recorder.bindPipeline();
+
+                recorder.pushConstants(id, VK_SHADER_STAGE_VERTEX_BIT, 0);
+
+                cubePool.draw(recorder);
 
                 commandBuffer.endRenderPass();
             }
@@ -536,10 +680,12 @@ int main() {
             commandBuffer.setViewports({viewport}, 0);
             commandBuffer.setScissors({scissor}, 0);
 
-            commandBuffer.bindGraphicsPipeline(lightCubePipeline);
-            commandBuffer.bindDescriptorSets(lightLayout, VK_PIPELINE_BIND_POINT_GRAPHICS, lightSet, 0);
-            cubePool.bindGeometry(commandBuffer);
-            cubePool.drawGeometry(commandBuffer);
+            globals.bind(recorder);
+            recorder.setMaterial(texturedSurface.get());
+
+            recorder.bindPipeline();
+            cubePool.draw(recorder);
+
 
             gui.draw(recorder);
             commandBuffer.endRenderPass();
