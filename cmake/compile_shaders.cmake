@@ -1,6 +1,6 @@
 function(compileShader SHADER_NAME SHADER_DIR OUTPUT_DIR)
-
-    add_custom_target(${SHADER_NAME} ALL COMMAND ${GLSL} -V --allow-partial-linkage -I${SHADER_DIR} -o ${OUTPUT_DIR}/${SHADER_NAME}.spv ${SHADER_DIR}/${SHADER_NAME})
+    add_custom_command(OUTPUT ${OUTPUT_DIR}/${SHADER_NAME}.spv COMMAND ${GLSL} -V --allow-partial-linkage -I${SHADER_DIR} -o ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_DIR}/${SHADER_NAME}.spv ${SHADER_DIR}/${SHADER_NAME}
+            MAIN_DEPENDENCY ${SHADER_DIR}/${SHADER_NAME})
 
 endfunction(compileShader)
 
@@ -20,8 +20,9 @@ function(compileShaders SHADER_DIR OUTPUT_DIR DEPENDENT_TARGET INSTALL_DIR)
         endforeach(SHADER)
 
         list(TRANSFORM SHADERS APPEND ".spv" OUTPUT_VARIABLE SHADERS_BINS)
-        list(TRANSFORM SHADERS_BINS PREPEND ${OUTPUT_DIR}/)
+        list(TRANSFORM SHADERS_BINS PREPEND ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_DIR}/)
+        target_sources(${DEPENDENT_TARGET} INTERFACE ${SHADERS_BINS})
         install(FILES ${SHADERS_BINS} DESTINATION ${INSTALL_DIR})
-        add_dependencies(${DEPENDENT_TARGET} ${SHADERS})
+
     ENDIF()
 endfunction(compileShaders)

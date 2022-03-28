@@ -88,12 +88,10 @@ include_directories(source/common)
 add_subdirectory(external)
 add_subdirectory(source)
 
-include(cmake/compile_shaders.cmake)
-
 set(EXAMPLE_ASSET_PATH "./data")
 
 configure_file(source/common/AssetPath.inc.in AssetPath.inc)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source/data/shaders)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source/data/textures)
-compileShaders(${CMAKE_CURRENT_SOURCE_DIR}/source/shaders ${CMAKE_CURRENT_BINARY_DIR}/source/data/shaders RenderKit .)
+
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source/data DESTINATION .)
