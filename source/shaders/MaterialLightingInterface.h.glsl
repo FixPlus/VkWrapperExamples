@@ -5,6 +5,8 @@ struct SurfaceInfo{
     vec3 normal;
     vec3 cameraOffset;
     vec3 position;
+    float metallic;
+    float roughness;
 };
 
 SurfaceInfo Material();

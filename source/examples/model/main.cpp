@@ -250,12 +250,14 @@ int main() {
         return 0;
     }
 
-    GLTFModel model{device, modelList.front()};
+    TestApp::DefaultTexturePool defaultTextures{device};
+
+    GLTFModel model{device, defaultTextures, modelList.front()};
 
     auto instance = model.createNewInstance();
     instance.update();
 
-    gui.customGui = [&instance, &model, &modelList, &modelListCstr, &device, &shaderLoader, &lightPass, &globalState, &window]() {
+    gui.customGui = [&instance, &model, &modelList, &modelListCstr, &device, &defaultTextures]() {
         //ImGui::SetNextWindowSize({400.0f, 150.0f}, ImGuiCond_Once);
         ImGui::Begin("Model", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
 
@@ -276,7 +278,7 @@ int main() {
                 // hack to get instance destroyed
                 auto dummy = std::move(instance);
             }
-            model = std::move(GLTFModel(device, modelList.at(current_model)));
+            model = std::move(GLTFModel(device, defaultTextures, modelList.at(current_model)));
             instance = model.createNewInstance();
             instance.update();
 

@@ -14,9 +14,8 @@ namespace RenderEngine{
         vkw::FragmentShader const& loadFragmentShader(RenderEngine::MaterialLayout const& material, RenderEngine::LightingLayout const& lighting) override;
 
     private:
-        std::vector<vkw::VertexShader> m_vertexShaders;
-        std::vector<vkw::FragmentShader> m_fragmentShaders;
-
+        std::map<std::pair<std::string, std::string>, vkw::VertexShader> m_vertexShaders;
+        std::map<std::pair<std::string, std::string>, vkw::FragmentShader> m_fragmentShaders;
     };
 
 

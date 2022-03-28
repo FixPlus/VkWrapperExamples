@@ -78,6 +78,7 @@ TestApp::MeshBase::MeshBase(vkw::Device &device, tinygltf::Model const &model, t
         const float *bufferNormals = nullptr;
         const float *bufferTexCoords = nullptr;
         const float *bufferColors = nullptr;
+        const float *bufferTangents = nullptr;
 
         int numColorComponents;
 
@@ -127,6 +128,26 @@ TestApp::MeshBase::MeshBase(vkw::Device &device, tinygltf::Model const &model, t
                             .data[colorAccessor.byteOffset + colorView.byteOffset]));
         }
 
+        if (primitive.attributes.find("COLOR_0") != primitive.attributes.end()) {
+            const tinygltf::Accessor &colorAccessor =
+                    model.accessors[primitive.attributes.find("COLOR_0")->second];
+            const tinygltf::BufferView &colorView =
+                    model.bufferViews[colorAccessor.bufferView];
+            // Color buffer are either of type vec3 or vec4
+            numColorComponents =
+                    colorAccessor.type == TINYGLTF_PARAMETER_TYPE_FLOAT_VEC3 ? 3 : 4;
+            bufferColors = reinterpret_cast<const float *>(
+                    &(model.buffers[colorView.buffer]
+                            .data[colorAccessor.byteOffset + colorView.byteOffset]));
+        }
+
+        if (primitive.attributes.find("TANGENT") != primitive.attributes.end())
+        {
+            const tinygltf::Accessor &tangentAccessor = model.accessors[primitive.attributes.find("TANGENT")->second];
+            const tinygltf::BufferView &tangentView = model.bufferViews[tangentAccessor.bufferView];
+            bufferTangents = reinterpret_cast<const float *>(&(model.buffers[tangentView.buffer].data[tangentAccessor.byteOffset + tangentView.byteOffset]));
+        }
+
         for (size_t i = 0; i < evalPrimitive.vertexCount; ++i) {
             size_t vertexOffset = (evalPrimitive.firstVertex + i);
             size_t localOffset = 0;
@@ -142,11 +163,19 @@ TestApp::MeshBase::MeshBase(vkw::Device &device, tinygltf::Model const &model, t
                             glm::vec3 normal = glm::vec3(glm::make_vec3(bufferNormals + i * 3));
                             vertexBuf.at(vertexOffset).normal = normal;
                         } else {
-                            vertexBuf.at(vertexOffset).normal = glm::vec3(0.0f);
+                            vertexBuf.at(vertexOffset).normal = glm::normalize(glm::vec3(1.0f));
                         }
                         break;
                     }
-                    case AttributeType::UV: {
+                    case AttributeType::TANGENT: {
+                        if (bufferTangents) {
+                            glm::vec3 tangent = glm::vec3(glm::make_vec3(bufferTangents + i * 3));
+                            vertexBuf.at(vertexOffset).tangent = tangent;
+                        } else {
+                            vertexBuf.at(vertexOffset).tangent = glm::normalize(glm::vec3(1.0f));
+                        }
+                        break;
+                    }                    case AttributeType::UV: {
                         if (bufferTexCoords) {
                             glm::vec2 uv = glm::vec2(glm::make_vec2(bufferTexCoords + i * 2));
                             vertexBuf.at(vertexOffset).uv = uv;
@@ -310,7 +339,7 @@ TestApp::ModelGeometry &TestApp::MMesh::instance(size_t id) {
     return m_instances.at(id);
 }
 
-TestApp::GLTFModel::GLTFModel(vkw::Device &device,
+TestApp::GLTFModel::GLTFModel(vkw::Device &device, DefaultTexturePool& pool,
                               std::filesystem::path const &path) :
         renderer_(device),
         sampler(device, VkSamplerCreateInfo{.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext=nullptr,
@@ -325,7 +354,8 @@ TestApp::GLTFModel::GLTFModel(vkw::Device &device,
                 .maxLod=1.0f,
         }),
         materialLayout(device),
-        geometryLayout(device) {
+        geometryLayout(device),
+        m_defaultTexturePool(pool){
 
     if (!path.has_extension())
         throw std::runtime_error("[MODEL][ERROR] " + path.generic_string() +
@@ -380,14 +410,24 @@ void TestApp::GLTFModel::loadMaterials(tinygltf::Model &gltfModel) {
                             .source);
         }
         material.sampler = &sampler;
+
+        if (mat.additionalValues.find("normalTexture") !=
+            mat.additionalValues.end()) {
+            material.normalMap = &getTexture(
+                    gltfModel
+                            .textures[mat.additionalValues["normalTexture"].TextureIndex()]
+                            .source);
+        }
+
+        if (mat.values.find("metallicRoughnessTexture") != mat.values.end()) {
+            material.metallicRoughnessMap = &getTexture(
+                    gltfModel
+                            .textures[mat.values["metallicRoughnessTexture"].TextureIndex()]
+                            .source);
+        }
 #if 0
         // Metallic roughness workflow
-        if (mat.values.find("metallicRoughnessTexture") != mat.values.end()) {
-          material.metallicRoughnessTexture = getTexture(
-              gltfModel
-                  .textures[mat.values["metallicRoughnessTexture"].TextureIndex()]
-                  .source);
-        }
+
         if (mat.values.find("roughnessFactor") != mat.values.end()) {
           material.materialSettings.roughnessFactor =
               static_cast<float>(mat.values["roughnessFactor"].Factor());
@@ -400,13 +440,7 @@ void TestApp::GLTFModel::loadMaterials(tinygltf::Model &gltfModel) {
           material.materialSettings.baseColorFactor =
               glm::make_vec4(mat.values["baseColorFactor"].ColorFactor().data());
         }
-        if (mat.additionalValues.find("normalTexture") !=
-            mat.additionalValues.end()) {
-          material.normalTexture = getTexture(
-              gltfModel
-                  .textures[mat.additionalValues["normalTexture"].TextureIndex()]
-                  .source);
-        }
+
         if (mat.additionalValues.find("emissiveTexture") !=
             mat.additionalValues.end()) {
           material.emissiveTexture = getTexture(
@@ -440,7 +474,7 @@ void TestApp::GLTFModel::loadMaterials(tinygltf::Model &gltfModel) {
 
         material.compileDescriptors();
 #endif
-        materials.emplace_back(renderer_.get(), materialLayout, material);
+        materials.emplace_back(renderer_.get(), m_defaultTexturePool, materialLayout, material);
     }
 }
 
@@ -598,6 +632,10 @@ TestApp::ModelMaterialLayout::ModelMaterialLayout(vkw::Device &device) :
         RenderEngine::MaterialLayout(device,
                                      RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="pbr", .setBindings={
                                              vkw::DescriptorSetLayoutBinding{0,
+                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                             vkw::DescriptorSetLayoutBinding{1,
+                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                             vkw::DescriptorSetLayoutBinding{2,
                                                                              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .rasterizationState=vkw::RasterizationStateCreateInfo(
                                              VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL,
                                              VK_CULL_MODE_BACK_BIT), .depthTestState=vkw::DepthTestStateCreateInfo(
@@ -605,17 +643,23 @@ TestApp::ModelMaterialLayout::ModelMaterialLayout(vkw::Device &device) :
 
 }
 
-TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, ModelMaterialLayout &layout, MaterialInfo info)
+TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, DefaultTexturePool& pool, ModelMaterialLayout &layout, MaterialInfo info)
         : RenderEngine::Material(layout), m_info(info) {
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    auto* colorMap = info.colorMap ? info.colorMap : &pool.colorMap();
+    auto* normalMap = info.normalMap ? info.normalMap : &pool.colorMap();
+    auto* mrMap = info.metallicRoughnessMap ? info.metallicRoughnessMap : &pool.metallicRoughnessMap();
 
-    set().write(0, info.colorMap->getView<vkw::ColorImageView>(device, info.colorMap->format(), mapping),
+    set().write(0, colorMap->getView<vkw::ColorImageView>(device, colorMap->format(), mapping),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
-
+    set().write(1, normalMap->getView<vkw::ColorImageView>(device, normalMap->format(), mapping),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
+    set().write(2, mrMap->getView<vkw::ColorImageView>(device, mrMap->format(), mapping),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
 }
 
 TestApp::ModelGeometryLayout::ModelGeometryLayout(vkw::Device &device) :
@@ -636,4 +680,118 @@ TestApp::ModelGeometry::ModelGeometry(vkw::Device &device, TestApp::ModelGeometr
 void TestApp::ModelGeometry::update() {
     *m_mapped = data;
     m_ubo.flush();
+}
+
+TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t textureDim):
+        m_colorMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
+        m_normalMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
+        m_metallicRoughnessMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+
+{
+    vkw::Buffer<uint32_t> stageBuffer{device, textureDim * textureDim, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU,.requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}};
+
+    auto* textureData = stageBuffer.map();
+
+    for(int i = 0; i < textureDim; ++i)
+        for(int j = 0; j < textureDim; ++j)
+            textureData[i * textureDim + j] = (i < textureDim / 2 && j < textureDim / 2) || (i > textureDim / 2 && j > textureDim / 2) ? 0xFFFF00FF : 0xFF000000;
+
+    stageBuffer.flush();
+
+    VkImageMemoryBarrier transitLayout1{};
+    transitLayout1.image = m_colorMap;
+    transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    transitLayout1.pNext = nullptr;
+    transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transitLayout1.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transitLayout1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transitLayout1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    transitLayout1.subresourceRange.baseArrayLayer = 0;
+    transitLayout1.subresourceRange.baseMipLevel = 0;
+    transitLayout1.subresourceRange.layerCount = 1;
+    transitLayout1.subresourceRange.levelCount = 1;
+    transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    transitLayout1.srcAccessMask = 0;
+
+    VkImageMemoryBarrier transitLayout2{};
+    transitLayout2.image = m_colorMap;
+    transitLayout2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    transitLayout2.pNext = nullptr;
+    transitLayout2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transitLayout2.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    transitLayout2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transitLayout2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transitLayout2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    transitLayout2.subresourceRange.baseArrayLayer = 0;
+    transitLayout2.subresourceRange.baseMipLevel = 0;
+    transitLayout2.subresourceRange.layerCount = 1;
+    transitLayout2.subresourceRange.levelCount = 1;
+    transitLayout2.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    transitLayout2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+
+    auto transferQueue = device.getTransferQueue();
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, transferQueue->familyIndex()};
+    auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
+    transferCommand.begin(0);
+    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                       {transitLayout1});
+    VkBufferImageCopy bufferCopy{};
+    bufferCopy.imageExtent = {static_cast<uint32_t>(textureDim), static_cast<uint32_t>(textureDim), 1};
+    bufferCopy.imageSubresource.mipLevel = 0;
+    bufferCopy.imageSubresource.layerCount = 1;
+    bufferCopy.imageSubresource.baseArrayLayer = 0;
+    bufferCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    transferCommand.copyBufferToImage(stageBuffer, m_colorMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
+
+    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                       {transitLayout2});
+    transferCommand.end();
+
+    transferQueue->submit(transferCommand);
+    transferQueue->waitIdle();
+
+    for(int i = 0; i < textureDim; ++i)
+        for(int j = 0; j < textureDim; ++j)
+            textureData[i * textureDim + j] = 0x0;
+    stageBuffer.flush();
+    transitLayout1.image = m_normalMap;
+    transitLayout2.image = m_normalMap;
+
+    transferCommand.begin(0);
+    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                       {transitLayout1});
+
+    transferCommand.copyBufferToImage(stageBuffer, m_normalMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
+
+    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                       {transitLayout2});
+    transferCommand.end();
+
+    transferQueue->submit(transferCommand);
+    transferQueue->waitIdle();
+
+
+    for(int i = 0; i < textureDim; ++i)
+        for(int j = 0; j < textureDim; ++j)
+            textureData[i * textureDim + j] = 0xFFFFFFFF;
+
+    stageBuffer.flush();
+    transitLayout1.image = m_metallicRoughnessMap;
+    transitLayout2.image = m_metallicRoughnessMap;
+
+    transferCommand.begin(0);
+    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                       {transitLayout1});
+
+    transferCommand.copyBufferToImage(stageBuffer, m_metallicRoughnessMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
+
+    transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                       {transitLayout2});
+    transferCommand.end();
+
+    transferQueue->submit(transferCommand);
+    transferQueue->waitIdle();
+
 }

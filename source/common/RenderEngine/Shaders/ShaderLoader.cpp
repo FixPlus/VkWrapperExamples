@@ -9,13 +9,19 @@ namespace RenderEngine {
 
     vkw::VertexShader const &ShaderLoader::loadVertexShader(RenderEngine::GeometryLayout const &geometry,
                                                             RenderEngine::ProjectionLayout const &projection) {
+        std::pair<std::string, std::string> key = {geometry.description().shaderSubstageName, projection.description().shaderSubstageName};
+        if(m_vertexShaders.contains(key))
+            return m_vertexShaders.at(key);
 
-
-        return m_vertexShaders.emplace_back(ShaderImporter::loadVertexShader(geometry.description().shaderSubstageName, projection.description().shaderSubstageName));
+        return m_vertexShaders.emplace(key, ShaderImporter::loadVertexShader(key.first, key.second)).first->second;
     }
 
     vkw::FragmentShader const &ShaderLoader::loadFragmentShader(RenderEngine::MaterialLayout const &material,
                                                                 RenderEngine::LightingLayout const &lighting) {
-        return m_fragmentShaders.emplace_back(ShaderImporter::loadFragmentShader(material.description().shaderSubstageName, lighting.description().shaderSubstageName));
+        std::pair<std::string, std::string> key = {material.description().shaderSubstageName, lighting.description().shaderSubstageName};
+        if(m_fragmentShaders.contains(key))
+            return m_fragmentShaders.at(key);
+
+        return m_fragmentShaders.emplace(key, ShaderImporter::loadFragmentShader(key.first, key.second)).first->second;
     }
 }

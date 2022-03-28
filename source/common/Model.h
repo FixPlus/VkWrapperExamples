@@ -25,17 +25,19 @@ namespace TestApp {
     enum class AttributeType {
         POSITION = 0, // 4f
         NORMAL = 1,   // 3f
-        UV = 2,       // 2f
-        COLOR = 3,    // 4f
-        JOINT = 4,    // 4f
-        WEIGHT = 5,   // 4f
-        LAST = 6
+        TANGENT = 2,  // 3f
+        UV = 3,       // 2f
+        COLOR = 4,    // 4f
+        JOINT = 5,    // 4f
+        WEIGHT = 6,   // 4f
+        LAST = 7
     };
 
-    struct ModelAttributes : public vkw::AttributeBase<vkw::VertexAttributeType::VEC4F, vkw::VertexAttributeType::VEC3F,
+    struct ModelAttributes : public vkw::AttributeBase<vkw::VertexAttributeType::VEC4F, vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC3F,
             vkw::VertexAttributeType::VEC2F, vkw::VertexAttributeType::VEC4F, vkw::VertexAttributeType::VEC4F, vkw::VertexAttributeType::VEC4F> {
         glm::vec4 pos;
         glm::vec3 normal;
+        glm::vec3 tangent;
         glm::vec2 uv;
         glm::vec4 color;
         glm::vec4 joint;
@@ -115,8 +117,12 @@ namespace TestApp {
     };
 #endif
 
+    class DefaultTexturePool;
+
     struct MaterialInfo {
-        vkw::ColorImage2D *colorMap;
+        vkw::ColorImage2D *colorMap = nullptr;
+        vkw::ColorImage2D *normalMap = nullptr;
+        vkw::ColorImage2D *metallicRoughnessMap = nullptr;
         vkw::Sampler const *sampler;
 
         auto operator<=>(MaterialInfo const &another) const = default;
@@ -131,7 +137,7 @@ namespace TestApp {
 
     class ModelMaterial : public RenderEngine::Material {
     public:
-        ModelMaterial(vkw::Device &device, ModelMaterialLayout &layout, MaterialInfo info);
+        ModelMaterial(vkw::Device &device, DefaultTexturePool& pool, ModelMaterialLayout &layout, MaterialInfo info);
 
         MaterialInfo const &info() const {
             return m_info;
@@ -208,6 +214,30 @@ namespace TestApp {
 
     class GLTFModelInstance;
 
+    class DefaultTexturePool{
+    public:
+
+        explicit DefaultTexturePool(vkw::Device& device, uint32_t textureDim = 256);
+
+        vkw::ColorImage2D& colorMap(){
+            return m_colorMap;
+        }
+
+        vkw::ColorImage2D& normalMap(){
+            return m_normalMap;
+        }
+
+        vkw::ColorImage2D& metallicRoughnessMap(){
+            return m_metallicRoughnessMap;
+        }
+
+
+    private:
+        vkw::ColorImage2D m_colorMap;
+        vkw::ColorImage2D m_normalMap;
+        vkw::ColorImage2D m_metallicRoughnessMap;
+    };
+
     class GLTFModel {
         ModelMaterialLayout materialLayout;
         ModelGeometryLayout geometryLayout;
@@ -217,6 +247,7 @@ namespace TestApp {
         std::vector<std::shared_ptr<MNode>> rootNodes;
         std::vector<std::shared_ptr<MNode>> linearNodes;
         std::reference_wrapper<vkw::Device> renderer_;
+        std::reference_wrapper<DefaultTexturePool> m_defaultTexturePool;
         vkw::Sampler sampler;
         std::stack<size_t> freeIDs;
         size_t instanceCount = 0;
@@ -240,7 +271,7 @@ namespace TestApp {
 
     public:
 
-        GLTFModel(vkw::Device &renderer, std::filesystem::path const &path);
+        GLTFModel(vkw::Device &renderer, DefaultTexturePool& pool, std::filesystem::path const &path);
 
         GLTFModelInstance createNewInstance();
 

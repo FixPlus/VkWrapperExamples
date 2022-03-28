@@ -72,5 +72,6 @@ WorldVertexInfo Geometry(){
     ret.color = vec4(0.0f, 0.1f, 0.7f, 1.0f);
     ret.UVW = vec3(uv, 1.0f);
     ret.normal = normal;
+    ret.tangent = normalize(tangent);
     return ret;
 }

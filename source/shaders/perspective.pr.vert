@@ -7,6 +7,7 @@ layout (location = 1) out vec3 outUVW;
 layout (location = 2) out vec3 outWorldPos;
 layout (location = 3) out vec3 outWorldNormal;
 layout (location = 4) out vec3 outViewPos;
+layout (location = 5) out vec3 outWorldTangent;
 
 layout (set = 1, binding = 0) uniform Camera{
     mat4 perspective;
@@ -17,6 +18,7 @@ layout (set = 1, binding = 0) uniform Camera{
 void Projection(WorldVertexInfo worldVertexInfo){
 
     outWorldNormal = worldVertexInfo.normal;
+    outWorldTangent = worldVertexInfo.tangent;
     outUVW = worldVertexInfo.UVW;
     outColor = vec4(1.0f);
     outWorldPos = worldVertexInfo.position;
