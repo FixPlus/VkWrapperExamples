@@ -93,21 +93,25 @@ public:
 
     };
 
-    glm::vec4 deepWaterColor = glm::vec4(0.0f, 0.01f, 0.3f, 1.0f);
+    struct WaterDescription {
+        glm::vec4 deepWaterColor = glm::vec4(0.0f, 0.01f, 0.3f, 1.0f);
+        float metallic = 0.2f;
+        float roughness = 0.2f;
+    } description;
 
     RenderEngine::Material const &get() const {
         return m_material;
     }
 
     void update() {
-        *m_material.m_mapped = deepWaterColor;
+        *m_material.m_mapped = description;
         m_material.m_buffer.map();
     }
 
 private:
     struct Material : public RenderEngine::Material {
-        vkw::UniformBuffer<glm::vec4> m_buffer;
-        glm::vec4 *m_mapped;
+        vkw::UniformBuffer<WaterDescription> m_buffer;
+        WaterDescription *m_mapped;
 
         Material(vkw::Device &device, WaterMaterial &waterMaterial);
     } m_material;

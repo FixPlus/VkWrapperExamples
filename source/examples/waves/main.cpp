@@ -192,8 +192,13 @@ int main() {
 
         ImGui::Text("Total tiles: %d", waves.totalTiles());
 
-        if (ImGui::ColorEdit4("Deep water color", &waveMaterial.deepWaterColor.x))
-            waveMaterialWireframe.deepWaterColor = waveMaterial.deepWaterColor;
+        if (ImGui::ColorEdit4("Deep water color", &waveMaterial.description.deepWaterColor.x))
+            waveMaterialWireframe.description.deepWaterColor = waveMaterial.description.deepWaterColor;
+        if (ImGui::SliderFloat("Metallic", &waveMaterial.description.metallic, 0.0f, 1.0f))
+            waveMaterialWireframe.description.metallic = waveMaterial.description.metallic;
+        if (ImGui::SliderFloat("Roughness", &waveMaterial.description.roughness, 0.0f, 1.0f))
+            waveMaterialWireframe.description.roughness = waveMaterial.description.roughness;
+
 
 
         ImGui::End();

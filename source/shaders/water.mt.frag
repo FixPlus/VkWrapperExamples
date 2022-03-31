@@ -10,6 +10,7 @@ layout (location = 4) in vec3 inViewPos;
 
 layout (set = 2, binding = 0) uniform Waves{
     vec4 deepWaterColor;
+    vec2 metallicRoughness;
 }waves;
 
 
@@ -19,8 +20,8 @@ SurfaceInfo Material(){
     ret.position = inWorldPos;
     ret.normal = inWorldNormal;
     ret.cameraOffset = inViewPos;
-    ret.metallic = 0.2f;
-    ret.roughness = 0.2f;
+    ret.metallic = waves.metallicRoughness.x;
+    ret.roughness = waves.metallicRoughness.y;
 
     return ret;
 }
