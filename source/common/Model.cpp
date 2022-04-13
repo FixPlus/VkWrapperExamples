@@ -594,6 +594,7 @@ TestApp::GLTFModelInstance::~GLTFModelInstance() {
 void TestApp::GLTFModelInstance::update() {
     auto rot = glm::mat4(1.0f);
 
+    rot = glm::translate(rot, translation);
     rot = glm::rotate(rot, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
     rot = glm::rotate(rot, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
     rot = glm::rotate(rot, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));

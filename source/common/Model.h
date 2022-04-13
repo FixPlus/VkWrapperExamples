@@ -288,6 +288,7 @@ namespace TestApp {
     public:
         glm::vec3 rotation = glm::vec3{0.0f};
         glm::vec3 scale = glm::vec3{1.0f};
+        glm::vec3 translation = glm::vec3{0.0f};
 
         GLTFModelInstance(GLTFModelInstance const &another) = delete;
 

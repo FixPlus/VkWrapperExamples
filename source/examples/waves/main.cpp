@@ -100,17 +100,17 @@ int main() {
     auto surface = window.surface(renderInstance);
     auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
-    auto mySwapChain = std::make_unique<TestApp::SwapChainImpl>(TestApp::SwapChainImpl{device, surface, true});
+    auto mySwapChain = TestApp::SwapChainImpl{device, surface, true};
 
-    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain->attachments().front().get().format(),
-                                                      mySwapChain->depthAttachment().get().format(),
+    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().get().format(),
+                                                      mySwapChain.depthAttachment().get().format(),
                                                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     std::vector<vkw::FrameBuffer> framebuffers;
 
-    for (auto &attachment: mySwapChain->attachments()) {
+    for (auto &attachment: mySwapChain.attachments()) {
         framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
                                                 vkw::Image2DArrayViewConstRefArray{attachment,
-                                                                                   mySwapChain->depthAttachment()}});
+                                                                                   mySwapChain.depthAttachment()}});
     }
 
     auto queue = device.getGraphicsQueue();
@@ -235,18 +235,20 @@ int main() {
             continue;
 
         try {
-            mySwapChain.get()->acquireNextImage(presentComplete, fence, 1000);
+            mySwapChain.acquireNextImage(presentComplete, fence, 1000);
         } catch (vkw::VulkanError &e) {
             if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
-                mySwapChain.reset();
-                mySwapChain = std::make_unique<TestApp::SwapChainImpl>(TestApp::SwapChainImpl{device, surface});
+                {
+                    auto dummy = std::move(mySwapChain);
+                }
+                mySwapChain = TestApp::SwapChainImpl{device, surface};
 
                 framebuffers.clear();
 
-                for (auto &attachment: mySwapChain->attachments()) {
+                for (auto &attachment: mySwapChain.attachments()) {
                     framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
                                                             vkw::Image2DArrayViewConstRefArray{attachment,
-                                                                                               mySwapChain->depthAttachment()}});
+                                                                                               mySwapChain.depthAttachment()}});
                 }
                 continue;
             } else {
@@ -276,7 +278,7 @@ int main() {
 
         recorder.reset();
         commandBuffer.begin(0);
-        auto currentImage = mySwapChain->currentImage();
+        auto currentImage = mySwapChain.currentImage();
 
         auto &fb = framebuffers.at(currentImage);
         auto renderArea = framebuffers.at(currentImage).getFullRenderArea();
@@ -303,7 +305,7 @@ int main() {
         commandBuffer.end();
         queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
                       renderComplete);
-        queue->present(*mySwapChain, renderComplete);
+        queue->present(mySwapChain, renderComplete);
         queue->waitIdle();
     }
 

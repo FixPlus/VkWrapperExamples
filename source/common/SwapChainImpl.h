@@ -17,6 +17,30 @@ namespace TestApp{
         vkw::Image2DArrayViewCRef depthAttachment() const{
             return m_depth_view.value();
         }
+
+        SwapChainImpl(SwapChainImpl&& another) noexcept:
+            vkw::SwapChain(std::move(another)),
+            m_images(std::move(another.m_images)),
+            m_image_views(std::move(another.m_image_views)),
+            m_surface(another.m_surface)
+        {
+            if(another.m_depth.has_value())
+                m_depth.emplace(std::move(another.m_depth.value()));
+            if(another.m_depth_view.has_value())
+                m_depth_view.emplace(another.m_depth_view.value());
+        }
+
+        SwapChainImpl& operator=(SwapChainImpl&& another) noexcept{
+            vkw::SwapChain::operator=(std::move(another));
+            m_image_views = std::move(another.m_image_views);
+            m_images = std::move(another.m_images);
+            if(another.m_depth.has_value())
+                m_depth.emplace(std::move(another.m_depth.value()));
+            if(another.m_depth_view.has_value())
+                m_depth_view.emplace(another.m_depth_view.value());
+            m_surface = another.m_surface;
+            return *this;
+        }
     private:
 
         std::vector<vkw::Image2DArrayViewCRef> m_image_views;
@@ -25,7 +49,7 @@ namespace TestApp{
         std::optional<vkw::Image2DArrayViewCRef> m_depth_view{};
         static VkSwapchainCreateInfoKHR compileInfo(vkw::Device &device, vkw::Surface &surface);
 
-        vkw::Surface &m_surface;
+        std::reference_wrapper<vkw::Surface> m_surface;
     };
 
 }

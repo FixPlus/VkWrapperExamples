@@ -404,7 +404,7 @@ int main() {
 
     // 4. Create swapchain
 
-    auto mySwapChain = std::make_unique<TestApp::SwapChainImpl>(TestApp::SwapChainImpl{device, surface});
+    auto mySwapChain = TestApp::SwapChainImpl{device, surface};
 
     auto queue = device.getGraphicsQueue();
 
@@ -413,7 +413,7 @@ int main() {
     // 6. load data to vertex buffer
 
 
-    auto fence = std::make_unique<vkw::Fence>(device);
+    auto fence = vkw::Fence(device);
 
     // 7. create command pool
 
@@ -431,7 +431,7 @@ int main() {
     // 8. create swapchain images views for framebuffer
 
     std::vector<vkw::Image2DArrayViewCRef> swapChainImageViews;
-    auto swapChainImages = mySwapChain->retrieveImages();
+    auto swapChainImages = mySwapChain.retrieveImages();
     for (auto &image: swapChainImages) {
         swapChainImageViews.emplace_back(image.getView<vkw::ColorImageView>(device, image.format(), 0, 1, mapping));
     }
@@ -595,17 +595,17 @@ int main() {
             continue;
         }
 
-        if (fence->signaled()) {
-            fence->wait();
-            fence->reset();
+        if (fence.signaled()) {
+            fence.wait();
+            fence.reset();
         }
 
         try {
-            mySwapChain->acquireNextImage(presentComplete, 1000);
+            mySwapChain.acquireNextImage(presentComplete, 1000);
 
 
             commandBuffer.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-            auto &currentFrameBuffer = framebuffers.at(mySwapChain->currentImage());
+            auto &currentFrameBuffer = framebuffers.at(mySwapChain.currentImage());
             std::array<VkClearValue, 2> values{};
             values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
             values.at(1).depthStencil.depth = 1.0f;
@@ -696,10 +696,13 @@ int main() {
 
         } catch (vkw::VulkanError &e) {
             if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
-                mySwapChain.reset();
-                mySwapChain = std::make_unique<TestApp::SwapChainImpl>(TestApp::SwapChainImpl{device, surface});
+                {
+                    auto dummy = std::move(mySwapChain);
+                }
+
+                mySwapChain = TestApp::SwapChainImpl{device, surface};
                 swapChainImages.clear();
-                swapChainImages = mySwapChain->retrieveImages();
+                swapChainImages = mySwapChain.retrieveImages();
 
                 swapChainImageViews.clear();
 
@@ -727,24 +730,19 @@ int main() {
                 throw;
             }
         }
-        queue->present(*mySwapChain, renderComplete);
+        queue->present(mySwapChain, renderComplete);
         queue->waitIdle();
     }
 
 
     // 14. clear resources and wait for device processes to finish
 
-    if (fence->signaled()) {
-        fence->wait();
-        fence->reset();
+    if (fence.signaled()) {
+        fence.wait();
+        fence.reset();
     }
 
     device.waitIdle();
-
-    fence.reset();
-    mySwapChain.reset();
-
-    cubes.clear();
 
     return 0;
 }
