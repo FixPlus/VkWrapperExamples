@@ -321,7 +321,7 @@ public:
     TexturedSurface(vkw::Device &device, RenderEngine::TextureLoader &loader, vkw::Sampler &sampler,
                     std::string const &imageName) :
             m_layout(device,
-                     RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="pbr", .setBindings={
+                     RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="texture", .setBindings={
                              vkw::DescriptorSetLayoutBinding{0,
                                                              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .depthTestState=vkw::DepthTestStateCreateInfo{
                              VK_COMPARE_OP_LESS, VK_TRUE}, .maxMaterials=1}),
