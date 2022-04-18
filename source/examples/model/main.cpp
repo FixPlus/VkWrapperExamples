@@ -260,7 +260,7 @@ int main() {
 
     for(int i = 0; i < 100; ++i){
         auto& inst = instances.emplace_back(model.createNewInstance());
-        inst.translation = glm::vec3((float)(i % 10) * 5.0f, 0.0f, (float)(i / 10) * 5.0f);
+        inst.translation = glm::vec3((float)(i % 10) * 5.0f, -10.0f, (float)(i / 10) * 5.0f);
         inst.update();
     }
 
@@ -294,7 +294,7 @@ int main() {
             instance.update();
             for(int i = 0; i < 100; ++i){
                 auto& inst = instances.emplace_back(model.createNewInstance());
-                inst.translation = glm::vec3((float)(i % 10) * 5.0f, 0.0f, (float)(i / 10) * 5.0f);
+                inst.translation = glm::vec3((float)(i % 10) * 5.0f, -10.0f, (float)(i / 10) * 5.0f);
                 inst.update();
             }
         }
@@ -313,10 +313,13 @@ int main() {
 
     while (!window.shouldClose()) {
         window.pollEvents();
-        if (fence.signaled()) {
+        static bool firstEncounter = true;
+        if(!firstEncounter) {
             fence.wait();
             fence.reset();
         }
+        else
+            firstEncounter = false;
 
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
@@ -331,7 +334,7 @@ int main() {
             continue;
 
         try {
-            mySwapChain.acquireNextImage(presentComplete, fence, 1000);
+            mySwapChain.acquireNextImage(presentComplete, 1000);
         } catch (vkw::VulkanError &e) {
             if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
                 {
@@ -346,6 +349,7 @@ int main() {
                                                             vkw::Image2DArrayViewConstRefArray{attachment,
                                                                                                mySwapChain.depthAttachment()}});
                 }
+                firstEncounter = true;
                 continue;
             } else {
                 throw;
@@ -395,15 +399,13 @@ int main() {
         commandBuffer.endRenderPass();
         commandBuffer.end();
         queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                      renderComplete);
+                      renderComplete, &fence);
         queue->present(mySwapChain, renderComplete);
-        queue->waitIdle();
     }
 
-    if (fence.signaled()) {
-        fence.wait();
-        fence.reset();
-    }
+    fence.wait();
+    fence.reset();
+
     device.waitIdle();
 
     return 0;

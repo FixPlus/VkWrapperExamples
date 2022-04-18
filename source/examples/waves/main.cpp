@@ -214,13 +214,17 @@ int main() {
     };
     while (!window.shouldClose()) {
         window.pollEvents();
-        if (fence.signaled()) {
-            fence.wait();
-            fence.reset();
-        }
+
 
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
+        static bool firstEncounter = true;
+        if(!firstEncounter) {
+            fence.wait();
+            fence.reset();
+        }
+        else
+            firstEncounter = false;
 
         window.update();
         gui.frame();
@@ -235,7 +239,7 @@ int main() {
             continue;
 
         try {
-            mySwapChain.acquireNextImage(presentComplete, fence, 1000);
+            mySwapChain.acquireNextImage(presentComplete, 1000);
         } catch (vkw::VulkanError &e) {
             if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
                 {
@@ -250,6 +254,7 @@ int main() {
                                                             vkw::Image2DArrayViewConstRefArray{attachment,
                                                                                                mySwapChain.depthAttachment()}});
                 }
+                firstEncounter = true;
                 continue;
             } else {
                 throw;
@@ -277,6 +282,9 @@ int main() {
 
 
         recorder.reset();
+
+
+
         commandBuffer.begin(0);
         auto currentImage = mySwapChain.currentImage();
 
@@ -304,15 +312,14 @@ int main() {
         commandBuffer.endRenderPass();
         commandBuffer.end();
         queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                      renderComplete);
+                      renderComplete, &fence);
         queue->present(mySwapChain, renderComplete);
-        queue->waitIdle();
     }
 
-    if (fence.signaled()) {
-        fence.wait();
-        fence.reset();
-    }
+
+    fence.wait();
+    fence.reset();
+
     device.waitIdle();
 
     return 0;

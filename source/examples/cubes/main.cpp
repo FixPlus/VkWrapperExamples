@@ -323,7 +323,7 @@ public:
             m_layout(device,
                      RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="texture", .setBindings={
                              vkw::DescriptorSetLayoutBinding{0,
-                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .depthTestState=vkw::DepthTestStateCreateInfo{
+                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .rasterizationState=vkw::RasterizationStateCreateInfo(0u, 0u, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT), .depthTestState=vkw::DepthTestStateCreateInfo{
                              VK_COMPARE_OP_LESS, VK_TRUE}, .maxMaterials=1}),
             m_material(device, m_layout, loader, sampler, imageName) {
     }
@@ -580,6 +580,13 @@ int main() {
 
         RenderEngine::Window::pollEvents();
 
+        static bool firstEncounter = true;
+        if(!firstEncounter) {
+            fence.wait();
+            fence.reset();
+        }
+        else
+            firstEncounter = false;
 
         window.update();
         gui.frame();
@@ -592,108 +599,14 @@ int main() {
 
         if (extents.width == 0 || extents.height == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            firstEncounter = true;
             continue;
         }
 
-        if (fence.signaled()) {
-            fence.wait();
-            fence.reset();
-        }
+
 
         try {
             mySwapChain.acquireNextImage(presentComplete, 1000);
-
-
-            commandBuffer.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-            auto &currentFrameBuffer = framebuffers.at(mySwapChain.currentImage());
-            std::array<VkClearValue, 2> values{};
-            values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
-            values.at(1).depthStencil.depth = 1.0f;
-            values.at(1).depthStencil.stencil = 0.0f;
-
-
-            VkViewport viewport;
-
-            viewport.height = globals.shadowTextureSize();
-            viewport.width = globals.shadowTextureSize();
-            viewport.x = viewport.y = 0.0f;
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            VkRect2D scissor;
-            scissor.extent.width = globals.shadowTextureSize();
-            scissor.extent.height = globals.shadowTextureSize();
-            scissor.offset.x = 0;
-            scissor.offset.y = 0;
-
-            auto per_thread = cubes.size() / thread_count;
-
-
-            threads.clear();
-
-            auto deltaTime = window.clock().frameTime();
-
-            for (int i = 0; i < thread_count; ++i) {
-                threads.emplace_back([&cubes, i, per_thread, deltaTime]() {
-                    for (int j = per_thread * i; j < std::min(per_thread * (i + 1), cubes.size()); ++j)
-                        cubes.at(j).update(deltaTime);
-
-                });
-            }
-
-            for (auto &thread: threads)
-                thread.join();
-
-
-            for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
-                commandBuffer.beginRenderPass(shadowRenderPass, shadowBuffers.at(i),
-                                              shadowBuffers.at(i).getFullRenderArea(), false,
-                                              1, values.data() + 1);
-
-                commandBuffer.setViewports({viewport}, 0);
-                commandBuffer.setScissors({scissor}, 0);
-
-                shadow.bind(recorder);
-
-                uint32_t id = i;
-
-                cubePool.bind(recorder);
-
-                recorder.bindPipeline();
-
-                recorder.pushConstants(id, VK_SHADER_STAGE_VERTEX_BIT, 0);
-
-                cubePool.draw(recorder);
-
-                commandBuffer.endRenderPass();
-            }
-
-
-            commandBuffer.beginRenderPass(lightRenderPass, currentFrameBuffer, currentFrameBuffer.getFullRenderArea(),
-                                          false,
-                                          values.size(), values.data());
-            viewport.height = currentFrameBuffer.getFullRenderArea().extent.height;
-            viewport.width = currentFrameBuffer.getFullRenderArea().extent.width;
-
-            scissor.extent.width = currentFrameBuffer.getFullRenderArea().extent.width;
-            scissor.extent.height = currentFrameBuffer.getFullRenderArea().extent.height;
-
-            commandBuffer.setViewports({viewport}, 0);
-            commandBuffer.setScissors({scissor}, 0);
-
-            globals.bind(recorder);
-            recorder.setMaterial(texturedSurface.get());
-
-            recorder.bindPipeline();
-            cubePool.draw(recorder);
-
-
-            gui.draw(recorder);
-            commandBuffer.endRenderPass();
-            commandBuffer.end();
-
-            queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                          renderComplete);
-
         } catch (vkw::VulkanError &e) {
             if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
                 {
@@ -725,22 +638,114 @@ int main() {
                                                          view.get().image()->rawExtents().height},
                                               vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
                 }
+                firstEncounter = true;
                 continue;
             } else {
                 throw;
             }
         }
+
+
+
+        commandBuffer.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+        auto &currentFrameBuffer = framebuffers.at(mySwapChain.currentImage());
+        std::array<VkClearValue, 2> values{};
+        values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
+        values.at(1).depthStencil.depth = 1.0f;
+        values.at(1).depthStencil.stencil = 0.0f;
+
+
+        VkViewport viewport;
+
+        viewport.height = globals.shadowTextureSize();
+        viewport.width = globals.shadowTextureSize();
+        viewport.x = viewport.y = 0.0f;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        VkRect2D scissor;
+        scissor.extent.width = globals.shadowTextureSize();
+        scissor.extent.height = globals.shadowTextureSize();
+        scissor.offset.x = 0;
+        scissor.offset.y = 0;
+
+        auto per_thread = cubes.size() / thread_count;
+
+
+        threads.clear();
+
+        auto deltaTime = window.clock().frameTime();
+
+        for (int i = 0; i < thread_count; ++i) {
+            threads.emplace_back([&cubes, i, per_thread, deltaTime]() {
+                for (int j = per_thread * i; j < std::min(per_thread * (i + 1), cubes.size()); ++j)
+                    cubes.at(j).update(deltaTime);
+
+            });
+        }
+
+        for (auto &thread: threads)
+            thread.join();
+
+
+        for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+            commandBuffer.beginRenderPass(shadowRenderPass, shadowBuffers.at(i),
+                                          shadowBuffers.at(i).getFullRenderArea(), false,
+                                          1, values.data() + 1);
+
+            commandBuffer.setViewports({viewport}, 0);
+            commandBuffer.setScissors({scissor}, 0);
+
+            shadow.bind(recorder);
+
+            uint32_t id = i;
+
+            cubePool.bind(recorder);
+
+            recorder.bindPipeline();
+
+            recorder.pushConstants(id, VK_SHADER_STAGE_VERTEX_BIT, 0);
+
+            cubePool.draw(recorder);
+
+            commandBuffer.endRenderPass();
+        }
+
+
+        commandBuffer.beginRenderPass(lightRenderPass, currentFrameBuffer, currentFrameBuffer.getFullRenderArea(),
+                                      false,
+                                      values.size(), values.data());
+        viewport.height = currentFrameBuffer.getFullRenderArea().extent.height;
+        viewport.width = currentFrameBuffer.getFullRenderArea().extent.width;
+
+        scissor.extent.width = currentFrameBuffer.getFullRenderArea().extent.width;
+        scissor.extent.height = currentFrameBuffer.getFullRenderArea().extent.height;
+
+        commandBuffer.setViewports({viewport}, 0);
+        commandBuffer.setScissors({scissor}, 0);
+
+        globals.bind(recorder);
+        recorder.setMaterial(texturedSurface.get());
+
+        recorder.bindPipeline();
+        cubePool.draw(recorder);
+
+
+        gui.draw(recorder);
+        commandBuffer.endRenderPass();
+        commandBuffer.end();
+
+        queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
+                      renderComplete, &fence);
+
+
         queue->present(mySwapChain, renderComplete);
-        queue->waitIdle();
     }
 
 
     // 14. clear resources and wait for device processes to finish
 
-    if (fence.signaled()) {
-        fence.wait();
-        fence.reset();
-    }
+    fence.wait();
+    fence.reset();
 
     device.waitIdle();
 
