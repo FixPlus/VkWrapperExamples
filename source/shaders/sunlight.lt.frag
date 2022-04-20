@@ -90,7 +90,7 @@ void Lighting(SurfaceInfo surfaceInfo){
     float diffuseFactor =  dot(L, normal);
     diffuseFactor = (diffuseFactor + 1.0f) / 2.0f;
     diffuseFactor = diffuseFactor * 0.4f + 0.2f;
-    vec3 diffuse = surfaceInfo.albedo.xyz * diffuseFactor;
+    vec3 diffuse = surfaceInfo.albedo.xyz * globals.lightColor.xyz * diffuseFactor;
     vec4 reflectDir = vec4(reflect(normalize(cameraDir).xyz, normal), 0.0f);
     float reflect = clamp(dot(normalize(reflectDir), normalize(globals.lightDir)), 0.05f, 1.0f);
     reflect -= 0.05f;
@@ -114,7 +114,7 @@ void Lighting(SurfaceInfo surfaceInfo){
     outFragColor += reflect * globals.lightColor;
     //fog = 0.0f;
 #endif
-    outFragColor = vec4(color, 1.0f);
+    outFragColor = vec4(color, surfaceInfo.albedo.a);
 
     outFragColor = outFragColor * (1.0f - fog) + globals.skyColor * fog;
 

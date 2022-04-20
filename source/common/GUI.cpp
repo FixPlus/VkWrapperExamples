@@ -457,4 +457,78 @@ namespace TestApp {
             throw std::runtime_error("GUI: failed to create Combined Image sampler: broken image view");
         }
     }
+
+    GUIWindow::GUIWindow(GUIFrontEnd& parent, WindowSettings settings): m_parent(parent), m_settings(std::move(settings)){
+        m_parent.get().m_windows.emplace(this);
+    }
+
+    GUIWindow::~GUIWindow(){
+        m_parent.get().m_windows.erase(this);
+    }
+
+    GUIWindow::GUIWindow(GUIWindow &&another) noexcept: GUIWindow(another.m_parent, another.m_settings){
+        m_opened = another.m_opened;
+    }
+
+    void GUIWindow::m_compileFlags(){
+        m_flags = 0;
+        if(!m_settings.movable){
+            m_flags |= ImGuiWindowFlags_NoMove;
+        }
+        if(!m_settings.resizable){
+            m_flags |= ImGuiWindowFlags_NoResize;
+        }
+        if(m_settings.autoSize){
+            m_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+        }
+    }
+
+    GUIWindow &GUIWindow::operator=(GUIWindow &&another) noexcept {
+        if(&m_parent.get() != &another.m_parent.get()) {
+            m_parent.get().m_windows.erase(this);
+            m_parent = another.m_parent;
+            m_parent.get().m_windows.emplace(this);
+        }
+
+        m_settings = std::move(another.m_settings);
+        m_opened = another.m_opened;
+
+        return *this;
+    }
+
+    void GUIWindow::drawWindow() {
+        if(m_opened) {
+            if(m_settings.size.x != 0 && m_settings.size.y != 0){
+                ImGui::SetNextWindowSize(m_settings.size);
+            }
+            if(m_settings.pos.x != -1 && m_settings.pos.y != -1)
+                ImGui::SetNextWindowPos(m_settings.pos, ImGuiCond_Once);
+
+            if(ImGui::Begin(m_settings.title.c_str(), &m_opened, m_flags))
+                onGui();
+
+            ImGui::End();
+        }
+    }
+
+    void GUIFrontEnd::frame() {
+        ImGui::SetCurrentContext(context());
+        ImGui::NewFrame();
+
+        for(auto* window: m_windows){
+            window->drawWindow();
+        }
+
+        gui();
+
+        ImGui::EndFrame();
+        ImGui::Render();
+
+    }
+
+    GUIFrontEnd::GUIFrontEnd(GUIFrontEnd &&another) noexcept: m_windows(std::move(another.m_windows)) {
+        for(auto* window: another.m_windows){
+            window->m_parent = *this;
+        }
+    }
 }

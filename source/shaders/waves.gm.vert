@@ -51,7 +51,7 @@ WorldVertexInfo Geometry(){
 
         float c = sqrt(9.8f /* gravitation */ / length(k));
         float f = dot(gridPos, k) + waves.time * c;
-        float steepness = waves.waves[i].w * pushConstants.waveEnable[i] * steepnessFactor;
+        float steepness = waves.waves[i].w * steepnessFactor;
         float waveAmp = steepness / length(k);
 
 

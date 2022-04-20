@@ -12,26 +12,17 @@
 #include "GlobalLayout.h"
 #include "vkw/Sampler.hpp"
 #include "RenderEngine/RecordingState.h"
+#include "Grid.h"
 
-class WaterSurface : public RenderEngine::GeometryLayout {
+class WaterSurface : public TestApp::Grid, public RenderEngine::GeometryLayout {
 public:
-    struct PrimitiveAttrs
-            : public vkw::AttributeBase<vkw::VertexAttributeType::VEC3F> {
-        glm::vec3 pos;
-    };
 
     struct UBO {
         glm::vec4 waves[4];
         float time = 0.0f;
     } ubo;
 
-    static constexpr uint32_t TILE_DIM = 64;
-    static constexpr float TILE_SIZE = 20.0f;
-
-    int cascades = 7;
     bool wireframe = false;
-    float tileScale = 1.0f;
-    float elevationScale = 0.1f;
 
     void update(float deltaTime) {
         ubo.time += deltaTime;
@@ -41,24 +32,8 @@ public:
 
     WaterSurface(vkw::Device &device);
 
-    void draw(RenderEngine::GraphicsRecordingState &buffer, GlobalLayout const &globalLayout);
-
-    int totalTiles() const {
-        return m_totalTiles;
-    }
 
 private:
-    enum class ConnectSide {
-        NORTH = 0,
-        EAST = 1,
-        SOUTH = 2,
-        WEST = 3,
-        NO_CONNECT = 4
-    };
-
-    static void m_addConnectingEdge(ConnectSide side, std::vector<uint32_t> &indices);
-
-    vkw::IndexBuffer<VK_INDEX_TYPE_UINT32> const &m_full_tile(ConnectSide side);
 
     struct Geometry : public RenderEngine::Geometry {
         vkw::UniformBuffer<UBO> m_ubo;
@@ -67,11 +42,9 @@ private:
         Geometry(vkw::Device &device, WaterSurface &surface);
     } m_geometry;
 
-    int m_totalTiles = 0;
-    vkw::VertexBuffer<PrimitiveAttrs> m_buffer;
-    std::map<int, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_full_tiles;
-    std::reference_wrapper<vkw::Device> m_device;
-
+protected:
+    void preDraw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout) override;
+    std::pair<float, float> heightBounds() const override { return {-5.0f,  5.0f};};
 };
 
 
@@ -105,7 +78,7 @@ public:
 
     void update() {
         *m_material.m_mapped = description;
-        m_material.m_buffer.map();
+        m_material.m_buffer.flush();
     }
 
 private:
@@ -116,6 +89,28 @@ private:
         Material(vkw::Device &device, WaterMaterial &waterMaterial);
     } m_material;
 
+};
+
+class WaveSettings: public TestApp::GridSettings{
+public:
+
+    WaveSettings(TestApp::GUIFrontEnd& gui, WaterSurface& water, std::map<std::string, std::reference_wrapper<WaterMaterial>> materials);
+
+    WaterMaterial& pickedMaterial() const{
+        return m_materials.at(m_materialNames.at(m_pickedMaterial));
+    }
+
+    WaveSettings(WaveSettings&& another) noexcept;
+    WaveSettings& operator=(WaveSettings&& another) noexcept;
+protected:
+
+    void onGui() override;
+
+private:
+    std::reference_wrapper<WaterSurface> m_water;
+    std::map<std::string, std::reference_wrapper<WaterMaterial>> m_materials;
+    std::vector<const char*> m_materialNames;
+    int m_pickedMaterial = 0;
 };
 
 #endif //TESTAPP_WATERSURFACE_H

@@ -13,6 +13,7 @@
 #include "Model.h"
 #include "GlobalLayout.h"
 #include "WaterSurface.h"
+#include "LandSurface.h"
 #include "SkyBox.h"
 
 using namespace TestApp;
@@ -130,6 +131,11 @@ int main() {
     auto waveMaterial = WaterMaterial{device};
     auto waveMaterialWireframe = WaterMaterial{device, true};
 
+
+    auto land = LandSurface(device);
+    auto landMaterial = LandMaterial{device};
+    auto landMaterialWireframe = LandMaterial{device, true};
+
     waves.ubo.waves[0].w = 0.180f;
     waves.ubo.waves[1].w = 0.108f;
     waves.ubo.waves[2].w = 0.412f;
@@ -153,55 +159,10 @@ int main() {
 
     skybox.lightColor = globalState.light.skyColor;
 
-    gui.customGui = [&waves, &globalState, &skybox, &waveMaterial, &waveMaterialWireframe]() {
-        ImGui::Begin("Waves", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    auto waveSettings = WaveSettings{gui, waves, {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
+    auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
 
-        static float dirs[4] = {33.402f, 103.918f, 68.66f, 50.103f};
-        static float wavenums[4] = {28.709f, 22.041f, 10.245f, 2.039f};
-        static bool firstSet = true;
-        for (int i = 0; i < 4; ++i) {
-            std::string header = "Wave #" + std::to_string(i);
-            if (firstSet) {
-                waves.ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
-                waves.ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
-
-            }
-            if (ImGui::TreeNode(header.c_str())) {
-                if (ImGui::SliderFloat("Direction", dirs + i, 0.0f, 360.0f)) {
-                    waves.ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
-                    waves.ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
-
-                }
-
-                if (ImGui::SliderFloat("Wavelength", wavenums + i, 0.5f, 100.0f)) {
-                    waves.ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
-                    waves.ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
-                }
-                ImGui::SliderFloat("Steepness", &waves.ubo.waves[i].w, 0.0f, 1.0f);
-                ImGui::SliderFloat("Steepness decay factor", &waves.ubo.waves[i].z, 0.0f, 1.0f);
-                ImGui::TreePop();
-            }
-
-        }
-
-        firstSet = false;
-        ImGui::Checkbox("wireframe", &waves.wireframe);
-        ImGui::SliderInt("Tile cascades", &waves.cascades, 1, 7);
-        ImGui::SliderFloat("Tile scale", &waves.tileScale, 0.1f, 10.0f);
-        ImGui::SliderFloat("Elevation scale", &waves.elevationScale, 0.0f, 1.0f);
-
-        ImGui::Text("Total tiles: %d", waves.totalTiles());
-
-        if (ImGui::ColorEdit4("Deep water color", &waveMaterial.description.deepWaterColor.x))
-            waveMaterialWireframe.description.deepWaterColor = waveMaterial.description.deepWaterColor;
-        if (ImGui::SliderFloat("Metallic", &waveMaterial.description.metallic, 0.0f, 1.0f))
-            waveMaterialWireframe.description.metallic = waveMaterial.description.metallic;
-        if (ImGui::SliderFloat("Roughness", &waveMaterial.description.roughness, 0.0f, 1.0f))
-            waveMaterialWireframe.description.roughness = waveMaterial.description.roughness;
-
-
-
-        ImGui::End();
+    gui.customGui = [ &globalState, &skybox]() {
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         if (ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x))
@@ -234,9 +195,14 @@ int main() {
         waves.update(window.clock().frameTime());
         waveMaterial.update();
         waveMaterialWireframe.update();
+        land.update();
+        landMaterial.update();
+        landMaterialWireframe.update();
 
-        if (window.minimized())
+        if (window.minimized()) {
+            firstEncounter = true;
             continue;
+        }
 
         try {
             mySwapChain.acquireNextImage(presentComplete, 1000);
@@ -300,12 +266,15 @@ int main() {
 
         globalState.bind(recorder);
 
-        if (waves.wireframe)
-            recorder.setMaterial(waveMaterialWireframe.get());
-        else
-            recorder.setMaterial(waveMaterial.get());
+        if(landSettings.enabled()) {
+            recorder.setMaterial(landSettings.pickedMaterial().get());
+            land.draw(recorder, globalState);
+        }
 
-        waves.draw(recorder, globalState);
+        if(waveSettings.enabled()){
+            recorder.setMaterial(waveSettings.pickedMaterial().get());
+            waves.draw(recorder, globalState);
+        }
 
         gui.draw(recorder);
 

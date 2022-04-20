@@ -20,7 +20,7 @@ public:
 
     GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera) :
             m_camera_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="perspective",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1),
-            m_light_layout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlight",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass}, 1),
+            m_light_layout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlight",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass, .blendStates={{m_getBlendState(), 0}}}, 1),
             m_camera(camera),
             m_light(device, m_light_layout, light),
             m_camera_projection(device, m_camera_projection_layout){
@@ -41,6 +41,20 @@ public:
     }
 
 private:
+
+    static VkPipelineColorBlendAttachmentState m_getBlendState(){
+        VkPipelineColorBlendAttachmentState state{};
+        state.blendEnable = VK_TRUE;
+        state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                               VK_COLOR_COMPONENT_A_BIT;
+        state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        state.colorBlendOp = VK_BLEND_OP_ADD;
+        state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        state.alphaBlendOp = VK_BLEND_OP_ADD;
+        return state;
+    }
     RenderEngine::ProjectionLayout m_camera_projection_layout;
     struct CameraProjection: public RenderEngine::Projection{
         struct ProjectionUniform {

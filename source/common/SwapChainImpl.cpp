@@ -9,8 +9,8 @@
 #include "Utils.h"
 
 namespace TestApp{
-    SwapChainImpl::SwapChainImpl(vkw::Device &device, vkw::Surface &surface, bool createDepthBuffer) :
-    vkw::SwapChain(device, compileInfo(device, surface)),
+    SwapChainImpl::SwapChainImpl(vkw::Device &device, vkw::Surface &surface, bool createDepthBuffer, bool vsync) :
+    vkw::SwapChain(device, compileInfo(device, surface, vsync)),
     m_surface(surface), m_images(retrieveImages()) {
 
             std::vector<VkImageMemoryBarrier> transitLayouts;
@@ -67,7 +67,7 @@ namespace TestApp{
             m_depth_view.emplace(m_depth->getView<vkw::DepthImageView>(device, mapping, m_depth->format()));
     }
 
-    VkSwapchainCreateInfoKHR SwapChainImpl::compileInfo(vkw::Device &device, vkw::Surface &surface) {
+    VkSwapchainCreateInfoKHR SwapChainImpl::compileInfo(vkw::Device &device, vkw::Surface &surface, bool vsync) {
         VkSwapchainCreateInfoKHR ret{};
 
         auto &physicalDevice = device.physicalDevice();
@@ -111,7 +111,8 @@ namespace TestApp{
                 }
             }
 
-       //swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+        if(vsync)
+            swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
 
         // Find a supported composite alpha format (not all devices support alpha
         // opaque)

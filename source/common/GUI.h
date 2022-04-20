@@ -130,24 +130,79 @@ namespace TestApp {
 
     };
 
+    class GUIWindow;
+
     class GUIFrontEnd : virtual public GUIBase {
     public:
 
-        void frame(){
-            ImGui::SetCurrentContext(context());
-            ImGui::NewFrame();
+        void frame();
 
-            gui();
+        GUIFrontEnd() = default;
 
-            ImGui::EndFrame();
-            ImGui::Render();
-        }
+        GUIFrontEnd(GUIFrontEnd const& another) = delete;
+        GUIFrontEnd(GUIFrontEnd&& another) noexcept;
+
+        GUIFrontEnd& operator=(GUIFrontEnd const& another) = delete;
+        GUIFrontEnd& operator=(GUIFrontEnd&& another) = delete;
 
     protected:
 
         virtual void gui() const = 0;
 
+    private:
+        friend class GUIWindow;
+
+        std::set<GUIWindow*> m_windows;
     };
+
+    struct WindowSettings{
+        std::string title;
+        ImVec2 size = ImVec2(0, 0);
+        ImVec2 pos = ImVec2(-1, -1);
+        bool movable = true;
+        bool resizable = false;
+        bool autoSize = true;
+    };
+
+    class GUIWindow{
+    public:
+        explicit GUIWindow(GUIFrontEnd& parent, WindowSettings settings);
+
+        GUIWindow(GUIWindow const& another) = delete;
+        GUIWindow(GUIWindow&& another) noexcept ;
+
+        GUIWindow& operator=(GUIWindow const& another) = delete;
+        GUIWindow& operator=(GUIWindow&& another) noexcept;
+
+        void open(){
+            m_opened = true;
+        }
+
+        void close() {
+            m_opened = false;
+        }
+
+        bool opened() const{
+            return m_opened;
+        }
+
+        virtual ~GUIWindow();
+
+    private:
+        friend class GUIFrontEnd;
+        std::reference_wrapper<GUIFrontEnd> m_parent;
+        bool m_opened = true;
+        ImGuiWindowFlags m_flags;
+
+        void m_compileFlags();
+
+        WindowSettings m_settings;
+        void drawWindow();
+    protected:
+
+        virtual void onGui() = 0;
+    };
+
 
 
 

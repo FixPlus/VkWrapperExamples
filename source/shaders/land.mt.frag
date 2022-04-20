@@ -8,23 +8,20 @@ layout (location = 2) in vec3 inWorldPos;
 layout (location = 3) in vec3 inWorldNormal;
 layout (location = 4) in vec3 inViewPos;
 
-layout (set = 2, binding = 0) uniform Waves{
-    vec4 deepWaterColor;
-    vec2 metallicRoughness;
-}waves;
+layout (set = 2, binding = 0) uniform Land{
+    vec4 color;
+}land;
 
 
 SurfaceInfo Material(){
 
-    float viewAngle = dot(-normalize(inWorldNormal), normalize(inWorldNormal - inViewPos));
     SurfaceInfo ret;
-    ret.albedo = waves.deepWaterColor;
-    ret.albedo.a = 1.0f - 0.8f * abs(viewAngle);
+    ret.albedo = land.color;
     ret.position = inWorldPos;
     ret.normal = inWorldNormal;
     ret.cameraOffset = inViewPos;
-    ret.metallic = waves.metallicRoughness.x;
-    ret.roughness = waves.metallicRoughness.y;
+    ret.metallic = 0.0f;
+    ret.roughness = 0.0f;
 
     return ret;
 }

@@ -8,7 +8,7 @@ namespace TestApp{
 
     class SwapChainImpl : public vkw::SwapChain {
     public:
-        SwapChainImpl(vkw::Device &device, vkw::Surface &surface, bool createDepthBuffer = false);
+        SwapChainImpl(vkw::Device &device, vkw::Surface &surface, bool createDepthBuffer = false, bool vsync = false);
 
         std::vector<vkw::Image2DArrayViewCRef> const&attachments() const{
             return m_image_views;
@@ -47,7 +47,7 @@ namespace TestApp{
         std::vector<vkw::SwapChainImage> m_images;
         std::optional<vkw::DepthStencilImage2D> m_depth{};
         std::optional<vkw::Image2DArrayViewCRef> m_depth_view{};
-        static VkSwapchainCreateInfoKHR compileInfo(vkw::Device &device, vkw::Surface &surface);
+        static VkSwapchainCreateInfoKHR compileInfo(vkw::Device &device, vkw::Surface &surface, bool vsync);
 
         std::reference_wrapper<vkw::Surface> m_surface;
     };
