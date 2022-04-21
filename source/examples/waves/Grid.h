@@ -25,6 +25,7 @@ namespace TestApp{
         float tileScale = 1.0f;
         float elevationScale = 0.1f;
         bool cameraAligned;
+        int cascadePower = 1;
 
         explicit Grid(vkw::Device &device, bool cameraAligned = true);
 

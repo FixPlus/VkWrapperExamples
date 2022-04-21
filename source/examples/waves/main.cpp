@@ -170,7 +170,7 @@ int main() {
         ImGui::ColorEdit4("Light color", &globalState.light.lightColor.x);
         if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
             globalState.light.lightVec = glm::normalize(globalState.light.lightVec);
-
+        ImGui::SliderFloat("fog", &globalState.light.fogginess, 10.0f, 1000.0f);
         ImGui::End();
     };
     while (!window.shouldClose()) {

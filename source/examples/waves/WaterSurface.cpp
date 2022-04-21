@@ -8,7 +8,7 @@ WaterSurface::WaterSurface(vkw::Device &device) : TestApp::Grid(device), RenderE
                                                                                               .setBindings = {vkw::DescriptorSetLayoutBinding{0,
                                                                                                                                               VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}, .pushConstants={
                                                                                                       VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=
-                                                                                                      7 * sizeof(float)}}}, .maxGeometries=1}),
+                                                                                                      8 * sizeof(float)}}}, .maxGeometries=1}),
                                                          m_geometry(device, *this) {
 
 }

@@ -20,7 +20,7 @@ layout (set = 1, binding = 0) uniform Camera{
 layout (push_constant) uniform PushConstants {
     vec2 translate;
     float scale;
-    float waveEnable[4];
+    float cellSize;
 } pushConstants;
 
 WorldVertexInfo Geometry(){

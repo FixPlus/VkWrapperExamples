@@ -14,6 +14,7 @@ namespace TestApp {
         if(!ImGui::CollapsingHeader("Tile grid settings"))
             return;
         ImGui::SliderInt("Tile cascades", &grid.cascades, 1, 15);
+        ImGui::SliderInt("Cascade power", &grid.cascadePower, 1, 4);
         ImGui::SliderFloat("Tile scale", &grid.tileScale, 0.1f, 10.0f);
         ImGui::SliderFloat("Elevation scale", &grid.elevationScale, 0.0f, 1.0f);
         ImGui::Checkbox("Camera aligned", &grid.cameraAligned);
@@ -175,6 +176,7 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, const Glo
     struct PushConstantBlock {
         glm::vec2 translate;
         float scale = 1.0f;
+        float cellSize;
     } constants;
 
 #if 0
@@ -212,25 +214,29 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, const Glo
 
     auto heightBoundsL = heightBounds();
 
+    int cascadeHalfSize = (int)(glm::pow(2.0f, cascadePower));
+
     for (int k = 0; k < cascades; ++k)
-        for (int i = -2; i < 2; ++i)
-            for (int j = -2; j < 2; ++j) {
+        for (int i = -cascadeHalfSize; i < cascadeHalfSize; ++i)
+            for (int j = -cascadeHalfSize; j < cascadeHalfSize; ++j) {
                 ConnectSide cside = ConnectSide::NO_CONNECT;
 
                 // Discard 'inner' tiles
-                if (k != 0 && ((i == 0 || i == -1) && (j == 0 || j == -1)))
+                bool iInner = (i < cascadeHalfSize / 2 && i >= -cascadeHalfSize / 2);
+                bool jInner = (j < cascadeHalfSize / 2 && j >= -cascadeHalfSize / 2);
+                if (k != 0 && (iInner && jInner))
                     continue;
                 if (k != 0) {
-                    if ((i == -1 || i == 0))
-                        if (j == 1)
+                    if (iInner)
+                        if (j == cascadeHalfSize / 2)
                             cside = ConnectSide::SOUTH;
-                        else if (j == -2)
+                        else if (j == (-cascadeHalfSize / 2 - 1))
                             cside = ConnectSide::NORTH;
 
-                    if ((j == -1 || j == 0))
-                        if (i == 1)
+                    if (jInner)
+                        if (i == cascadeHalfSize / 2)
                             cside = ConnectSide::WEST;
-                        else if (i == -2)
+                        else if (i == (-cascadeHalfSize / 2 - 1))
                             cside = ConnectSide::EAST;
                 }
                 auto scale = static_cast<float>(1u << k) * elevationFactor * tileScale;
@@ -253,6 +259,7 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, const Glo
 
                 constants.translate = glm::vec2(tileTranslate.x, tileTranslate.z);
                 constants.scale = scale;
+                constants.cellSize = scale * TILE_SIZE * tileScale / (float)(TILE_DIM);
 
                 buffer.commands().bindIndexBuffer(indexBuffer, 0);
 

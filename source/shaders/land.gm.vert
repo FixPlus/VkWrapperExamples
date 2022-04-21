@@ -19,6 +19,7 @@ layout (set = 1, binding = 0) uniform Camera{
 layout (push_constant) uniform PushConstants {
     vec2 translate;
     float scale;
+    float cellSize;
 } pushConstants;
 
 /* Function to linearly interpolate between a0 and a1
@@ -130,17 +131,14 @@ WorldVertexInfo Geometry(){
 
     float distance = length(camera.cameraSpace * position);
 
-
     int harmonics = land.harmonics;
-
-
 
     float currentElevation = mutate(perlinHarmonics(gridPos.x / distanceScale, gridPos.y / distanceScale, harmonics)) * heightScale;
 
     position += vec4(0.0f, currentElevation, 0.0f, 0.0f);
 
     float height = 0.0f;
-    float deltaP = 0.001f * distanceScale;
+    float deltaP = pushConstants.cellSize;
     vec3 tangent1 = normalize(vec3(deltaP, mutate(perlinHarmonics((gridPos.x + deltaP) / distanceScale, gridPos.y / distanceScale, harmonics)) * heightScale - currentElevation, 0.0f));
     vec3 binormal1 = normalize(vec3(0.0f, mutate(perlinHarmonics(gridPos.x / distanceScale, (gridPos.y + deltaP) / distanceScale, harmonics)) * heightScale - currentElevation, deltaP));
     vec3 tangent2 = normalize(vec3(-deltaP, mutate(perlinHarmonics((gridPos.x - deltaP) / distanceScale, gridPos.y / distanceScale, harmonics)) * heightScale - currentElevation, 0.0f));

@@ -7,7 +7,7 @@ TestApp::LandSurface::LandSurface(vkw::Device &device) : Grid(device, false),
                                                .setBindings = {vkw::DescriptorSetLayoutBinding{0,
                                                                                                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}, .pushConstants={
                                                        VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=
-                                                       7 * sizeof(float)}}}, .maxGeometries=1}),
+                                                       8 * sizeof(float)}}}, .maxGeometries=1}),
                                                          m_geometry(device, *this){
 
 }
@@ -54,7 +54,8 @@ void TestApp::LandSettings::onGui() {
 
     ImGui::SliderFloat("Height scale", &land.ubo.params.x, 0.1f, 100.0f);
     ImGui::SliderFloat("Distance scale", &land.ubo.params.y, 0.1f, 1000.0f);
-    ImGui::SliderInt("Harmonics", &land.ubo.harmonics, 1, 5);
+    ImGui::SliderInt("Harmonics", &land.ubo.harmonics, 1, 20);
+    ImGui::SliderFloat("Harmonics distance factor", &land.ubo.params.z, 1.0f, 100.0f);
 
 
 }

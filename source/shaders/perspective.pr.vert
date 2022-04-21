@@ -20,7 +20,7 @@ void Projection(WorldVertexInfo worldVertexInfo){
     outWorldNormal = worldVertexInfo.normal;
     outWorldTangent = worldVertexInfo.tangent;
     outUVW = worldVertexInfo.UVW;
-    outColor = vec4(1.0f);
+    outColor = worldVertexInfo.color;
     outWorldPos = worldVertexInfo.position;
     outViewPos = vec3(inverse(camera.cameraSpace) * vec4(0.0f, 0.0f, 0.0f, 1.0f));
     gl_Position = camera.perspective * camera.cameraSpace * vec4(worldVertexInfo.position, 1.0f);

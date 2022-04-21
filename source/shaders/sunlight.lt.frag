@@ -7,6 +7,7 @@ layout (set = 3,binding = 0) uniform Globals{
     vec4 lightDir;
     vec4 skyColor;
     vec4 lightColor;
+    float fogginess;
 } globals;
 
 layout (location = 0) out vec4 outFragColor;
@@ -86,7 +87,7 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     vec3 F = F_SchlickR(max(dot(N, V), 0.0), F0, surfaceInfo.roughness);
 
-    float fog = clamp(length(cameraDir) / 1000.0f, 0.0f , 1.0f);
+    float fog = 1.0f - exp(-length(cameraDir) / globals.fogginess);
     float diffuseFactor =  dot(L, normal);
     diffuseFactor = (diffuseFactor + 1.0f) / 2.0f;
     diffuseFactor = diffuseFactor * 0.4f + 0.2f;

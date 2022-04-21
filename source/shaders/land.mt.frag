@@ -16,7 +16,7 @@ layout (set = 2, binding = 0) uniform Land{
 SurfaceInfo Material(){
 
     SurfaceInfo ret;
-    ret.albedo = land.color;
+    ret.albedo = land.color; //* inColor;
     ret.position = inWorldPos;
     ret.normal = inWorldNormal;
     ret.cameraOffset = inViewPos;
