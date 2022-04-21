@@ -46,49 +46,49 @@ namespace TestApp {
 
         temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeBegin.y, cubeBegin.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(temp);
         max = glm::vec3(temp);
 
         temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeBegin.y, cubeBegin.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
         max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
 
         temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeEnd.y, cubeBegin.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
         max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
 
         temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeBegin.y, cubeEnd.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
         max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
 
         temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeEnd.y, cubeBegin.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
         max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
 
         temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeBegin.y, cubeEnd.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
         max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
 
         temp = m_projection * m_view * glm::vec4(cubeBegin.x, cubeEnd.y, cubeEnd.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
         max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
 
         temp = m_projection * m_view * glm::vec4(cubeEnd.x, cubeEnd.y, cubeEnd.z, 1.0f);
 
-        temp /= temp.w;
+        temp /= glm::abs(temp.w);
         min = glm::vec3(glm::min(temp.x, min.x), glm::min(temp.y, min.y), glm::min(temp.z, min.z));
         max = glm::vec3(glm::max(temp.x, max.x), glm::max(temp.y, max.y), glm::max(temp.z, max.z));
 

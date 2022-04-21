@@ -30,7 +30,7 @@ namespace TestApp{
 
     protected:
         void preDraw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout) override;
-        std::pair<float, float> heightBounds() const override { return {-ubo.params.x, ubo.params.x};};
+        std::pair<float, float> heightBounds() const override { return {-ubo.params.x * 2.0f, ubo.params.x * 2.0f};};
     };
 
 
