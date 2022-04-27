@@ -11,7 +11,7 @@ namespace TestApp {
     template<uint32_t Cascades>
     class SceneCamera : public ControlledCamera, public ShadowCascadesCamera<Cascades> {
     public:
-        SceneCamera(float fov, float ratio) : Camera(fov, ratio) {};
+        SceneCamera(float fov, float ratio) : ShadowCascadesCamera<Cascades>(fov, ratio) {};
 
         void update(float deltaTime) override {
             ControlledCamera::update(deltaTime);

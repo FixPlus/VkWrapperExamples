@@ -7,7 +7,9 @@
 #include <vkw/DescriptorPool.hpp>
 #include <common/Camera.h>
 #include "RenderEngine/RecordingState.h"
-
+#include <vkw/Image.hpp>
+#include <vkw/Sampler.hpp>
+#include "ShadowPass.h"
 
 class GlobalLayout {
 public:
@@ -19,11 +21,11 @@ public:
         float fogginess = 100.0f;
     } light;
 
-    GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera) :
+    GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera, TestApp::ShadowRenderPass& shadowPass) :
             m_camera_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="perspective",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1),
-            m_light_layout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlight",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass, .blendStates={{m_getBlendState(), 0}}}, 1),
+            m_light_layout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlightShadow",.setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}, {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass, .blendStates={{m_getBlendState(), 0}}}, 1),
             m_camera(camera),
-            m_light(device, m_light_layout, light),
+            m_light(device, m_light_layout, light, shadowPass),
             m_camera_projection(device, m_camera_projection_layout){
     }
 
@@ -85,10 +87,20 @@ private:
     struct Light: public RenderEngine::Lighting{
 
 
-        Light(vkw::Device& device, RenderEngine::LightingLayout& layout, LightUniform const& ubo): RenderEngine::Lighting(layout), uniform(device,
+        Light(vkw::Device& device, RenderEngine::LightingLayout& layout, LightUniform const& ubo, TestApp::ShadowRenderPass& shadowPass): RenderEngine::Lighting(layout),
+                                                                                                                                             m_sampler(m_create_sampler(device)), uniform(device,
                                                                                                                                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
         mapped(uniform.map()){
             set().write(0, uniform);
+            VkComponentMapping mapping;
+            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            auto& shadowMap = shadowPass.shadowMap();
+            set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, shadowMap.arrayLayers(), mapping), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+            set().write(2, shadowPass.ubo());
             *mapped = ubo;
             uniform.flush();
         }
@@ -97,8 +109,11 @@ private:
             *mapped = ubo;
             uniform.flush();
         }
+        vkw::Sampler m_sampler;
         vkw::UniformBuffer<LightUniform> uniform;
         LightUniform* mapped;
+    private:
+        static vkw::Sampler m_create_sampler(vkw::Device& device);
     }m_light;
     std::reference_wrapper<TestApp::Camera const> m_camera;
 };

@@ -15,7 +15,7 @@ namespace TestApp {
                              glm::vec3(0.0f, 0.0f, 1.0f));
 
         m_view = glm::translate(m_view, -m_position);
-        m_projection = glm::perspective(m_fov, m_ratio, m_near_plane, m_far_plane);
+        m_projection = m_get_projection();
         m_projection[1][1] *= -1.0f;
     }
 
@@ -140,5 +140,17 @@ namespace TestApp {
         auto circles = rotate(rotPhi, rotPsi, 0.0f);
 
         targetPhi = targetPhi - static_cast<float>(circles) * 360.0f;
+    }
+
+    glm::mat4 CameraPerspective::m_get_projection() const {
+        return glm::perspective(m_fov, m_ratio, m_near_plane, m_far_plane);
+    }
+
+    void Camera::lookAt(glm::vec3 eyePos, glm::vec3 center, glm::vec3 up) {
+        m_view = glm::lookAt(eyePos, center, up);
+    }
+
+    glm::mat4 CameraOrtho::m_get_projection() const{
+        return glm::ortho(m_left, m_right, m_bottom, m_top, m_z_near, m_z_far);
     }
 }

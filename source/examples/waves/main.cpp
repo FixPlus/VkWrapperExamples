@@ -15,6 +15,7 @@
 #include "WaterSurface.h"
 #include "LandSurface.h"
 #include "SkyBox.h"
+#include "ShadowPass.h"
 
 using namespace TestApp;
 
@@ -106,6 +107,8 @@ int main() {
     TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().get().format(),
                                                       mySwapChain.depthAttachment().get().format(),
                                                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+    auto shadowPass = TestApp::ShadowRenderPass{device};
     std::vector<vkw::FrameBuffer> framebuffers;
 
     for (auto &attachment: mySwapChain.attachments()) {
@@ -126,7 +129,7 @@ int main() {
 
     window.setContext(gui);
 
-    auto globalState = GlobalLayout{device, lightPass, 0, window.camera()};
+    auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass};
     auto waves = WaterSurface(device);
     auto waveMaterial = WaterMaterial{device};
     auto waveMaterialWireframe = WaterMaterial{device, true};
@@ -161,7 +164,9 @@ int main() {
 
     auto waveSettings = WaveSettings{gui, waves, {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
     auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
-
+    shadowPass.onPass = [&land, &globalState](RenderEngine::GraphicsRecordingState& state){
+        land.draw(state, globalState);
+    };
     gui.customGui = [ &globalState, &skybox]() {
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
@@ -198,6 +203,7 @@ int main() {
         land.update();
         landMaterial.update();
         landMaterialWireframe.update();
+        shadowPass.update(window.camera(), globalState.light.lightVec);
 
         if (window.minimized()) {
             firstEncounter = true;
@@ -227,6 +233,12 @@ int main() {
             }
         }
 
+        recorder.reset();
+
+        commandBuffer.begin(0);
+
+        shadowPass.execute(commandBuffer, recorder);
+
         std::array<VkClearValue, 2> values{};
         values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
         values.at(1).depthStencil.depth = 1.0f;
@@ -247,11 +259,6 @@ int main() {
         scissor.offset.y = 0;
 
 
-        recorder.reset();
-
-
-
-        commandBuffer.begin(0);
         auto currentImage = mySwapChain.currentImage();
 
         auto &fb = framebuffers.at(currentImage);

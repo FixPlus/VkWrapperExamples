@@ -8,10 +8,11 @@
 
 namespace TestApp {
 
-    class Camera {
+    class Camera{
     public:
-        Camera(float fov = 60.0f, float ratio = 16.0f / 9.0f) : m_fov(fov), m_ratio(ratio) {
-        }
+        Camera() = default;
+
+        void lookAt(glm::vec3 eyePos, glm::vec3 center, glm::vec3 up = glm::vec3{0.0f, 1.0f, 0.0f});
 
         void set(glm::vec3 position) {
             m_position = position;
@@ -50,16 +51,6 @@ namespace TestApp {
             return extra;
         }
 
-        void setAspectRatio(float ratio) {
-            m_ratio = ratio;
-            m_need_set_matrix = true;
-        }
-
-        void setFOV(float fov) {
-            m_fov = fov;
-            m_need_set_matrix = true;
-        }
-
         glm::mat4 const &projection() const {
             return m_projection;
         }
@@ -91,33 +82,13 @@ namespace TestApp {
             return m_Tilt;
         }
 
-        float fov() const {
-            return m_fov;
-        }
-
-        float ratio() const {
-            return m_ratio;
-        }
-
-        float nearPlane() const {
-            return m_near_plane;
-        }
-
-        float farPlane() const {
-            return m_far_plane;
-        }
-
         bool offBounds(glm::vec3 cubeBegin, glm::vec3 cubeEnd) const;
         /** Here child classes can push their state during frame time. */
         virtual void update(float deltaTime) { setMatrices(); };
 
+        virtual ~Camera() = default;
     private:
-        bool m_need_set_matrix = true;
 
-        float m_ratio;
-        float m_fov;
-        float m_near_plane = 0.1f;
-        float m_far_plane = 1000.0f;
 
         glm::vec3 m_position{};
 
@@ -128,13 +99,132 @@ namespace TestApp {
         void m_set_matrix();
 
         glm::mat4 m_view{};
+    protected:
+        bool m_need_set_matrix = true;
+        virtual glm::mat4 m_get_projection() const = 0;
         glm::mat4 m_projection{};
+    };
+
+    class CameraPerspective: virtual public Camera {
+    public:
+        explicit CameraPerspective(float fov = 60.0f, float ratio = 16.0f / 9.0f) : m_fov(fov), m_ratio(ratio) {
+        }
+
+        float fov() const {
+            return m_fov;
+        }
+
+        void setFov(float fov){
+            m_fov = fov;
+            m_need_set_matrix = true;
+        }
+
+        float ratio() const {
+            return m_ratio;
+        }
+
+        void setRatio(float ratio){
+            m_ratio = ratio;
+            m_need_set_matrix = true;
+        }
+
+        float nearPlane() const {
+            return m_near_plane;
+        }
+
+        void setNearPlane(float nearPlane){
+            m_near_plane = nearPlane;
+            m_need_set_matrix = true;
+        }
+
+        float farPlane() const {
+            return m_far_plane;
+        }
+
+        void setFarPlane(float farPlane){
+            m_far_plane = farPlane;
+            m_need_set_matrix = true;
+        }
+    private:
+
+        glm::mat4 m_get_projection() const final;
+        float m_ratio;
+        float m_fov;
+        float m_near_plane = 0.1f;
+        float m_far_plane = 1000.0f;
+
+    };
+
+    class CameraOrtho: virtual public Camera{
+    public:
+        CameraOrtho(float left, float right, float bottom, float top, float zNear, float zFar):
+        m_left(left), m_right(right), m_top(top), m_bottom(bottom), m_z_near(zNear), m_z_far(zFar){};
+
+        void setLeft(float left){
+            m_left = left;
+            m_need_set_matrix = true;
+        }
+
+        float left() const{
+            return m_left;
+        }
+
+        void setRight(float right){
+            m_right = right;
+            m_need_set_matrix = true;
+        }
+
+        float right() const{
+            return m_right;
+        }
+
+        void setTop(float top){
+            m_top = top;
+            m_need_set_matrix = true;
+        }
+
+        float top() const{
+            return m_left;
+        }
+
+        void setBottom(float bottom){
+            m_bottom = bottom;
+            m_need_set_matrix = true;
+        }
+
+        float bottom() const{
+            return m_bottom;
+        }
+
+        void setZNear(float zNear){
+            m_z_near = zNear;
+            m_need_set_matrix = true;
+        }
+
+        float zNear() const{
+            return m_z_near;
+        }
+
+        void setZFar(float zFar){
+            m_z_far = zFar;
+            m_need_set_matrix = true;
+        }
+
+        float zFar() const{
+            return m_z_far;
+        }
+    private:
+        glm::mat4 m_get_projection() const final;
+        float m_left, m_right, m_top, m_bottom;
+        float m_z_near, m_z_far;
     };
 
     /** This class sets shadow cascade centers and radius automatically. */
     template<uint32_t Cascades>
-    class ShadowCascadesCamera : virtual public Camera {
+    class ShadowCascadesCamera : public CameraPerspective {
     public:
+
+        explicit ShadowCascadesCamera(float fov = 60.0f, float ratio = 16.0f / 9.0f): CameraPerspective(fov, ratio){};
 
         void moveSplitLambda(float deltaLambda) {
             m_split_lambda = std::clamp(m_split_lambda + deltaLambda, 0.0f, 1.0f);

@@ -22,6 +22,9 @@ public:
         m_material.m_buffer.flush();
     }
 
+    RenderEngine::Geometry const& geom() const{
+        return m_geometry;
+    }
 private:
 
     std::reference_wrapper<vkw::Device> m_device;

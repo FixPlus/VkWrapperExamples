@@ -8,6 +8,8 @@
 #include <RenderPassesImpl.h>
 #include <Semaphore.hpp>
 #include <RenderEngine/Shaders/ShaderLoader.h>
+//#include <examples/waves/GlobalLayout.h>
+
 #include "GUI.h"
 #include "AssetPath.inc"
 #include "Model.h"
@@ -410,3 +412,4 @@ int main() {
 
     return 0;
 }
+
