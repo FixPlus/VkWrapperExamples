@@ -74,6 +74,8 @@ void WaveSettings::onGui() {
 
     }
 
+    ImGui::SliderFloat("Gravitation", &m_water.get().ubo.params.x, 0.1f, 100.0f);
+
     firstSet = false;
 
     ImGui::Combo("Materials", &m_pickedMaterial, m_materialNames.data(), m_materialNames.size());

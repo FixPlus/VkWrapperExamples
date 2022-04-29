@@ -167,7 +167,7 @@ int main() {
     shadowPass.onPass = [&land, &globalState](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
         land.draw(state, globalState.camera().position(), camera);
     };
-    gui.customGui = [ &globalState, &skybox]() {
+    gui.customGui = [ &globalState, &skybox, &window]() {
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         if (ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x))
@@ -176,6 +176,10 @@ int main() {
         if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
             globalState.light.lightVec = glm::normalize(globalState.light.lightVec);
         ImGui::SliderFloat("fog", &globalState.light.fogginess, 10.0f, 1000.0f);
+        static float splitL = window.camera().splitLambda();
+        if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
+            window.camera().setSplitLambda(splitL);
+        }
         ImGui::End();
     };
     while (!window.shouldClose()) {

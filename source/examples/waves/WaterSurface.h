@@ -19,6 +19,7 @@ public:
 
     struct UBO {
         glm::vec4 waves[4];
+        glm::vec4 params = glm::vec4{9.8f, 0.0f, 0.0f, 0.0f};
         float time = 0.0f;
     } ubo;
 

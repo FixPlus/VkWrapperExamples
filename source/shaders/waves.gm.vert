@@ -9,6 +9,7 @@ layout (location = 0) in vec3 inPos;
 
 layout (set = 0, binding = 0) uniform Waves{
     vec4 waves[4]; /* xy - wave vector, z - steepnees decay factor, w - steepness */
+    vec4 params;
     float time;
 }waves;
 
@@ -34,7 +35,7 @@ WorldVertexInfo Geometry(){
     vec3 tangent = vec3(1.0f, 0.0, 0.0f);
     vec3 binormal = vec3(0.0f, 0.0f, 1.0f);
 
-
+    float gravitation = waves.params.x;
 
     for(int i = 0; i < 4; ++i){
         float lambda = length(waves.waves[i].xy);
@@ -49,7 +50,7 @@ WorldVertexInfo Geometry(){
         float dx = waves.waves[i].x / lambda;
         float dy = waves.waves[i].y / lambda;
 
-        float c = sqrt(9.8f /* gravitation */ / length(k));
+        float c = sqrt(gravitation / length(k));
         float f = dot(gridPos, k) + waves.time * c;
         float steepness = waves.waves[i].w * steepnessFactor;
         float waveAmp = steepness / length(k);
