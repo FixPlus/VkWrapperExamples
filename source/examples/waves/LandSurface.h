@@ -29,7 +29,7 @@ namespace TestApp{
         } m_geometry;
 
     protected:
-        void preDraw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout) override;
+        void preDraw(RenderEngine::GraphicsRecordingState &buffer) override;
         std::pair<float, float> heightBounds() const override { return {-ubo.params.x * 2.0f, ubo.params.x * 2.0f};};
     };
 

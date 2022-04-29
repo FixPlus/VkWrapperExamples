@@ -12,7 +12,7 @@ TestApp::LandSurface::LandSurface(vkw::Device &device) : Grid(device, false),
 
 }
 
-void TestApp::LandSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout) {
+void TestApp::LandSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer) {
     buffer.setGeometry(m_geometry);
     buffer.bindPipeline();
 }

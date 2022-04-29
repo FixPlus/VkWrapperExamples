@@ -157,7 +157,7 @@ namespace TestApp {
 
     class CameraOrtho: virtual public Camera{
     public:
-        CameraOrtho(float left, float right, float bottom, float top, float zNear, float zFar):
+        explicit CameraOrtho(float left = -1.0f, float right = 1.0f, float bottom = 1.0f, float top = -1.0f, float zNear = 0.0f, float zFar = 1.0f):
         m_left(left), m_right(right), m_top(top), m_bottom(bottom), m_z_near(zNear), m_z_far(zFar){};
 
         void setLeft(float left){

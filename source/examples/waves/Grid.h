@@ -33,7 +33,7 @@ namespace TestApp{
             return m_totalTiles;
         }
 
-        void draw(RenderEngine::GraphicsRecordingState &buffer, GlobalLayout const &globalLayout);
+        void draw(RenderEngine::GraphicsRecordingState &buffer, glm::vec3 center, Camera const &camera);
     private:
         enum class ConnectSide {
             NORTH = 0,
@@ -58,7 +58,7 @@ namespace TestApp{
 
         static vkw::VertexInputStateCreateInfo<vkw::per_vertex<PrimitiveAttrs, 0>> m_vertexInputStateCreateInfo;
 
-        virtual void preDraw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout){}
+        virtual void preDraw(RenderEngine::GraphicsRecordingState &buffer){}
 
         virtual std::pair<float, float> heightBounds() const { return {0.0f, 1.0f};};
     };

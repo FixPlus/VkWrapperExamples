@@ -164,8 +164,8 @@ int main() {
 
     auto waveSettings = WaveSettings{gui, waves, {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
     auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
-    shadowPass.onPass = [&land, &globalState](RenderEngine::GraphicsRecordingState& state){
-        land.draw(state, globalState);
+    shadowPass.onPass = [&land, &globalState](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
+        land.draw(state, globalState.camera().position(), camera);
     };
     gui.customGui = [ &globalState, &skybox]() {
 
@@ -275,12 +275,12 @@ int main() {
 
         if(landSettings.enabled()) {
             recorder.setMaterial(landSettings.pickedMaterial().get());
-            land.draw(recorder, globalState);
+            land.draw(recorder, globalState.camera().position(), globalState.camera());
         }
 
         if(waveSettings.enabled()){
             recorder.setMaterial(waveSettings.pickedMaterial().get());
-            waves.draw(recorder, globalState);
+            waves.draw(recorder, globalState.camera().position(), globalState.camera());
         }
 
         gui.draw(recorder);

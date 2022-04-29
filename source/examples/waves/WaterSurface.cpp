@@ -13,7 +13,7 @@ WaterSurface::WaterSurface(vkw::Device &device) : TestApp::Grid(device), RenderE
 
 }
 
-void WaterSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout) {
+void WaterSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer) {
     buffer.setGeometry(m_geometry);
     buffer.bindPipeline();
 }

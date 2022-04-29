@@ -43,7 +43,7 @@ private:
     } m_geometry;
 
 protected:
-    void preDraw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout) override;
+    void preDraw(RenderEngine::GraphicsRecordingState &buffer) override;
     std::pair<float, float> heightBounds() const override { return {-5.0f,  5.0f};};
 };
 

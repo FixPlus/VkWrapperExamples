@@ -172,7 +172,7 @@ vkw::IndexBuffer<VK_INDEX_TYPE_UINT32> const &TestApp::Grid::m_full_tile(TestApp
                                                                                                               indices.end())).first->second;
 }
 
-void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, const GlobalLayout &globalLayout) {
+void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, glm::vec3 center, Camera const &camera) {
     struct PushConstantBlock {
         glm::vec2 translate;
         float scale = 1.0f;
@@ -191,15 +191,12 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, const Glo
     buffer.bindVertexBuffer();
 #endif
 
-    preDraw(buffer, globalLayout);
+    preDraw(buffer);
 
     buffer.commands().bindVertexBuffer(m_buffer, 0, 0);
 
     int cascadeIndex = 0;
 
-
-
-    glm::vec3 center = globalLayout.camera().position();
 
     auto baseTileSize = tileScale * TILE_SIZE;
     if(!cameraAligned){
@@ -244,7 +241,7 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, const Glo
                         glm::vec3(center.x, 0.0f, center.z) + glm::vec3(i * TILE_SIZE, 0.0f, j * TILE_SIZE) * scale;
 
                 // Discard tiles that do not appear in camera frustum
-                if (globalLayout.camera().offBounds(tileTranslate + glm::vec3{-2.0f, heightBoundsL.first, -2.0f}, tileTranslate +
+                if (camera.offBounds(tileTranslate + glm::vec3{-2.0f, heightBoundsL.first, -2.0f}, tileTranslate +
                                                                                                     glm::vec3{
                                                                                                             TILE_SIZE *
                                                                                                             scale +
@@ -253,7 +250,6 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, const Glo
                                                                                                             scale +
                                                                                                             2.0f}))
                     continue;
-
 
                 auto &indexBuffer = m_full_tile(cside);
 
