@@ -1,6 +1,4 @@
 #include <SceneProjector.h>
-#include <RenderEngine/AssetImport/AssetImport.h>
-#include <vkw/Library.hpp>
 #include <SwapChainImpl.h>
 #include <vkw/Queue.hpp>
 #include <vkw/Fence.hpp>
@@ -8,12 +6,10 @@
 #include <RenderPassesImpl.h>
 #include <Semaphore.hpp>
 #include <RenderEngine/Shaders/ShaderLoader.h>
-//#include <examples/waves/GlobalLayout.h>
-
+#include "ShadowPass.h"
 #include "GUI.h"
 #include "AssetPath.inc"
 #include "Model.h"
-#include "RenderEngine/RecordingState.h"
 
 using namespace TestApp;
 
@@ -80,20 +76,20 @@ public:
         glm::vec4 lightVec = glm::normalize(glm::vec4{-0.37, 0.37, -0.85, 0.0f});
         glm::vec4 skyColor = glm::vec4{158.0f, 146.0f, 144.0f, 255.0f} / 255.0f;
         glm::vec4 lightColor = glm::vec4{244.0f, 218.0f, 62.0f, 255.0f} / 255.0f;
+        float fogginess = 1000.0f;
     } light;
 
-    GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera) :
+    GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera, ShadowRenderPass& shadowPass) :
             m_camera_projection_layout(device,
                                        RenderEngine::SubstageDescription{.shaderSubstageName="perspective", .setBindings={
                                                vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
                                        1),
             m_light_layout(device,
-                           RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlight", .setBindings={
-                                   vkw::DescriptorSetLayoutBinding{0,
-                                                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass},
+                           RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlightShadow", .setBindings={
+                                   {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}, {2,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass},
                            1),
             m_camera(camera),
-            m_light(device, m_light_layout, light),
+            m_light(device, m_light_layout, light, shadowPass),
             m_camera_projection(device, m_camera_projection_layout) {
     }
 
@@ -145,11 +141,24 @@ private:
     struct Light : public RenderEngine::Lighting {
 
 
-        Light(vkw::Device &device, RenderEngine::LightingLayout &layout, LightUniform const &ubo)
+        Light(vkw::Device &device, RenderEngine::LightingLayout &layout, LightUniform const &ubo, ShadowRenderPass& shadowPass)
                 : RenderEngine::Lighting(layout), uniform(device,
                                                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                  mapped(uniform.map()) {
+                  mapped(uniform.map()),
+                  m_sampler(m_create_sampler(device)){
             set().write(0, uniform);
+            VkComponentMapping mapping;
+            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            auto& shadowMap = shadowPass.shadowMap();
+            set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, TestApp::SHADOW_CASCADES_COUNT,
+                                                                       mapping),
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+            set().write(2, shadowPass.ubo());
+
             *mapped = ubo;
             uniform.flush();
         }
@@ -160,7 +169,25 @@ private:
         }
 
         vkw::UniformBuffer<LightUniform> uniform;
+        vkw::Sampler m_sampler;
         LightUniform *mapped;
+    private:
+        static vkw::Sampler m_create_sampler(vkw::Device& device){
+            VkSamplerCreateInfo createInfo{};
+            createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            createInfo.pNext = nullptr;
+            createInfo.minFilter = VK_FILTER_LINEAR;
+            createInfo.magFilter = VK_FILTER_LINEAR;
+            createInfo.minLod = 0.0f;
+            createInfo.maxLod = 1.0f;
+            createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+            createInfo.anisotropyEnable = false;
+
+            return {device, createInfo};
+        }
     } m_light;
 
     std::reference_wrapper<TestApp::Camera const> m_camera;
@@ -231,7 +258,9 @@ int main() {
 
     window.setContext(gui);
 
-    auto globalState = GlobalLayout{device, lightPass, 0, window.camera()};
+    auto shadowPass = ShadowRenderPass{device};
+
+    auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass};
 
     auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
 
@@ -269,7 +298,7 @@ int main() {
     auto instance = model.createNewInstance();
     instance.update();
 
-    gui.customGui = [&instance, &model, &modelList, &modelListCstr, &device, &defaultTextures, &instances]() {
+    gui.customGui = [&instance, &model, &modelList, &modelListCstr, &device, &defaultTextures, &instances, &globalState, &window]() {
         //ImGui::SetNextWindowSize({400.0f, 150.0f}, ImGuiCond_Once);
         ImGui::Begin("Model", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
 
@@ -303,6 +332,18 @@ int main() {
 
 
         ImGui::End();
+
+        ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x);
+        ImGui::ColorEdit4("Light color", &globalState.light.lightColor.x);
+        if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
+            globalState.light.lightVec = glm::normalize(globalState.light.lightVec);
+        ImGui::SliderFloat("fog", &globalState.light.fogginess, 10.0f, 1000.0f);
+        static float splitL = window.camera().splitLambda();
+        if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
+            window.camera().setSplitLambda(splitL);
+        }
+        ImGui::End();
     };
 
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
@@ -312,6 +353,13 @@ int main() {
 
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
+
+    shadowPass.onPass = [&instance, &instances](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
+        instance.drawGeometryOnly(state);
+
+        for(auto& inst: instances)
+            inst.drawGeometryOnly(state);
+    };
 
     while (!window.shouldClose()) {
         window.pollEvents();
@@ -331,6 +379,7 @@ int main() {
         gui.push();
         globalState.update();
         recorder.reset();
+        shadowPass.update(window.camera(), glm::vec3{globalState.light.lightVec});
 
         if (window.minimized())
             continue;
@@ -379,6 +428,9 @@ int main() {
 
 
         commandBuffer.begin(0);
+
+        shadowPass.execute(commandBuffer, recorder);
+
         auto currentImage = mySwapChain.currentImage();
 
         auto &fb = framebuffers.at(currentImage);

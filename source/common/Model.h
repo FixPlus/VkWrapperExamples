@@ -90,6 +90,9 @@ namespace TestApp {
         /** bindBuffers must be called before executing this method */
         void drawPrimitive(RenderEngine::GraphicsRecordingState &recorder, int index) const;
 
+        /** bindBuffers must be called before executing this method */
+        void drawPrimitiveWithoutMaterial(RenderEngine::GraphicsRecordingState &recorder, int index) const;
+
         size_t primitiveCount() const { return primitives_.size(); };
 
         /** useful for camera frustum culling and collision detection. */
@@ -185,6 +188,8 @@ namespace TestApp {
 
         void draw(RenderEngine::GraphicsRecordingState &recorder, size_t instanceId) const;
 
+        void drawGeometryOnly(RenderEngine::GraphicsRecordingState &recorder, size_t instanceId) const;
+
         ModelGeometry const &instance(size_t id) const;
 
         ModelGeometry &instance(size_t id);
@@ -269,6 +274,8 @@ namespace TestApp {
 
         void drawInstance(RenderEngine::GraphicsRecordingState &recorder, size_t id);
 
+        void drawInstanceGeometryOnly(RenderEngine::GraphicsRecordingState &recorder, size_t id);
+
     public:
 
         GLTFModel(vkw::Device &renderer, DefaultTexturePool& pool, std::filesystem::path const &path);
@@ -311,6 +318,10 @@ namespace TestApp {
 
         void draw(RenderEngine::GraphicsRecordingState &recorder) {
             model_->drawInstance(recorder, id_.value());
+        };
+
+        void drawGeometryOnly(RenderEngine::GraphicsRecordingState &recorder) {
+            model_->drawInstanceGeometryOnly(recorder, id_.value());
         };
 
         ~GLTFModelInstance();

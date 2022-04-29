@@ -270,6 +270,17 @@ void TestApp::MeshBase::drawPrimitive(RenderEngine::GraphicsRecordingState &reco
         recorder.commands().draw(primitive.vertexCount, primitive.firstVertex);
 }
 
+void TestApp::MeshBase::drawPrimitiveWithoutMaterial(RenderEngine::GraphicsRecordingState &recorder, int index) const {
+    auto &primitive = primitives_.at(index);
+    recorder.bindPipeline();
+
+    if (primitive.indexCount != 0)
+        recorder.commands().drawIndexed(primitive.indexCount, 1, primitive.firstIndex,
+                                        primitive.firstVertex);
+    else
+        recorder.commands().draw(primitive.vertexCount, primitive.firstVertex);
+}
+
 
 void TestApp::Primitive::setDimensions(glm::vec3 min, glm::vec3 max) {
     dimensions.min = min;
@@ -337,6 +348,16 @@ const TestApp::ModelGeometry &TestApp::MMesh::instance(size_t id) const {
 
 TestApp::ModelGeometry &TestApp::MMesh::instance(size_t id) {
     return m_instances.at(id);
+}
+
+void TestApp::MMesh::drawGeometryOnly(RenderEngine::GraphicsRecordingState &recorder, size_t instanceId) const {
+    recorder.setGeometry(m_instances.at(instanceId));
+
+    bindBuffers(recorder);
+
+    for (int i = 0; i < primitives_.size(); ++i) {
+        drawPrimitiveWithoutMaterial(recorder, i);
+    }
 }
 
 TestApp::GLTFModel::GLTFModel(vkw::Device &device, DefaultTexturePool& pool,
@@ -582,6 +603,14 @@ TestApp::GLTFModel::drawInstance(RenderEngine::GraphicsRecordingState &recorder,
     for (auto &node: linearNodes) {
         if (node->mesh) {
             node->mesh->draw(recorder, id);
+        }
+    }
+}
+
+void TestApp::GLTFModel::drawInstanceGeometryOnly(RenderEngine::GraphicsRecordingState &recorder, size_t id){
+    for (auto &node: linearNodes) {
+        if (node->mesh) {
+            node->mesh->drawGeometryOnly(recorder, id);
         }
     }
 }

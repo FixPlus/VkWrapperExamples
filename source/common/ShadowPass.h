@@ -27,40 +27,7 @@ namespace TestApp{
 
         std::function<void(RenderEngine::GraphicsRecordingState& state, const Camera& camera)> onPass = [](RenderEngine::GraphicsRecordingState& state, const Camera& camera){};
 
-        template<uint32_t Cascades>
-        void update(TestApp::ShadowCascadesCamera<Cascades> const &camera, glm::vec3 lightDir) {
-            lightDir *= -1.0f;
-            auto greaterRadius = camera.cascade(Cascades - 1).radius;
-            for (int i = 0; i < Cascades; ++i) {
-                auto cascade = camera.cascade(i);
-                auto shadowDepthFactor = 5.0f;
-                auto center = cascade.center;
-                auto shadowDepth = 2000.0f;
-                if (shadowDepth < cascade.radius * shadowDepthFactor)
-                    shadowDepth = cascade.radius * shadowDepthFactor;
-
-                auto& cam = m_cameras.at(i);
-                cam.setLeft(-cascade.radius);
-                cam.setRight(cascade.radius);
-                cam.setTop(cascade.radius);
-                cam.setBottom(-cascade.radius);
-                cam.setZNear(0.0f);
-                cam.setZFar(shadowDepth);
-                cam.update(0.0f);
-                cam.lookAt(center - glm::normalize(lightDir) * (shadowDepth - cascade.radius),
-                           center,
-                           glm::vec3{0.0f, 1.0f, 0.0f});
-
-                glm::mat4 proj = glm::ortho(-cascade.radius, cascade.radius, cascade.radius, -cascade.radius, 0.0f,
-                                            shadowDepth/*cascade.radius * shadowDepthFactor*/);
-                glm::mat4 lookAt = glm::lookAt(center - glm::normalize(lightDir) * (shadowDepth - cascade.radius),
-                                               center,
-                                               glm::vec3{0.0f, 1.0f, 0.0f});
-                m_mapped->cascades[i] = cam.projection() * cam.cameraSpace();
-                m_mapped->splits[i * 4] = cascade.split;
-            }
-            flush();
-        }
+        void update(TestApp::ShadowCascadesCamera<TestApp::SHADOW_CASCADES_COUNT> const &camera, glm::vec3 lightDir);
 
         auto& ubo() const{
             return m_ubo;
