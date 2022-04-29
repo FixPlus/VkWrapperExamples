@@ -47,6 +47,7 @@ void TestApp::LandSettings::onGui() {
     ImGui::Combo("Materials", &m_pickedMaterial, m_materialNames.data(), m_materialNames.size());
     auto& material = pickedMaterial();
     ImGui::ColorEdit4("Land color", &material.description.color.x);
+    ImGui::SliderFloat("Split level", &material.description.params.x, -100.0f, 100.0f);
     if(!ImGui::CollapsingHeader("Perlin noise"))
         return;
 
@@ -55,7 +56,7 @@ void TestApp::LandSettings::onGui() {
     ImGui::SliderFloat("Height scale", &land.ubo.params.x, 0.1f, 100.0f);
     ImGui::SliderFloat("Distance scale", &land.ubo.params.y, 0.1f, 1000.0f);
     ImGui::SliderInt("Harmonics", &land.ubo.harmonics, 1, 20);
-    ImGui::SliderFloat("Harmonics distance factor", &land.ubo.params.z, 1.0f, 100.0f);
+    ImGui::SliderFloat("Height mutation factor", &land.ubo.params.z, 0.0f, 1.0f);
 
 
 }

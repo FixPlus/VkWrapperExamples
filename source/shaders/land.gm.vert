@@ -109,12 +109,13 @@ float perlinHarmonics(float x, float y, int harmonics){
 }
 
 float mutate(float x){
-    if(x < -0.1f){
-        return x - (x + 1.0f) / 0.9f * 0.4f;
-    } else if (x < 0.1f){
-        return x + x / 0.1f * 0.4f;
+    float a = land.params.z;
+    if(x < -a){
+        return x - (x + 1.0f) / (-a + 1.0f) * 0.4f;
+    } else if (x < a){
+        return x + x / a * 0.4f;
     } else{
-        return x + (1.0f - (x - 0.1f) / 0.9f) * 0.4f;
+        return x + (1.0f - (x - a) / (1.0f - a)) * 0.4f;
     }
 }
 

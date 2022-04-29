@@ -54,6 +54,7 @@ namespace TestApp{
 
         struct LandDescription {
             glm::vec4 color = glm::vec4(0.7f, 0.29f, 0.3f, 1.0f);
+            glm::vec4 params = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f};
         } description;
 
         RenderEngine::Material const &get() const {
