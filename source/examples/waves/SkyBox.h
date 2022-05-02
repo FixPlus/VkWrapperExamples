@@ -58,6 +58,9 @@ public:
     vkw::UniformBuffer<Sun> const& sunBuffer() const{
         return m_material.m_material_buffer;
     }
+    vkw::UniformBuffer<Atmosphere> const& atmoBuffer() const{
+        return m_material.m_atmo_buffer;
+    }
 
     glm::vec3 sunDirection() const{
         return glm::vec3{glm::sin(sun.params.x) * glm::sin(sun.params.y), glm::cos(sun.params.y), glm::cos(sun.params.x) * glm::sin(sun.params.y)};

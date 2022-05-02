@@ -73,14 +73,25 @@ vec3 outScattering(float height, float psi){
 
     return ret;
 }
-vec4 skyColor(vec2 sphCoords){
-    //if(sphCoords.y > PI / 2.0f || sun.params.y > PI / 2.0f)
-        //return vec4(0.0f);
+
+vec3 outScatteringTwoPoints(float height1, float height2, float distance){
     float samples = atmosphere.samples;
-    float height = globals.cameraPos.y;
-    float atmosphereDepth = (atmosphere.params.y - height) / atmosphere.params.y * (1.0f + sphCoords.y);
-    float stepPerSample = atmosphereDepth / samples;
-    vec3 ray = rayDirection();
+    float stepDistance = distance / atmosphere.params.y / samples;
+    float stepHeight = (height2 - height1) / samples / atmosphere.params.y;
+    vec3 ret = vec3(0);
+    vec3 K = atmosphere.K.xyz;
+    float H0 = atmosphere.params.z;
+    for(int i = 0; i < samples; ++i){
+        float currentHeight = height1 / atmosphere.params.y + i * stepHeight;
+        ret += 4.0f * PI * K * exp(-currentHeight/ H0) * stepDistance;
+    }
+
+    return ret;
+}
+vec3 inScatter(float height, vec2 sphCoords, float distance){
+    float samples = atmosphere.samples;
+    float stepPerSample = distance / samples;
+    vec3 ray = vec3(sin(sphCoords.x) * sin(sphCoords.y), cos(sphCoords.y), cos(sphCoords.x) * sin(sphCoords.y));
     vec3 sunDir = vec3(sin(sun.params.x) * sin(sun.params.y), cos(sun.params.y), cos(sun.params.x) * sin(sun.params.y));
     ray.y *= -1.0f;
     float sunPsi = asin(length(cross(sunDir, ray)));
@@ -88,22 +99,28 @@ vec4 skyColor(vec2 sphCoords){
     if(dot(sunDir, ray) < 0.0f){
         sunPsi = sign(sunPsi) * PI - sunPsi;
     }
-    //return vec4(pow(sunPsi / PI * 1.1f, 3.0f), 0.0f, 0.0f, 1.0f);
     float phaseMie = phaseFunction(sunPsi, atmosphere.params.w);
     float phaseReleigh = phaseFunction(sunPsi, 0.0f);
     float H0 = atmosphere.params.z;
     vec3 ret = vec3(0.0f);
     vec3 sunIrradiance = sun.color.xyz * sun.params.z;
+    float angle = ray.y > 0.0f ? sphCoords.y : PI - sphCoords.y;
 
     for(int i = 0; i < samples; ++i){
-        float currentHeight = height/ atmosphere.params.y + i * cos(sphCoords.y) * stepPerSample;
-        ret += exp(-currentHeight/H0)  * stepPerSample * exp(-outScattering(currentHeight, sun.params.y) - (outScattering(height, sphCoords.y) - outScattering(currentHeight, sphCoords.y)));
+        float currentHeight = (height + i * cos(sphCoords.y) * stepPerSample) / atmosphere.params.y;
+        float curHeightNonNorm = height + i * cos(sphCoords.y) * stepPerSample;
+        ret += exp(-currentHeight/H0)  * stepPerSample / atmosphere.params.y * exp(-outScattering(curHeightNonNorm, sun.params.y) - abs(outScatteringTwoPoints(height, curHeightNonNorm, i * stepPerSample)));
     }
 
     ret = sunIrradiance * ret * (atmosphere.K.xyz * phaseReleigh + atmosphere.K.w * phaseMie);
 
-    return vec4(ret, 1.0f);
+    return ret;
 
+}
+
+vec4 skyColor(vec2 sphCoords){
+    float atmosphereDepth = (atmosphere.params.y - globals.cameraPos.y) * (1.0f + sphCoords.y);
+    return vec4(inScatter(globals.cameraPos.y, sphCoords, atmosphereDepth), 1.0f);
 }
 
 

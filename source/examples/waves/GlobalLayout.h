@@ -27,7 +27,8 @@ public:
                     .shaderSubstageName="sunlightShadow",
                     .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                   {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                  {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                  {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                  {3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
                      .pass=pass,
                      .subpass=subpass,
                      .blendStates={{m_getBlendState(), 0}}},
@@ -106,6 +107,7 @@ private:
             auto& shadowMap = shadowPass.shadowMap();
             set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, shadowMap.arrayLayers(), mapping), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
             set().write(2, shadowPass.ubo());
+            set().write(3, skyBox.atmoBuffer());
         }
 
         vkw::Sampler m_sampler;

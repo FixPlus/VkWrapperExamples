@@ -177,8 +177,15 @@ int main() {
         if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
             window.camera().setSplitLambda(splitL);
         }
+
+        static float farClip = window.camera().farClip();
+        if(ImGui::SliderFloat("Far clip", &farClip, window.camera().nearPlane(), window.camera().farPlane())){
+            window.camera().setFarClip(farClip);
+        }
         ImGui::End();
     };
+
+    window.camera().setFarPlane(10000.0f);
     while (!window.shouldClose()) {
         window.pollEvents();
 

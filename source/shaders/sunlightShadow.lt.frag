@@ -5,7 +5,7 @@
 
 layout (set = 3,binding = 0) uniform Sun{
     vec4 color;
-    vec4 position; // x - phi, y - psi, z - distance
+    vec4 params; // x - phi, y - psi, z - distance
 } sun;
 
 layout (set = 3, binding = 1) uniform sampler2DArray shadowMaps;
@@ -17,6 +17,11 @@ layout (set = 3, binding = 2) uniform ShadowSpace{
     float splits[SHADOW_CASCADES];
 } shadowSpace;
 
+layout (set = 3, binding = 3) uniform Atmosphere{
+    vec4 K; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
+    vec4 params; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
+    int samples;
+} atmosphere;
 
 layout (location = 0) out vec4 outFragColor;
 
@@ -71,6 +76,19 @@ float filterPCF(vec4 sc, uint cascadeIndex)
     return shadowFactor / count;
 }
 
+float getShadowInPos(vec3 position, vec3 cameraPosition){
+    uint cascadeIndex = 0;
+    vec3 inViewPos = position - cameraPosition;
+
+    for(uint i = 0; i < SHADOW_CASCADES - 1; ++i) {
+        if(length(inViewPos) > shadowSpace.splits[i]) {
+            cascadeIndex = i + 1;
+        }
+    }
+    // Depth compare for shadowing
+    vec4 shadowCoord = (biasMat * shadowSpace.cascades[cascadeIndex]) * vec4(position, 1.0f);
+    return textureProj(shadowCoord / shadowCoord.w, vec2(0.0f), cascadeIndex);
+}
 float getShadow(SurfaceInfo surfaceInfo){
     // Get cascade index for the current fragment's view position
     uint cascadeIndex = 0;
@@ -92,6 +110,93 @@ float getShadow(SurfaceInfo surfaceInfo){
 }
 
 #define PI 3.141592
+
+
+    // Atmosphere processing
+
+    #if 1
+vec2 sphericalCoords(vec3 rayDir){
+
+    vec2 planeProj = rayDir.xz;
+    float psi = PI / 2.0f - asin(rayDir.y);
+    float sinVal = planeProj.x / abs(sin(psi));
+    if(abs(sinVal) > 1.0f)
+    sinVal = sign(sinVal);
+    float phi = asin(sinVal);
+    if(planeProj.y < 0.0f)
+    phi = sign(planeProj.x) * PI - phi;
+
+
+    return vec2(phi, psi);
+}
+
+float phaseFunction(float psi, float g){
+    //float g = atmosphere.params.w;
+    float cosPsi = cos(psi);
+    return (3.0f * (1 - g * g) / (2.0f * (2.0f + g * g))) * (1 + cosPsi * cosPsi) / pow(1 + g * g - 2.0f * g * cosPsi, 3.0f / 2.0f);
+}
+
+vec3 outScattering(float height, float psi){
+    float samples = atmosphere.samples;
+    float atmosphereDepth = (atmosphere.params.y - height) / atmosphere.params.y * (1.0f + psi);
+    float stepDistance = atmosphereDepth / samples;
+    vec3 ret = vec3(0);
+    vec3 K = atmosphere.K.xyz;
+    float H0 = atmosphere.params.z;
+    for(int i = 0; i < samples; ++i){
+        float currentHeight = height / atmosphere.params.y + i * stepDistance * cos(psi);
+        ret += 4.0f * PI * K * exp(-currentHeight/ H0) * stepDistance;
+    }
+
+    return ret;
+}
+
+vec3 outScatteringTwoPoints(float height1, float height2, float distance){
+    float samples = atmosphere.samples;
+    float stepDistance = distance / atmosphere.params.y / samples;
+    float stepHeight = (height2 - height1) / samples / atmosphere.params.y;
+    vec3 ret = vec3(0);
+    vec3 K = atmosphere.K.xyz;
+    float H0 = atmosphere.params.z;
+    for(int i = 0; i < samples; ++i){
+        float currentHeight = height1 / atmosphere.params.y + i * stepHeight;
+        ret += 4.0f * PI * K * exp(-currentHeight/ H0) * stepDistance;
+    }
+
+    return ret;
+}
+vec3 inScatter(float height, vec2 sphCoords, float distance, vec3 initPos, vec3 cameraPos){
+    float samples = atmosphere.samples;
+    float stepPerSample = distance / samples;
+    vec3 ray = vec3(sin(sphCoords.x) * sin(sphCoords.y), cos(sphCoords.y), cos(sphCoords.x) * sin(sphCoords.y));
+    vec3 sunDir = vec3(sin(sun.params.x) * sin(sun.params.y), cos(sun.params.y), cos(sun.params.x) * sin(sun.params.y));
+    ray.y *= -1.0f;
+    float sunPsi = asin(length(cross(sunDir, ray)));
+
+    if(dot(sunDir, ray) < 0.0f){
+        sunPsi = sign(sunPsi) * PI - sunPsi;
+    }
+    float phaseMie = phaseFunction(sunPsi, atmosphere.params.w);
+    float phaseReleigh = phaseFunction(sunPsi, 0.0f);
+    float H0 = atmosphere.params.z;
+    vec3 ret = vec3(0.0f);
+    vec3 sunIrradiance = sun.color.xyz * sun.params.z;
+    float angle = ray.y > 0.0f ? sphCoords.y : PI - sphCoords.y;
+
+    for(int i = 0; i < samples; ++i){
+        float currentHeight = (height + i * cos(sphCoords.y) * stepPerSample) / atmosphere.params.y;
+        float curHeightNonNorm = height + i * cos(sphCoords.y) * stepPerSample;
+        vec3 currentPos = initPos + ray * i * stepPerSample;
+        if(getShadowInPos(currentPos, cameraPos) > 0.5f)
+            ret += exp(-currentHeight/H0)  * stepPerSample / atmosphere.params.y * exp(-outScattering(curHeightNonNorm, sun.params.y) - abs(outScatteringTwoPoints(height, curHeightNonNorm, i * stepPerSample)));
+    }
+
+    ret = sunIrradiance * ret * (atmosphere.K.xyz * phaseReleigh + atmosphere.K.w * phaseMie);
+
+    return ret;
+
+}
+    #endif
 
 // Normal Distribution function --------------------------------------
 float D_GGX(float dotNH, float roughness)
@@ -123,15 +228,13 @@ vec3 F_SchlickR(float cosTheta, vec3 F0, float roughness)
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float roughness, vec3 albedo)
+vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float roughness, vec3 albedo, vec3 lightColor)
 {
     // Precalculate vectors and dot products
     vec3 H = normalize (V + L);
     float dotNH = clamp(dot(N, H), 0.0, 1.0);
     float dotNV = clamp(dot(N, V), 0.0, 1.0);
     float dotNL = clamp(dot(N, L), 0.0, 1.0);
-
-    vec3 lightColor = sun.color.xyz;
 
     vec3 color = vec3(0.0);
 
@@ -150,39 +253,6 @@ vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float
     return color;
 }
 
-#if 0
-vec2 sphericalCoords(vec3 rayDir){
-
-    vec2 planeProj = rayDir.xz;
-    float phi = -asin(planeProj.x) / PI;
-    float psi = asin(rayDir.y) / (PI / 2.0f);
-
-    return vec2(phi, psi);
-}
-
-vec4 skyColor(vec2 sphCoords){
-
-    float f = 1.0f - 0.7f * abs(sphCoords.y);
-    float phi = clamp((sphCoords.x + 1.0f) / 2.0f, 0.0f, 1.0f);
-    vec4 ret = f * (phi * skyMaterial.skyColor1 + (1.0f - phi) * skyMaterial.skyColor2) ;//f * globals.skyColor + (1.0f - f) * vec4(0.8f, 0.8f, 0.8f, 1.0f);
-    return ret;
-
-}
-
-
-vec4 fliteredSkyColor(vec2 sphCoords, float filterMag){
-    float delta = filterMag;
-    vec4 ret = skyColor(sphCoords);
-    int count = 1;
-    for(int i = 0; i < 3; ++i)
-        for(int j = 0; j < 3; ++j){
-            ret += skyColor(sphCoords + vec2(delta * (i - 1), delta  * (j - 1)));
-            count++;
-        }
-
-    return ret / count;
-}
-#endif
 void Lighting(SurfaceInfo surfaceInfo){
 
     if(surfaceInfo.albedo.a == 0.0f)
@@ -192,6 +262,7 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     bool hasShadow = shadow < 0.5f;
 
+    vec3 sunIrradiance = hasShadow ? vec3(0.0f, 0.0f, 0.0f) : outScattering(surfaceInfo.position.y, sun.params.y);
     vec3 normal = normalize( surfaceInfo.normal );
     vec3 N = normal;
     vec4 cameraDir = vec4(surfaceInfo.position - surfaceInfo.cameraOffset, 1.0f);
@@ -201,8 +272,8 @@ void Lighting(SurfaceInfo surfaceInfo){
     F0 = mix(F0, surfaceInfo.albedo.xyz, surfaceInfo.metallic);
 
     vec3 Lo = vec3(0.0);
-    vec3 L = normalize(vec3(sin(sun.position.x) * sin(sun.position.y), cos(sun.position.y), cos(sun.position.x) * sin(sun.position.y)));
-    Lo += specularContribution(L, V, N, F0, surfaceInfo.metallic, surfaceInfo.roughness, surfaceInfo.albedo.xyz);
+    vec3 L = normalize(vec3(sin(sun.params.x) * sin(sun.params.y), cos(sun.params.y), cos(sun.params.x) * sin(sun.params.y)));
+    Lo += specularContribution(L, V, N, F0, surfaceInfo.metallic, surfaceInfo.roughness, surfaceInfo.albedo.xyz, sunIrradiance);
 
     vec3 F = F_SchlickR(max(dot(N, V), 0.0), F0, surfaceInfo.roughness);
 
@@ -219,7 +290,7 @@ void Lighting(SurfaceInfo surfaceInfo){
     sunRef -= 0.05f;
     sunRef = pow(sun, 32.0f) * 2.2f;
 
-    reflect += sun.color * sunRef;
+    reflect += vec4(sunIrradiance, 1.0f) * sunRef;
     #endif
     vec3 specular = reflect.xyz * F;//globals.skyColor.xyz * reflect * (1.0f - surfaceInfo.roughness);
     // Ambient part
@@ -232,6 +303,24 @@ void Lighting(SurfaceInfo surfaceInfo){
     vec3 color = ambient + Lo;
 
     outFragColor = vec4(color, surfaceInfo.albedo.a);
-    outFragColor =  vec4(outFragColor.xyz * (1.0f - fog) + skyCol.xyz * fog, surfaceInfo.albedo.a);
+
+    float psi = PI / 2.0f - asin(-V.y);
+    float realPsi = psi;
+    float phiSin = V.x / abs(sin(psi));
+    if(phiSin > 1.0f)
+        phiSin = 1.0f;
+    float phi = asin(phiSin);
+
+
+    float cameraHeight = surfaceInfo.cameraOffset.y;
+    float fragmentHeight = surfaceInfo.position.y;
+    if(fragmentHeight - cameraHeight < 0.0f)
+        psi = PI - psi;
+    vec2 sphereCoords = sphericalCoords(vec3(V.x, -V.y, V.z));
+    outFragColor = vec4(outFragColor.xyz * exp(-abs(outScatteringTwoPoints(cameraHeight, fragmentHeight, sphereCoords.y))) , surfaceInfo.albedo.a);
+    //if(!hasShadow)
+        outFragColor += vec4(inScatter(cameraHeight, sphereCoords, length(cameraDir), surfaceInfo.position, surfaceInfo.cameraOffset), 0.0f);
+    //outFragColor = vec4(outScattering(cameraHeight, psi), 1.0f);
+    //outFragColor =  vec4(outFragColor.xyz * (1.0f - fog) + skyCol.xyz * fog, surfaceInfo.albedo.a);
 
 }

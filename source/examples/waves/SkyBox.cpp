@@ -40,7 +40,7 @@ void SkyBoxSettings::onGui() {
         ImGui::ColorEdit4("color", &m_skybox.get().sun.color.x);
         ImGui::SliderFloat("irradiance", &m_skybox.get().sun.params.z, 0.1f, 1000.0f);
         ImGui::SliderFloat("lon", &m_skybox.get().sun.params.x, 0.0f, glm::pi<float>() * 2.0f);
-        ImGui::SliderFloat("lat", &m_skybox.get().sun.params.y, 0.0f, glm::pi<float>() / 2.0f);
+        ImGui::SliderFloat("lat", &m_skybox.get().sun.params.y, 0.0f, glm::pi<float>());
     }
     if(ImGui::CollapsingHeader("Atmosphere")){
         ImGui::SliderFloat4("K", &m_skybox.get().atmosphere.K.x, 0.0f, 1.0f);

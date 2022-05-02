@@ -224,7 +224,7 @@ namespace TestApp {
     class ShadowCascadesCamera : public CameraPerspective {
     public:
 
-        explicit ShadowCascadesCamera(float fov = 60.0f, float ratio = 16.0f / 9.0f): CameraPerspective(fov, ratio){};
+        explicit ShadowCascadesCamera(float fov = 60.0f, float ratio = 16.0f / 9.0f): CameraPerspective(fov, ratio), m_far_clip(farPlane()){};
 
         void moveSplitLambda(float deltaLambda) {
             m_split_lambda = std::clamp(m_split_lambda + deltaLambda, 0.0f, 1.0f);
@@ -234,10 +234,19 @@ namespace TestApp {
             m_split_lambda = std::clamp(lambda, 0.0f, 1.0f);
         }
 
+        void setFarClip(float farClip){
+            m_far_clip = farClip;
+        }
+
+        float farClip() const {
+            return m_far_clip;
+        }
+
         void update(float deltaTime) override {
             float cascadeSplits[Cascades];
 
-            float farClip = farPlane();
+            float farClip = m_far_clip;
+            float frustumRatio = (farClip / farPlane());
             float nearClip = nearPlane();
             float clipRange = farClip - nearClip;
             float clipRatio = farClip / nearClip;
@@ -247,7 +256,7 @@ namespace TestApp {
                 float log = nearClip * std::pow(clipRatio, p);
                 float linear = nearClip + clipRange * p;
                 float d = (log - linear) * m_split_lambda + linear;
-                cascadeSplits[i] = (d - nearClip) / clipRange;
+                cascadeSplits[i] = (d - nearClip) / clipRange ;
             }
             auto inverseProjection = glm::inverse(projection() * cameraSpace());
 
@@ -277,8 +286,8 @@ namespace TestApp {
 
                 for (uint32_t j = 0; j < 4; j++) {
                     glm::vec3 dist = frustumCorners[j + 4] - frustumCorners[j];
-                    innerFrustumCorners[j + 4] = frustumCorners[j] + (dist * splitDist);
-                    innerFrustumCorners[j] = frustumCorners[j] + (dist * lastSplitDist);
+                    innerFrustumCorners[j + 4] = frustumCorners[j] + (dist * splitDist * frustumRatio);
+                    innerFrustumCorners[j] = frustumCorners[j] + (dist * lastSplitDist * frustumRatio);
                 }
 
                 glm::vec3 innerFrustumCenter{0.0f};
@@ -322,6 +331,7 @@ namespace TestApp {
         std::array<Cascade, Cascades> m_cascades;
 
         float m_split_lambda = 0.5f;
+        float m_far_clip;
     };
 
     class ControlledCamera : virtual public Camera {
