@@ -10,6 +10,7 @@
 #include <vkw/Image.hpp>
 #include <vkw/Sampler.hpp>
 #include "ShadowPass.h"
+#include "SkyBox.h"
 
 class GlobalLayout {
 public:
@@ -21,11 +22,26 @@ public:
         float fogginess = 100.0f;
     } light;
 
-    GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera, TestApp::ShadowRenderPass& shadowPass) :
-            m_camera_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="perspective",.setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1),
-            m_light_layout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlightShadow",.setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}, {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass, .blendStates={{m_getBlendState(), 0}}}, 1),
+    GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera, TestApp::ShadowRenderPass& shadowPass, const SkyBox& skyBox) :
+            m_camera_projection_layout(device,
+                                       RenderEngine::SubstageDescription{
+                                            .shaderSubstageName="perspective",
+                                            .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                            1),
+            m_light_layout(device,
+                           RenderEngine::LightingLayout::CreateInfo{
+                    .substageDescription=RenderEngine::SubstageDescription{
+                    .shaderSubstageName="sunlightShadow",
+                    .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                  {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                  {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                  {3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                     .pass=pass,
+                     .subpass=subpass,
+                     .blendStates={{m_getBlendState(), 0}}},
+                     1),
             m_camera(camera),
-            m_light(device, m_light_layout, light, shadowPass),
+            m_light(device, m_light_layout, light, shadowPass, skyBox),
             m_camera_projection(device, m_camera_projection_layout){
     }
 
@@ -87,7 +103,7 @@ private:
     struct Light: public RenderEngine::Lighting{
 
 
-        Light(vkw::Device& device, RenderEngine::LightingLayout& layout, LightUniform const& ubo, TestApp::ShadowRenderPass& shadowPass): RenderEngine::Lighting(layout),
+        Light(vkw::Device& device, RenderEngine::LightingLayout& layout, LightUniform const& ubo, TestApp::ShadowRenderPass& shadowPass, const SkyBox& skyBox): RenderEngine::Lighting(layout),
                                                                                                                                              m_sampler(m_create_sampler(device)), uniform(device,
                                                                                                                                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
         mapped(uniform.map()){
@@ -101,6 +117,7 @@ private:
             auto& shadowMap = shadowPass.shadowMap();
             set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, shadowMap.arrayLayers(), mapping), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
             set().write(2, shadowPass.ubo());
+            set().write(3, skyBox.materialBuffer());
             *mapped = ubo;
             uniform.flush();
         }

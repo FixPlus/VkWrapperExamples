@@ -129,7 +129,9 @@ int main() {
 
     window.setContext(gui);
 
-    auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass};
+    auto skybox = SkyBox{device, lightPass, 0};
+
+    auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass, skybox};
     auto waves = WaterSurface(device);
     auto waveMaterial = WaterMaterial{device};
     auto waveMaterialWireframe = WaterMaterial{device, true};
@@ -151,7 +153,7 @@ int main() {
     window.camera().setOrientation(172.0f, 15.0f, 0.0f);
 
 
-    auto skybox = SkyBox{device, lightPass, 0};
+
 
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
     auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
@@ -160,18 +162,19 @@ int main() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
-    skybox.lightColor = globalState.light.skyColor;
-
     auto waveSettings = WaveSettings{gui, waves, {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
     auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
-    shadowPass.onPass = [&land, &globalState](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
-        land.draw(state, globalState.camera().position(), camera);
+    shadowPass.onPass = [&land, &globalState, &landSettings](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
+        if(landSettings.enabled())
+            land.draw(state, globalState.camera().position(), camera);
     };
     gui.customGui = [ &globalState, &skybox, &window]() {
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        if (ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x))
-            skybox.lightColor = globalState.light.skyColor;
+
+        ImGui::ColorEdit4("Sky color 1", &skybox.material.skyColor1.x);
+        ImGui::ColorEdit4("Sky color 2", &skybox.material.skyColor2.x);
+
         ImGui::ColorEdit4("Light color", &globalState.light.lightColor.x);
         if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
             globalState.light.lightVec = glm::normalize(globalState.light.lightVec);
@@ -200,7 +203,7 @@ int main() {
         gui.frame();
         gui.push();
         globalState.update();
-        skybox.update();
+        skybox.update(window.camera());
         waves.update(window.clock().frameTime());
         waveMaterial.update();
         waveMaterialWireframe.update();
