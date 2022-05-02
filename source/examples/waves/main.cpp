@@ -164,6 +164,8 @@ int main() {
 
     auto waveSettings = WaveSettings{gui, waves, {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
     auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
+    auto skyboxSettings = SkyBoxSettings{gui, skybox, "Skybox"};
+
     shadowPass.onPass = [&land, &globalState, &landSettings](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
         if(landSettings.enabled())
             land.draw(state, globalState.camera().position(), camera);
@@ -171,14 +173,6 @@ int main() {
     gui.customGui = [ &globalState, &skybox, &window]() {
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-
-        ImGui::ColorEdit4("Sky color 1", &skybox.material.skyColor1.x);
-        ImGui::ColorEdit4("Sky color 2", &skybox.material.skyColor2.x);
-
-        ImGui::ColorEdit4("Light color", &globalState.light.lightColor.x);
-        if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
-            globalState.light.lightVec = glm::normalize(globalState.light.lightVec);
-        ImGui::SliderFloat("fog", &globalState.light.fogginess, 10.0f, 1000.0f);
         static float splitL = window.camera().splitLambda();
         if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
             window.camera().setSplitLambda(splitL);
@@ -210,7 +204,7 @@ int main() {
         land.update();
         landMaterial.update();
         landMaterialWireframe.update();
-        shadowPass.update(window.camera(), globalState.light.lightVec);
+        shadowPass.update(window.camera(), skybox.sunDirection());
 
         if (window.minimized()) {
             firstEncounter = true;

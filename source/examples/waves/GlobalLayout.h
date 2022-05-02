@@ -15,13 +15,6 @@
 class GlobalLayout {
 public:
 
-    struct LightUniform {
-        glm::vec4 lightVec = glm::normalize(glm::vec4{-0.37, 0.37, -0.85, 0.0f});
-        glm::vec4 skyColor = glm::vec4{158.0f, 146.0f, 144.0f, 255.0f} / 255.0f;
-        glm::vec4 lightColor = glm::vec4{244.0f, 218.0f, 62.0f, 255.0f} / 255.0f;
-        float fogginess = 100.0f;
-    } light;
-
     GlobalLayout(vkw::Device &device, vkw::RenderPass& pass, uint32_t subpass, TestApp::Camera const &camera, TestApp::ShadowRenderPass& shadowPass, const SkyBox& skyBox) :
             m_camera_projection_layout(device,
                                        RenderEngine::SubstageDescription{
@@ -34,14 +27,13 @@ public:
                     .shaderSubstageName="sunlightShadow",
                     .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                   {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                  {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                                  {3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                  {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
                      .pass=pass,
                      .subpass=subpass,
                      .blendStates={{m_getBlendState(), 0}}},
                      1),
             m_camera(camera),
-            m_light(device, m_light_layout, light, shadowPass, skyBox),
+            m_light(device, m_light_layout, shadowPass, skyBox),
             m_camera_projection(device, m_camera_projection_layout){
     }
 
@@ -51,7 +43,6 @@ public:
     }
 
     void update() {
-        m_light.update(light);
         m_camera_projection.update(m_camera);
     }
 
@@ -103,11 +94,9 @@ private:
     struct Light: public RenderEngine::Lighting{
 
 
-        Light(vkw::Device& device, RenderEngine::LightingLayout& layout, LightUniform const& ubo, TestApp::ShadowRenderPass& shadowPass, const SkyBox& skyBox): RenderEngine::Lighting(layout),
-                                                                                                                                             m_sampler(m_create_sampler(device)), uniform(device,
-                                                                                                                               VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        mapped(uniform.map()){
-            set().write(0, uniform);
+        Light(vkw::Device& device, RenderEngine::LightingLayout& layout, TestApp::ShadowRenderPass& shadowPass, const SkyBox& skyBox): RenderEngine::Lighting(layout),
+                                                                                                                                             m_sampler(m_create_sampler(device)){
+            set().write(0, skyBox.sunBuffer());
             VkComponentMapping mapping;
             mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
             mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -117,18 +106,9 @@ private:
             auto& shadowMap = shadowPass.shadowMap();
             set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, shadowMap.arrayLayers(), mapping), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
             set().write(2, shadowPass.ubo());
-            set().write(3, skyBox.materialBuffer());
-            *mapped = ubo;
-            uniform.flush();
         }
 
-        void update(LightUniform const& ubo){
-            *mapped = ubo;
-            uniform.flush();
-        }
         vkw::Sampler m_sampler;
-        vkw::UniformBuffer<LightUniform> uniform;
-        LightUniform* mapped;
     private:
         static vkw::Sampler m_create_sampler(vkw::Device& device);
     }m_light;

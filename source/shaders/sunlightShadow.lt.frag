@@ -3,12 +3,10 @@
 #include "MaterialLightingInterface.h.glsl"
 
 
-layout (set = 3,binding = 0) uniform Globals{
-    vec4 lightDir;
-    vec4 skyColor;
-    vec4 lightColor;
-    float fogginess;
-} globals;
+layout (set = 3,binding = 0) uniform Sun{
+    vec4 color;
+    vec4 position; // x - phi, y - psi, z - distance
+} sun;
 
 layout (set = 3, binding = 1) uniform sampler2DArray shadowMaps;
 
@@ -18,12 +16,6 @@ layout (set = 3, binding = 2) uniform ShadowSpace{
     mat4 cascades[SHADOW_CASCADES];
     float splits[SHADOW_CASCADES];
 } shadowSpace;
-
-
-layout (set = 3, binding = 3) uniform SkyMaterial{
-    vec4 skyColor1;
-    vec4 skyColor2;
-} skyMaterial;
 
 
 layout (location = 0) out vec4 outFragColor;
@@ -96,18 +88,6 @@ float getShadow(SurfaceInfo surfaceInfo){
 
 
     float shadow = filterPCF(shadowCoord / shadowCoord.w, cascadeIndex);
-#if 0
-    float diffuse = dot(globals.lightDir, vec4(surfaceInfo.normal, 0.0f));
-
-    // Self-Shadow artifacts elimination
-
-    if(diffuse < 0.3f && diffuse > 0.0f){
-        float factor = diffuse / 0.3f;
-        shadow = 0.3f * (1.0f - factor) +  shadow * factor;
-    }
-    if(diffuse < 0.0f)
-    shadow = 0.3f;
-#endif
     return shadow;
 }
 
@@ -151,7 +131,7 @@ vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float
     float dotNV = clamp(dot(N, V), 0.0, 1.0);
     float dotNL = clamp(dot(N, L), 0.0, 1.0);
 
-    vec3 lightColor = globals.lightColor.xyz;
+    vec3 lightColor = sun.color.xyz;
 
     vec3 color = vec3(0.0);
 
@@ -170,6 +150,7 @@ vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float
     return color;
 }
 
+#if 0
 vec2 sphericalCoords(vec3 rayDir){
 
     vec2 planeProj = rayDir.xz;
@@ -188,6 +169,7 @@ vec4 skyColor(vec2 sphCoords){
 
 }
 
+
 vec4 fliteredSkyColor(vec2 sphCoords, float filterMag){
     float delta = filterMag;
     vec4 ret = skyColor(sphCoords);
@@ -200,6 +182,7 @@ vec4 fliteredSkyColor(vec2 sphCoords, float filterMag){
 
     return ret / count;
 }
+#endif
 void Lighting(SurfaceInfo surfaceInfo){
 
     if(surfaceInfo.albedo.a == 0.0f)
@@ -218,25 +201,25 @@ void Lighting(SurfaceInfo surfaceInfo){
     F0 = mix(F0, surfaceInfo.albedo.xyz, surfaceInfo.metallic);
 
     vec3 Lo = vec3(0.0);
-    vec3 L = normalize(vec3(globals.lightDir));
+    vec3 L = normalize(vec3(sin(sun.position.x) * sin(sun.position.y), cos(sun.position.y), cos(sun.position.x) * sin(sun.position.y)));
     Lo += specularContribution(L, V, N, F0, surfaceInfo.metallic, surfaceInfo.roughness, surfaceInfo.albedo.xyz);
 
     vec3 F = F_SchlickR(max(dot(N, V), 0.0), F0, surfaceInfo.roughness);
 
-    float fog = 1.0f - exp(-length(cameraDir) / globals.fogginess);
+    float fog = 1.0f - exp(-length(cameraDir) / 300.0f /* fogginess */);
     float diffuseFactor =  clamp(dot(L, normal), 0.0f, 1.0f);
    // diffuseFactor = (diffuseFactor + 1.0f) / 2.0f;
     //diffuseFactor = diffuseFactor * 0.4f + 0.2f;
     vec3 diffuse = surfaceInfo.albedo.xyz * diffuseFactor;
     vec4 reflectDir = normalize(vec4(reflect(normalize(-cameraDir).xyz, normal), 0.0f));
-    vec4 skyCol = 0.1f * skyColor(sphericalCoords(vec3(-reflectDir)));
+    vec4 skyCol = 0.1f * vec4(0.0f, 0.0f, 0.9f, 1.0f);//skyColor(sphericalCoords(vec3(-reflectDir)));
     vec4 reflect = skyCol;
     #if 0
-    float sun = clamp(dot(normalize(reflectDir), normalize(globals.lightDir)), 0.05f, 1.0f);
-    sun -= 0.05f;
-    sun = pow(sun, 32.0f) * 2.2f;
+    float sunRef = clamp(dot(normalize(reflectDir), L), 0.05f, 1.0f);
+    sunRef -= 0.05f;
+    sunRef = pow(sun, 32.0f) * 2.2f;
 
-    reflect += globals.lightColor * sun;
+    reflect += sun.color * sunRef;
     #endif
     vec3 specular = reflect.xyz * F;//globals.skyColor.xyz * reflect * (1.0f - surfaceInfo.roughness);
     // Ambient part
@@ -248,18 +231,7 @@ void Lighting(SurfaceInfo surfaceInfo){
         Lo *= 0.0f;
     vec3 color = ambient + Lo;
 
-
-
-#if 0
-    float angle = clamp(dot(normalize(cameraDir).xyz, -normal), 0.0f, 1.0f);
-    angle = pow(angle, 1.0f / 2.0f);
-    vec4 baseColor = surfaceInfo.albedo * angle * shadow + globals.skyColor * (1.0f - angle);
-    outFragColor = baseColor;
-    //outFragColor *= diffuse;
-    outFragColor += reflect * globals.lightColor * shadow;
-    //fog = 0.0f;
-#endif
     outFragColor = vec4(color, surfaceInfo.albedo.a);
-    outFragColor =  vec4(outFragColor.xyz * (1.0f - fog) + fliteredSkyColor(0.5f * sphericalCoords(vec3(-reflectDir)), fog).xyz * fog, surfaceInfo.albedo.a);
+    outFragColor =  vec4(outFragColor.xyz * (1.0f - fog) + skyCol.xyz * fog, surfaceInfo.albedo.a);
 
 }
