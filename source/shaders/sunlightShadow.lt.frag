@@ -271,9 +271,7 @@ void Lighting(SurfaceInfo surfaceInfo){
     vec3 F0 = vec3(0.0);
     F0 = mix(F0, surfaceInfo.albedo.xyz, surfaceInfo.metallic);
 
-    vec3 Lo = vec3(0.0);
     vec3 L = normalize(vec3(sin(sun.params.x) * sin(sun.params.y), cos(sun.params.y), cos(sun.params.x) * sin(sun.params.y)));
-    //Lo += specularContribution(L, V, N, F0, surfaceInfo.metallic, surfaceInfo.roughness, surfaceInfo.albedo.xyz, sunIrradiance);
 
     vec3 F = F_SchlickR(max(dot(N, V), 0.0), F0, surfaceInfo.roughness);
 
@@ -286,23 +284,13 @@ void Lighting(SurfaceInfo surfaceInfo){
     ambientColor = (1.0f - transit) * ambientColor + groundColor * transit;
     vec3 diffuse = surfaceInfo.albedo.xyz * (clamp(ambientColor, 0.0f, 0.3f) + clamp(sunIrradiance * clamp(dot(L, N), 0.0f, 1.0f), 0.0f, 0.4f));
 
-    #if 0
-    float sunRef = clamp(dot(normalize(reflectDir), L), 0.05f, 1.0f);
-    sunRef -= 0.05f;
-    sunRef = pow(sun, 32.0f) * 2.2f;
-
-    reflect += vec4(sunIrradiance, 1.0f) * sunRef;
-    #endif
     vec3 specular = (sunIrradiance * pow(clamp(dot(L, -reflectDir.xyz), 0.0f, 1.0f), 64.0f) + clamp(ambientColor, 0.0f, 0.3f)) * F;
-    //specular *= 0.0f;
+
     // Ambient part
     vec3 kD = 1.0 - F;
     kD *= 1.0 - surfaceInfo.metallic;
     vec3 ambient = kD * diffuse  + specular;
-
-    //if(hasShadow)
-        Lo *= 0.0f;
-    vec3 color = ambient + Lo;
+    vec3 color = ambient;
 
     outFragColor = vec4(color, surfaceInfo.albedo.a);
 

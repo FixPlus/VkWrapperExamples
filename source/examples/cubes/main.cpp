@@ -272,23 +272,15 @@ int main() {
                       std::cout << ext.first << std::endl;
                   });
 
-    // 2. Create Device
+    // 2. Enumerate available devices
 
     auto devs = renderInstance.enumerateAvailableDevices();
-
-    vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
 
     if (devs.empty()) {
         std::cout << "No available devices supporting vulkan on this machine." << std::endl <<
                   " Make sure your graphics drivers are installed and updated." << std::endl;
         return 1;
     }
-
-    deviceDesc.enableExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-    deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
-
-    auto device = vkw::Device{renderInstance, deviceDesc};
 
 
     uint32_t counter = 0;
@@ -299,20 +291,27 @@ int main() {
         counter++;
     }
 
-    // 3. Create surface
+    // 3. Pick first in the list
+
+    vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
+
+    // 4. enable needed device extensions and create logical device
+
+    deviceDesc.enableExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
+
+    auto device = vkw::Device{renderInstance, deviceDesc};
+
+    // 5. Create surface
 
     auto surface = window.surface(renderInstance);
 
-    // 4. Create swapchain
+    // 6. Create swapchain, present queue and fence for sync
 
     auto mySwapChain = TestApp::SwapChainImpl{device, surface};
 
     auto queue = device.getGraphicsQueue();
-
-    // 5. create vertex buffer
-
-    // 6. load data to vertex buffer
-
 
     auto fence = vkw::Fence(device);
 
@@ -322,14 +321,13 @@ int main() {
                                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                                         device.getGraphicsQueue()->familyIndex()};
 
+    // 8. create swapchain images views for framebuffer
+
     VkComponentMapping mapping;
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-
-    // 8. create swapchain images views for framebuffer
 
     std::vector<vkw::Image2DArrayViewCRef> swapChainImageViews;
     auto swapChainImages = mySwapChain.retrieveImages();
@@ -362,24 +360,20 @@ int main() {
         return 1;
     }
 
-    // 11. create Cubes
-
-
-    VmaAllocationCreateInfo createInfo{};
-    createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-    createInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
+    // 11. create Shadow pass
 
     auto shadow = ShadowRenderPass(device);
 
 
-    createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    createInfo.requiredFlags = 0;
-
+    // 12. Create asset loaders
 
     RenderEngine::TextureLoader textureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
+    RenderEngine::ShaderImporter shaderImporter{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
+    RenderEngine::ShaderLoader shaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
     auto cubeTexture = textureLoader.loadTexture("image");
     auto &cubeTextureView = cubeTexture.getView<vkw::ColorImageView>(device, cubeTexture.format(), mapping);
+
+    // 13. create global layout
 
     VkSamplerCreateInfo samplerCI{};
     samplerCI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -398,6 +392,8 @@ int main() {
 
     auto globals = GlobalLayout(device, lightRenderPass, 0, window.camera(), shadow, textureSampler);
 
+    // 14. create cubes
+
     constexpr const int cubeCount = 50000;
 
     TestApp::CubePool cubePool{device, cubeCount};
@@ -414,20 +410,21 @@ int main() {
         cubes.emplace_back(cubePool, pos, scale, rotate);
     }
 
-    RenderEngine::ShaderImporter shaderImporter{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-    RenderEngine::ShaderLoader shaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-
     auto texturedSurface = TexturedSurface(device, textureLoader, textureSampler, "image");
 
-    // 12. create command buffer and sync primitives
+    // 15. create command buffer and sync primitives
 
     auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
+    // 16. Create pipeline pool and recorder state abstraction
+
     auto pipelinePool = RenderEngine::GraphicsPipelinePool{device, shaderLoader};
     auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
+
+    // 17. Create GUI
 
     GUI gui{window, device, lightRenderPass, 0, textureLoader};
 
@@ -448,7 +445,7 @@ int main() {
         cubePool.draw(state);
     };
 
-    // 13. render on screen in a loop
+    // 18. render on screen in a loop
 
     constexpr const int thread_count = 12;
     std::vector<std::thread> threads;
@@ -597,7 +594,7 @@ int main() {
     }
 
 
-    // 14. clear resources and wait for device processes to finish
+    // 19. clear resources and wait for device processes to finish
 
     fence.wait();
     fence.reset();

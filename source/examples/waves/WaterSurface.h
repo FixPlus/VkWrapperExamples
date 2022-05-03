@@ -69,8 +69,8 @@ public:
 
     struct WaterDescription {
         glm::vec4 deepWaterColor = glm::vec4(0.0f, 0.01f, 0.3f, 1.0f);
-        float metallic = 0.2f;
-        float roughness = 0.2f;
+        float metallic = 1.0f;
+        float roughness = 0.0f;
     } description;
 
     RenderEngine::Material const &get() const {
