@@ -36,7 +36,7 @@ SurfaceInfo Material(){
     ret.normal = inWorldNormal;
     ret.cameraOffset = inViewPos;
     ret.metallic = 0.0f;
-    ret.roughness = 0.0f;
+    ret.roughness = 1.0f;
 
     return ret;
 }

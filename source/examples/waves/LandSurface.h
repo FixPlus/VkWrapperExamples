@@ -11,8 +11,8 @@ namespace TestApp{
 
         LandSurface(vkw::Device& device);
         struct UBO{
-            glm::vec4 params = glm::vec4{20.0f, 100.0f, 0.0f, 0.0f};
-            int harmonics = 1;
+            glm::vec4 params = glm::vec4{200.0f, 1000.0f, 0.32f, 0.0f};
+            int harmonics = 11;
         } ubo;
 
         void update(){
@@ -49,7 +49,6 @@ namespace TestApp{
                                                                                                           VK_COMPARE_OP_LESS,
                                                                                                           true}, .maxMaterials=1}),
                                                                      m_material(device, *this) {
-
         };
 
         struct LandDescription {

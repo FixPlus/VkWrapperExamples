@@ -23,13 +23,13 @@ public:
 
     struct Sun{
         glm::vec4 color = glm::vec4(1.0f);
-        glm::vec4 params = glm::vec4(1.0f);
+        glm::vec4 params = glm::vec4(1.0f, 1.0f, 10.0f, 1.0f);
     } sun;
 
     struct Atmosphere{
         glm::vec4 K =  glm::vec4{0.1f, 0.2f, 0.8f, 0.5f}; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
         glm::vec4 params = glm::vec4{1000000.0f, 10000.0f, 0.05f, -0.999f}; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
-        int samples = 20;
+        int samples = 13;
     } atmosphere;
 
     void draw(RenderEngine::GraphicsRecordingState &buffer);

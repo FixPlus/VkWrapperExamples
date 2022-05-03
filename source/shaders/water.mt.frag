@@ -18,13 +18,13 @@ SurfaceInfo Material(){
 
     float viewAngle = dot(-normalize(inWorldNormal), normalize(inWorldNormal - inViewPos));
     SurfaceInfo ret;
-    ret.albedo = waves.deepWaterColor;
-    ret.albedo.a = 1.0f;// - 0.8f * abs(viewAngle);
+    ret.albedo = vec4(1.0f); //waves.deepWaterColor;
+    //ret.albedo.a = 1.0f;// - 0.8f * abs(viewAngle);
     ret.position = inWorldPos;
     ret.normal = inWorldNormal;
     ret.cameraOffset = inViewPos;
-    ret.metallic = waves.metallicRoughness.x * (1.0f - abs(viewAngle)) + abs(viewAngle);
-    ret.roughness = waves.metallicRoughness.y * abs(viewAngle);
+    ret.metallic = waves.metallicRoughness.x;
+    ret.roughness = waves.metallicRoughness.y;
 
     return ret;
 }

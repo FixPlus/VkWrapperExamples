@@ -9,7 +9,9 @@ TestApp::LandSurface::LandSurface(vkw::Device &device) : Grid(device, false),
                                                        VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=
                                                        8 * sizeof(float)}}}, .maxGeometries=1}),
                                                          m_geometry(device, *this){
-
+    cascadePower = 2;
+    cascades = 8;
+    tileScale = 0.75f;
 }
 
 void TestApp::LandSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer) {

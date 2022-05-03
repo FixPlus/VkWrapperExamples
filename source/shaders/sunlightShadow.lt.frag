@@ -56,7 +56,7 @@ float textureProj(vec4 shadowCoord, vec2 off, uint cascadeIndex)
 float filterPCF(vec4 sc, uint cascadeIndex)
 {
     ivec2 texDim = textureSize(shadowMaps, 0).xy;
-    float scale = 1.5;
+    float scale = 1.0;
     float dx = scale * 1.0 / float(texDim.x);
     float dy = scale * 1.0 / float(texDim.y);
 
@@ -196,7 +196,7 @@ vec3 inScatter(float height, vec2 sphCoords, float distance, vec3 initPos, vec3 
     return ret;
 
 }
-    #endif
+#endif
 
 // Normal Distribution function --------------------------------------
 float D_GGX(float dotNH, float roughness)
@@ -262,18 +262,18 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     bool hasShadow = shadow < 0.5f;
 
-    vec3 sunIrradiance = hasShadow ? vec3(0.0f, 0.0f, 0.0f) : exp(-outScattering(surfaceInfo.position.y, sun.params.y));
+    vec3 sunIrradiance = hasShadow ? vec3(0.0f, 0.0f, 0.0f) : exp(-outScattering(surfaceInfo.position.y, sun.params.y)) * sun.color.xyz * sun.params.z;
     vec3 normal = normalize( surfaceInfo.normal );
     vec3 N = normal;
     vec4 cameraDir = vec4(surfaceInfo.position - surfaceInfo.cameraOffset, 1.0f);
     vec3 V = normalize((-cameraDir).xyz);
 
-    vec3 F0 = vec3(0.04);
+    vec3 F0 = vec3(0.0);
     F0 = mix(F0, surfaceInfo.albedo.xyz, surfaceInfo.metallic);
 
     vec3 Lo = vec3(0.0);
     vec3 L = normalize(vec3(sin(sun.params.x) * sin(sun.params.y), cos(sun.params.y), cos(sun.params.x) * sin(sun.params.y)));
-    Lo += specularContribution(L, V, N, F0, surfaceInfo.metallic, surfaceInfo.roughness, surfaceInfo.albedo.xyz, sunIrradiance);
+    //Lo += specularContribution(L, V, N, F0, surfaceInfo.metallic, surfaceInfo.roughness, surfaceInfo.albedo.xyz, sunIrradiance);
 
     vec3 F = F_SchlickR(max(dot(N, V), 0.0), F0, surfaceInfo.roughness);
 
@@ -281,10 +281,10 @@ void Lighting(SurfaceInfo surfaceInfo){
     float fragmentHeight = surfaceInfo.position.y;
     vec2 reflectSpherical = sphericalCoords(vec3(reflectDir.x, -reflectDir.y, reflectDir.z));
     vec3 groundColor = vec3(0.3f, 0.3f, 0.3f);
-    vec3 ambientColor = clamp(inScatter(fragmentHeight, reflectSpherical, (atmosphere.params.y - fragmentHeight) * (1.0f + reflectSpherical.y), surfaceInfo.position, surfaceInfo.cameraOffset), 0.0f, 1.0f);
+    vec3 ambientColor = inScatter(fragmentHeight, reflectSpherical, (atmosphere.params.y - fragmentHeight) * (1.0f + reflectSpherical.y), surfaceInfo.position, surfaceInfo.cameraOffset);// + 0.2f * clamp(sunIrradiance, 0.0f, 1.0f);
     float transit = clamp((reflectSpherical.y - PI / 4.0f) / (PI / 4.0f), 0.0f, 1.0f);
     ambientColor = (1.0f - transit) * ambientColor + groundColor * transit;
-    vec3 diffuse = surfaceInfo.albedo.xyz * ambientColor;
+    vec3 diffuse = surfaceInfo.albedo.xyz * (clamp(ambientColor, 0.0f, 0.3f) + clamp(sunIrradiance * clamp(dot(L, N), 0.0f, 1.0f), 0.0f, 0.4f));
 
     #if 0
     float sunRef = clamp(dot(normalize(reflectDir), L), 0.05f, 1.0f);
@@ -293,30 +293,22 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     reflect += vec4(sunIrradiance, 1.0f) * sunRef;
     #endif
-    vec3 specular = diffuse * F;
+    vec3 specular = (sunIrradiance * pow(clamp(dot(L, -reflectDir.xyz), 0.0f, 1.0f), 64.0f) + clamp(ambientColor, 0.0f, 0.3f)) * F;
+    //specular *= 0.0f;
     // Ambient part
     vec3 kD = 1.0 - F;
     kD *= 1.0 - surfaceInfo.metallic;
     vec3 ambient = kD * diffuse  + specular;
 
-    if(hasShadow)
+    //if(hasShadow)
         Lo *= 0.0f;
     vec3 color = ambient + Lo;
 
     outFragColor = vec4(color, surfaceInfo.albedo.a);
 
-    float psi = PI / 2.0f - asin(-V.y);
-    float realPsi = psi;
-    float phiSin = V.x / abs(sin(psi));
-    if(phiSin > 1.0f)
-        phiSin = 1.0f;
-    float phi = asin(phiSin);
-
-
     float cameraHeight = surfaceInfo.cameraOffset.y;
 
-    if(fragmentHeight - cameraHeight < 0.0f)
-        psi = PI - psi;
+
     vec2 sphereCoords = sphericalCoords(vec3(V.x, -V.y, V.z));
     outFragColor = vec4(outFragColor.xyz * exp(-abs(outScatteringTwoPoints(cameraHeight, fragmentHeight, sphereCoords.y))) , surfaceInfo.albedo.a);
     outFragColor += vec4(inScatter(cameraHeight, sphereCoords, length(cameraDir), surfaceInfo.cameraOffset, surfaceInfo.cameraOffset), 0.0f);
