@@ -262,7 +262,7 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     bool hasShadow = shadow < 0.5f;
 
-    vec3 sunIrradiance = hasShadow ? vec3(0.0f, 0.0f, 0.0f) : outScattering(surfaceInfo.position.y, sun.params.y);
+    vec3 sunIrradiance = hasShadow ? vec3(0.0f, 0.0f, 0.0f) : exp(-outScattering(surfaceInfo.position.y, sun.params.y));
     vec3 normal = normalize( surfaceInfo.normal );
     vec3 N = normal;
     vec4 cameraDir = vec4(surfaceInfo.position - surfaceInfo.cameraOffset, 1.0f);
@@ -277,14 +277,15 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     vec3 F = F_SchlickR(max(dot(N, V), 0.0), F0, surfaceInfo.roughness);
 
-    float fog = 1.0f - exp(-length(cameraDir) / 300.0f /* fogginess */);
-    float diffuseFactor =  clamp(dot(L, normal), 0.0f, 1.0f);
-   // diffuseFactor = (diffuseFactor + 1.0f) / 2.0f;
-    //diffuseFactor = diffuseFactor * 0.4f + 0.2f;
-    vec3 diffuse = surfaceInfo.albedo.xyz * diffuseFactor;
     vec4 reflectDir = normalize(vec4(reflect(normalize(-cameraDir).xyz, normal), 0.0f));
-    vec4 skyCol = 0.1f * vec4(0.0f, 0.0f, 0.9f, 1.0f);//skyColor(sphericalCoords(vec3(-reflectDir)));
-    vec4 reflect = skyCol;
+    float fragmentHeight = surfaceInfo.position.y;
+    vec2 reflectSpherical = sphericalCoords(vec3(reflectDir.x, -reflectDir.y, reflectDir.z));
+    vec3 groundColor = vec3(0.3f, 0.3f, 0.3f);
+    vec3 ambientColor = clamp(inScatter(fragmentHeight, reflectSpherical, (atmosphere.params.y - fragmentHeight) * (1.0f + reflectSpherical.y), surfaceInfo.position, surfaceInfo.cameraOffset), 0.0f, 1.0f);
+    float transit = clamp((reflectSpherical.y - PI / 4.0f) / (PI / 4.0f), 0.0f, 1.0f);
+    ambientColor = (1.0f - transit) * ambientColor + groundColor * transit;
+    vec3 diffuse = surfaceInfo.albedo.xyz * ambientColor;
+
     #if 0
     float sunRef = clamp(dot(normalize(reflectDir), L), 0.05f, 1.0f);
     sunRef -= 0.05f;
@@ -292,11 +293,11 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     reflect += vec4(sunIrradiance, 1.0f) * sunRef;
     #endif
-    vec3 specular = reflect.xyz * F;//globals.skyColor.xyz * reflect * (1.0f - surfaceInfo.roughness);
+    vec3 specular = diffuse * F;
     // Ambient part
     vec3 kD = 1.0 - F;
     kD *= 1.0 - surfaceInfo.metallic;
-    vec3 ambient = (kD * diffuse * shadow  + specular);
+    vec3 ambient = kD * diffuse  + specular;
 
     if(hasShadow)
         Lo *= 0.0f;
@@ -313,14 +314,12 @@ void Lighting(SurfaceInfo surfaceInfo){
 
 
     float cameraHeight = surfaceInfo.cameraOffset.y;
-    float fragmentHeight = surfaceInfo.position.y;
+
     if(fragmentHeight - cameraHeight < 0.0f)
         psi = PI - psi;
     vec2 sphereCoords = sphericalCoords(vec3(V.x, -V.y, V.z));
     outFragColor = vec4(outFragColor.xyz * exp(-abs(outScatteringTwoPoints(cameraHeight, fragmentHeight, sphereCoords.y))) , surfaceInfo.albedo.a);
-    //if(!hasShadow)
-        outFragColor += vec4(inScatter(cameraHeight, sphereCoords, length(cameraDir), surfaceInfo.position, surfaceInfo.cameraOffset), 0.0f);
-    //outFragColor = vec4(outScattering(cameraHeight, psi), 1.0f);
-    //outFragColor =  vec4(outFragColor.xyz * (1.0f - fog) + skyCol.xyz * fog, surfaceInfo.albedo.a);
+    outFragColor += vec4(inScatter(cameraHeight, sphereCoords, length(cameraDir), surfaceInfo.cameraOffset, surfaceInfo.cameraOffset), 0.0f);
+
 
 }

@@ -44,7 +44,6 @@ void SkyBoxSettings::onGui() {
     }
     if(ImGui::CollapsingHeader("Atmosphere")){
         ImGui::SliderFloat4("K", &m_skybox.get().atmosphere.K.x, 0.0f, 1.0f);
-        ImGui::SliderFloat("K Mie", &m_skybox.get().atmosphere.K.w, 0.0f, 1.0f);
         ImGui::SliderFloat("H0", &m_skybox.get().atmosphere.params.z, 0.0f, 1.0f);
         ImGui::SliderFloat("Atmosphere height", &m_skybox.get().atmosphere.params.y, 0.0f, 10000.0f);
         ImGui::SliderFloat("g", &m_skybox.get().atmosphere.params.w, -1.0f, 0.0f);

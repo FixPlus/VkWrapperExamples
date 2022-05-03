@@ -72,12 +72,16 @@ private:
 class GlobalLayout {
 public:
 
-    struct LightUniform {
-        glm::vec4 lightVec = glm::normalize(glm::vec4{-0.37, 0.37, -0.85, 0.0f});
-        glm::vec4 skyColor = glm::vec4{158.0f, 146.0f, 144.0f, 255.0f} / 255.0f;
-        glm::vec4 lightColor = glm::vec4{244.0f, 218.0f, 62.0f, 255.0f} / 255.0f;
-        float fogginess = 1000.0f;
-    } light;
+    struct Sun{
+        glm::vec4 color = glm::vec4(1.0f);
+        glm::vec4 params = glm::vec4(1.0f);
+    } sun;
+
+    struct Atmosphere{
+        glm::vec4 K =  glm::vec4{0.1f, 0.2f, 0.8f, 0.5f}; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
+        glm::vec4 params = glm::vec4{1000000.0f, 10000.0f, 0.05f, -0.999f}; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
+        int samples = 20;
+    } atmosphere;
 
     GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera, ShadowRenderPass& shadowPass) :
             m_camera_projection_layout(device,
@@ -85,11 +89,19 @@ public:
                                                vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
                                        1),
             m_light_layout(device,
-                           RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlightShadow", .setBindings={
-                                   {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}, {2,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass},
+                           RenderEngine::LightingLayout::CreateInfo{
+                .substageDescription=RenderEngine::SubstageDescription{
+                    .shaderSubstageName="sunlightShadow",
+                    .setBindings={
+                            {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                            {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                            {2,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                            {3,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                    .pass=pass,
+                    .subpass=subpass},
                            1),
             m_camera(camera),
-            m_light(device, m_light_layout, light, shadowPass),
+            m_light(device, m_light_layout, shadowPass),
             m_camera_projection(device, m_camera_projection_layout) {
     }
 
@@ -99,7 +111,7 @@ public:
     }
 
     void update() {
-        m_light.update(light);
+        m_light.update(sun, atmosphere);
         m_camera_projection.update(m_camera);
     }
 
@@ -107,6 +119,9 @@ public:
         return m_camera.get();
     }
 
+    glm::vec3 sunDirection() const{
+        return glm::vec3{glm::sin(sun.params.x) * glm::sin(sun.params.y), glm::cos(sun.params.y), glm::cos(sun.params.x) * glm::sin(sun.params.y)};
+    }
 private:
     RenderEngine::ProjectionLayout m_camera_projection_layout;
 
@@ -141,12 +156,15 @@ private:
     struct Light : public RenderEngine::Lighting {
 
 
-        Light(vkw::Device &device, RenderEngine::LightingLayout &layout, LightUniform const &ubo, ShadowRenderPass& shadowPass)
-                : RenderEngine::Lighting(layout), uniform(device,
+        Light(vkw::Device &device, RenderEngine::LightingLayout &layout, ShadowRenderPass& shadowPass)
+                : RenderEngine::Lighting(layout), sun(device,
                                                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                  mapped(uniform.map()),
-                  m_sampler(m_create_sampler(device)){
-            set().write(0, uniform);
+                  sun_mapped(sun.map()),
+                  m_sampler(m_create_sampler(device)),
+                  atmo(device,
+                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                  atmo_mapped(atmo.map()){
+            set().write(0, sun);
             VkComponentMapping mapping;
             mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
             mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -158,19 +176,19 @@ private:
                                                                        mapping),
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
             set().write(2, shadowPass.ubo());
-
-            *mapped = ubo;
-            uniform.flush();
+            set().write(3, atmo);
         }
 
-        void update(LightUniform const &ubo) {
-            *mapped = ubo;
-            uniform.flush();
+        void update(Sun const &sun, Atmosphere const &atmo) const {
+            *sun_mapped = sun;
+            *atmo_mapped = atmo;
         }
 
-        vkw::UniformBuffer<LightUniform> uniform;
+        vkw::UniformBuffer<Sun> sun;
+        vkw::UniformBuffer<Atmosphere> atmo;
         vkw::Sampler m_sampler;
-        LightUniform *mapped;
+        Sun *sun_mapped;
+        Atmosphere *atmo_mapped;
     private:
         static vkw::Sampler m_create_sampler(vkw::Device& device){
             VkSamplerCreateInfo createInfo{};
@@ -334,14 +352,26 @@ int main() {
         ImGui::End();
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::ColorEdit4("Sky color", &globalState.light.skyColor.x);
-        ImGui::ColorEdit4("Light color", &globalState.light.lightColor.x);
-        if (ImGui::SliderFloat3("Light direction", &globalState.light.lightVec.x, -1.0f, 1.0f))
-            globalState.light.lightVec = glm::normalize(globalState.light.lightVec);
-        ImGui::SliderFloat("fog", &globalState.light.fogginess, 10.0f, 1000.0f);
+        if(ImGui::CollapsingHeader("Sun")) {
+            ImGui::ColorEdit4("color", &globalState.sun.color.x);
+            ImGui::SliderFloat("irradiance", &globalState.sun.params.z, 0.1f, 1000.0f);
+            ImGui::SliderFloat("lon", &globalState.sun.params.x, 0.0f, glm::pi<float>() * 2.0f);
+            ImGui::SliderFloat("lat", &globalState.sun.params.y, 0.0f, glm::pi<float>());
+        }
+        if(ImGui::CollapsingHeader("Atmosphere")){
+            ImGui::SliderFloat4("K", &globalState.atmosphere.K.x, 0.0f, 1.0f);
+            ImGui::SliderFloat("H0", &globalState.atmosphere.params.z, 0.0f, 1.0f);
+            ImGui::SliderFloat("Atmosphere height", &globalState.atmosphere.params.y, 0.0f, 10000.0f);
+            ImGui::SliderFloat("g", &globalState.atmosphere.params.w, -1.0f, 0.0f);
+            ImGui::SliderInt("samples", &globalState.atmosphere.samples, 5, 50);
+        }
         static float splitL = window.camera().splitLambda();
         if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
             window.camera().setSplitLambda(splitL);
+        }
+        static float farClip = window.camera().farClip();
+        if(ImGui::SliderFloat("Far clip", &farClip, window.camera().nearPlane(), window.camera().farPlane())){
+            window.camera().setFarClip(farClip);
         }
         ImGui::End();
     };
@@ -379,7 +409,7 @@ int main() {
         gui.push();
         globalState.update();
         recorder.reset();
-        shadowPass.update(window.camera(), glm::vec3{globalState.light.lightVec});
+        shadowPass.update(window.camera(), glm::vec3{globalState.sunDirection()});
 
         if (window.minimized())
             continue;
