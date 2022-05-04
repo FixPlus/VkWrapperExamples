@@ -80,6 +80,8 @@ namespace RenderEngine {
 
         vkw::FragmentShader loadFragmentShader(std::string const &material, std::string const &lighting) const;
 
+        vkw::ComputeShader loadComputeShader(std::string const& name) const;
+
     private:
         std::vector<uint32_t> m_link(std::vector<std::vector<uint32_t> const*> const& binaries) const;
         std::reference_wrapper<vkw::Device> m_device;

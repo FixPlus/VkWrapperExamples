@@ -104,3 +104,78 @@ WaveSettings &WaveSettings::operator=(WaveSettings &&another) noexcept {
     }
     return *this;
 }
+
+WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader, uint32_t baseCascadeSize, uint32_t cascades):
+        TestApp::PrecomputeImageLayout(device, shaderLoader, RenderEngine::SubstageDescription{.shaderSubstageName="fft"}, 16, 16){
+    for(int i = 0; i < cascades; ++i){
+        m_cascades.emplace_back(*this, device, baseCascadeSize / (1u << i));
+    }
+}
+
+WaveSurfaceTexture::WaveSurfaceTextureCascade::WaveSurfaceTextureCascade(WaveSurfaceTexture &parent,
+                                                                         vkw::Device &device, uint32_t cascadeSize):
+        WaveSurfaceTextureCascadeImageHandler(device, cascadeSize), TestApp::PrecomputeImage(device, parent, texture()){
+
+}
+
+WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCascadeImageHandler(vkw::Device& device, uint32_t cascadeSize):
+        m_surfaceTexture{device.getAllocator(),
+                        VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY,
+                                                .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                        VK_FORMAT_R8G8B8A8_UNORM,
+                        cascadeSize,
+                        cascadeSize,
+                        1,
+                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT}{
+
+    auto queue = device.getComputeQueue();
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto transferBuffer = vkw::PrimaryCommandBuffer{commandPool};
+
+    transferBuffer.begin(0);
+
+    VkImageMemoryBarrier transitLayout1{};
+    transitLayout1.image = m_surfaceTexture;
+    transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    transitLayout1.pNext = nullptr;
+    transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transitLayout1.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    transitLayout1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;//device.getGraphicsQueue()->familyIndex();
+    transitLayout1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;//queue->familyIndex();
+    transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    transitLayout1.subresourceRange.baseArrayLayer = 0;
+    transitLayout1.subresourceRange.baseMipLevel = 0;
+    transitLayout1.subresourceRange.layerCount = m_surfaceTexture.arrayLayers();
+    transitLayout1.subresourceRange.levelCount = 1;
+    transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    transitLayout1.srcAccessMask = 0;
+
+    transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, {transitLayout1});
+
+    transitLayout1.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    transitLayout1.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    transitLayout1.srcQueueFamilyIndex = queue->familyIndex();
+    transitLayout1.dstQueueFamilyIndex = device.getGraphicsQueue()->familyIndex();
+    transitLayout1.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+
+    transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, {transitLayout1});
+/*
+    transitLayout1.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    transitLayout1.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    transitLayout1.srcQueueFamilyIndex = queue->familyIndex();
+    transitLayout1.dstQueueFamilyIndex = device.getGraphicsQueue()->familyIndex();
+    transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    transitLayout1.dstAccessMask = 0;
+    transitLayout1.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+
+    transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, {transitLayout1});
+*/
+    transferBuffer.end();
+
+    queue->submit(transferBuffer);
+
+    queue->waitIdle();
+
+}

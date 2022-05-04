@@ -15,6 +15,9 @@ namespace RenderEngine{
         virtual vkw::VertexShader const& loadVertexShader(GeometryLayout const& geometry, ProjectionLayout const& projection) = 0;
 
         virtual vkw::FragmentShader const& loadFragmentShader(MaterialLayout const& material, LightingLayout const& lighting) = 0;
+
+        virtual vkw::ComputeShader const& loadComputeShader(std::string const& name) = 0;
+
     };
 }
 #endif //TESTAPP_SHADERLOADERINTERFACE_H

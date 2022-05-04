@@ -13,7 +13,79 @@
 #include "vkw/Sampler.hpp"
 #include "RenderEngine/RecordingState.h"
 #include "Grid.h"
+#include "Precompute.h"
 
+class WaveSurfaceTexture: public TestApp::PrecomputeImageLayout{
+public:
+    WaveSurfaceTexture(vkw::Device& device, RenderEngine::ShaderLoaderInterface& shaderLoader, uint32_t baseCascadeSize, uint32_t cascades = 1);
+
+    vkw::ColorImage2DArrayInterface& cascade(uint32_t cascadeIndex){
+        return m_cascades.at(cascadeIndex).texture();
+    }
+
+    size_t cascadesCount() const{
+        return m_cascades.size();
+    }
+
+    void dispatch(vkw::CommandBuffer& buffer) const{
+        for(auto& cascade: m_cascades)
+            cascade.dispatch(buffer);
+    }
+
+    void releaseOwnershipTo(vkw::CommandBuffer& buffer,
+                            uint32_t computeFamilyIndex,
+                            VkImageLayout incomingLayout,
+                            VkAccessFlags incomingAccessMask,
+                            VkPipelineStageFlags incomingStageMask) const{
+        for(auto& cascade: m_cascades)
+            cascade.releaseOwnershipTo(buffer, computeFamilyIndex, incomingLayout, incomingAccessMask, incomingStageMask);
+    }
+
+    void acquireOwnership(vkw::CommandBuffer& buffer,
+                          uint32_t incomingFamilyIndex,
+                          VkImageLayout incomingLayout,
+                          VkAccessFlags incomingAccessMask,
+                          VkPipelineStageFlags incomingStageMask) const{
+        for(auto& cascade: m_cascades)
+            cascade.acquireOwnership(buffer, incomingFamilyIndex, incomingLayout, incomingStageMask, incomingStageMask);
+    }
+
+
+    void releaseOwnership(vkw::CommandBuffer& buffer,
+                          uint32_t acquireFamilyIndex,
+                          VkImageLayout acquireLayout,
+                          VkAccessFlags acquireAccessMask,
+                          VkPipelineStageFlags acquireStageMask) const{
+        for(auto& cascade: m_cascades)
+            cascade.releaseOwnership(buffer, acquireFamilyIndex, acquireLayout, acquireAccessMask, acquireStageMask);
+    }
+
+    void acquireOwnershipFrom(vkw::CommandBuffer& buffer,
+                              uint32_t computeFamilyIndex,
+                              VkImageLayout acquireLayout,
+                              VkAccessFlags acquireAccessMask,
+                              VkPipelineStageFlags acquireStageMask) const{
+        for(auto& cascade: m_cascades)
+            cascade.acquireOwnershipFrom(buffer, computeFamilyIndex, acquireLayout, acquireAccessMask, acquireStageMask);
+    }
+private:
+    class WaveSurfaceTextureCascadeImageHandler{
+    public:
+        WaveSurfaceTextureCascadeImageHandler(vkw::Device& device, uint32_t cascadeSize);
+        vkw::ColorImage2DArrayInterface& texture() {
+            return m_surfaceTexture;
+        }
+
+    private:
+        vkw::ColorImage2DArray<2> m_surfaceTexture;
+    };
+    class WaveSurfaceTextureCascade: public WaveSurfaceTextureCascadeImageHandler, public TestApp::PrecomputeImage{
+    public:
+        WaveSurfaceTextureCascade(WaveSurfaceTexture& parent, vkw::Device& device, uint32_t cascadeSize);
+    };
+
+    std::vector<WaveSurfaceTextureCascade> m_cascades;
+};
 class WaterSurface : public TestApp::Grid, public RenderEngine::GeometryLayout {
 public:
 

@@ -233,3 +233,16 @@ std::vector<uint32_t> RenderEngine::ShaderImporter::m_link(std::vector<std::vect
 
     return ret;
 }
+
+vkw::ComputeShader RenderEngine::ShaderImporter::loadComputeShader(const std::string &name) const {
+    std::string filename = name + ".comp.spv";
+    auto code = read_binary<uint32_t>(filename);
+    std::vector<std::vector<uint32_t> const*> binRefs;
+    binRefs.push_back(&code);
+    try {
+        auto linked = m_link(binRefs);
+        return {m_device, linked.size() * 4u, linked.data()};
+    } catch (std::runtime_error& e){
+        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + filename);
+    }
+}

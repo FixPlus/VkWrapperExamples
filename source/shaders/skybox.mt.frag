@@ -73,7 +73,6 @@ vec3 outScattering(float height, float psi){
 
     return ret;
 }
-
 vec3 outScatteringTwoPoints(float height1, float height2, float distance){
     float samples = atmosphere.samples;
     float stepDistance = distance / atmosphere.params.y / samples;

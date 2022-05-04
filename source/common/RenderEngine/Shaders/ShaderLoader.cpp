@@ -24,4 +24,11 @@ namespace RenderEngine {
 
         return m_fragmentShaders.emplace(key, ShaderImporter::loadFragmentShader(key.first, key.second)).first->second;
     }
+
+    vkw::ComputeShader const &ShaderLoader::loadComputeShader(const std::string &name) {
+        if(m_computeShaders.contains(name))
+            return m_computeShaders.at(name);
+
+        return m_computeShaders.emplace(name, ShaderImporter::loadComputeShader(name)).first->second;
+    }
 }
