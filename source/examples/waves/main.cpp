@@ -234,6 +234,7 @@ int main() {
         landMaterial.update();
         landMaterialWireframe.update();
         shadowPass.update(window.camera(), skybox.sunDirection());
+        waveSurfaceTexture.computeSpectrum();
 
         if (window.minimized()) {
             firstEncounter = true;

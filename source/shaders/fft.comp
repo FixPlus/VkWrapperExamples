@@ -2,9 +2,11 @@
 
 layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding = 0, rgba8) uniform image2DArray computedImage;
+layout (binding = 1, rgba32f) uniform readonly image2DArray inputImage;
 
 void main() {
     vec4 res = vec4(gl_GlobalInvocationID.x % 2, gl_GlobalInvocationID.y % 2, 0.0f, 1.0f);
-
+    vec2 inputNums = imageLoad(inputImage, ivec3(gl_GlobalInvocationID.xy, 0)).rg;
+    res = res * vec4(inputNums, 1.0f, 1.0f);
     imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 0), res);
 }

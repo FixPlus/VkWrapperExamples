@@ -27,7 +27,7 @@ private:
 };
 
 
-class PrecomputeImage: private RenderEngine::Compute{
+class PrecomputeImage: public RenderEngine::Compute{
 public:
     PrecomputeImage(vkw::Device& device, PrecomputeImageLayout& parent, vkw::ColorImage2DArrayInterface& image);
 
