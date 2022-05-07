@@ -78,10 +78,10 @@ WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMater
     set().write(1, derivatives, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
 }
 
-WaveSettings::WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water,
+WaveSettings::WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water, WaveSurfaceTexture &texture,
                            std::map<std::string, std::reference_wrapper<WaterMaterial>> materials)
         : TestApp::GridSettings(gui, water, "Waves"),
-          m_water(water), m_materials(std::move(materials)) {
+          m_water(water), m_materials(std::move(materials)), m_texture(texture) {
     if (m_materials.empty())
         throw std::runtime_error("Cannot create WaveSettings window with empty material map");
 
@@ -96,6 +96,69 @@ void WaveSettings::onGui() {
     if (!ImGui::CollapsingHeader("Surface waves"))
         return;
     ImGui::SliderFloat("Scale", &m_water.get().ubo.scale, 0.0f, 1000.0f);
+    ImGui::SliderFloat("Stretch", &m_texture.get().dynamicSpectrumParams.stretch, 0.0f, 10.0f);
+
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("Wind Direction", &m_texture.get().spectrumParameters.angle, 0.0f,
+                               2.0f * glm::pi<float>()) || m_need_update_static_spectrum;
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("Gravity", &m_texture.get().spectrumParameters.GravityAcceleration, 0.0f, 100.0f) ||
+            m_need_update_static_spectrum;
+
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("Fetch", &m_fetch, 0.0f, 100.0f) || m_need_update_static_spectrum;
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("WindSpeed", &m_wind_speed, 0.0f, 100.0f) || m_need_update_static_spectrum;
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("Height scale", &m_texture.get().spectrumParameters.scale, 0.0f, 100.0f) ||
+            m_need_update_static_spectrum;
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("Gamma", &m_texture.get().spectrumParameters.gamma, 0.0f, 100.0f) ||
+            m_need_update_static_spectrum;
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("Spread blend", &m_texture.get().spectrumParameters.spreadBlend, 0.0f, 1.0f) ||
+            m_need_update_static_spectrum;
+    m_need_update_static_spectrum =
+            ImGui::SliderFloat("Swell", &m_texture.get().spectrumParameters.swell, 0.0f, 100.0f) ||
+            m_need_update_static_spectrum;
+#if 0
+    m_need_update_static_spectrum = ImGui::SliderFloat("Alpha", &m_texture.get().spectrumParameters.alpha, 0.0f,
+                                                       100.0f) ||
+                                    m_need_update_static_spectrum;
+
+    m_need_update_static_spectrum = ImGui::SliderFloat("Peak omega", &m_texture.get().spectrumParameters.peakOmega,
+                                                       0.0f, 100.0f) ||
+                                    m_need_update_static_spectrum;
+#endif
+    m_need_update_static_spectrum = ImGui::SliderFloat("Short waves fade",
+                                                       &m_texture.get().spectrumParameters.shortWavesFade, 0.0f,
+                                                       1.0f) ||
+                                    m_need_update_static_spectrum;
+    m_need_update_static_spectrum = ImGui::SliderFloat("Depth",
+                                                       &m_texture.get().spectrumParameters.Depth, 1.0f,
+                                                       1000.0f) ||
+                                    m_need_update_static_spectrum;
+    ImGui::Text("alpha: %.3f, peak omega %.3f", m_texture.get().spectrumParameters.alpha, m_texture.get().spectrumParameters.peakOmega);
+
+    for (int i = 0; i < m_texture.get().cascadesCount(); ++i) {
+        if (!ImGui::CollapsingHeader(("Cascade" + std::to_string(i)).c_str()))
+            continue;
+        auto &params = m_texture.get().cascadeParams(i);
+
+        m_need_update_static_spectrum =
+                ImGui::SliderFloat("Cutoff low", &params.CutoffLow, 0.0f, 1000.0f) || m_need_update_static_spectrum;
+        m_need_update_static_spectrum = ImGui::SliderFloat("Cutoff high", &params.CutoffHigh, 200.0f, 10000.0f) ||
+                                        m_need_update_static_spectrum;
+        if (ImGui::SliderFloat("Scale", &params.LengthScale, 10.0f, 1000.0f)) {
+            m_need_update_static_spectrum = true;
+            m_water.get().ubo.scale = params.LengthScale;
+        }
+    }
+
+    if (m_need_update_static_spectrum) {
+        m_calculate_alpha();
+        m_calculate_peak_frequency();
+    }
 
     ImGui::Combo("Materials", &m_pickedMaterial, m_materialNames.data(), m_materialNames.size());
 
@@ -109,7 +172,8 @@ void WaveSettings::onGui() {
 WaveSettings::WaveSettings(WaveSettings &&another) noexcept: TestApp::GridSettings(std::move(another)),
                                                              m_water(another.m_water),
                                                              m_pickedMaterial(another.m_pickedMaterial),
-                                                             m_materials(std::move(another.m_materials)) {
+                                                             m_materials(std::move(another.m_materials)),
+                                                             m_texture(another.m_texture) {
     for (auto &material: m_materials) {
         m_materialNames.emplace_back(material.first.c_str());
     }
@@ -125,6 +189,16 @@ WaveSettings &WaveSettings::operator=(WaveSettings &&another) noexcept {
         m_materialNames.emplace_back(material.first.c_str());
     }
     return *this;
+}
+
+void WaveSettings::m_calculate_alpha() {
+    m_texture.get().spectrumParameters.alpha = 0.076f * glm::pow(
+            m_texture.get().spectrumParameters.GravityAcceleration * m_fetch / m_wind_speed / m_wind_speed, -0.22f);
+}
+
+void WaveSettings::m_calculate_peak_frequency() {
+    auto g = m_texture.get().spectrumParameters.GravityAcceleration;
+    m_texture.get().spectrumParameters.peakOmega = 22.0f * glm::pow(m_wind_speed * m_fetch / g / g, -0.33f);
 }
 
 void WaveSurfaceTexture::dispatch(vkw::CommandBuffer &buffer) {
@@ -210,7 +284,8 @@ WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::Shader
                               {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-                              {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1),
+                              {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+                              {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1),
         m_combiner_layout(device, shaderLoader, RenderEngine::SubstageDescription{
                 .shaderSubstageName="combine_water_texture",
                 .setBindings={{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
@@ -218,20 +293,26 @@ WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::Shader
                               {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-                              {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1) {
+                              {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1),
+        m_dyn_params(device,
+                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+        m_dyn_params_mapped(m_dyn_params.map()) {
 
 
     for (int i = 0; i < cascades; ++i) {
         m_cascades.emplace_back(*this, m_spectrum_precompute_layout, m_dyn_spectrum_gen_layout, m_combiner_layout,
-                                device, m_spectrum_params, baseCascadeSize / (1u << i));
+                                device, m_spectrum_params, m_dyn_params, baseCascadeSize / (1u << i));
     }
 
     computeSpectrum();
 
-    *m_params_mapped = spectrumParameters;
+
 }
 
 void WaveSurfaceTexture::computeSpectrum() {
+    *m_params_mapped = spectrumParameters;
+    m_spectrum_params.flush();
+
     auto &device = m_device.get();
     auto queue = device.getComputeQueue();
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
@@ -255,12 +336,13 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::WaveSurfaceTextureCascade(WaveSur
                                                                          RenderEngine::ComputeLayout &combinerLayout,
                                                                          vkw::Device &device,
                                                                          vkw::UniformBuffer<SpectrumParameters> const &spectrumParams,
+                                                                         vkw::UniformBuffer<DynamicSpectrumParams> const &dynParams,
                                                                          uint32_t cascadeSize) :
         WaveSurfaceTextureCascadeImageHandler(device, cascadeSize),
         m_spectrum_textures(spectrumPrecomputeLayout, spectrumParams, device, cascadeSize),
         m_device(device),
         m_layout(spectrumPrecomputeLayout),
-        m_dynamic_spectrum(dynSpectrumCompute, m_spectrum_textures, device, cascadeSize),
+        m_dynamic_spectrum(dynSpectrumCompute, m_spectrum_textures, dynParams, device, cascadeSize),
         cascade_size(cascadeSize),
         m_texture_combiner(combinerLayout, m_dynamic_spectrum, *this, device) {
     VkComponentMapping mapping{};
@@ -275,6 +357,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::WaveSurfaceTextureCascade(WaveSur
 
 void WaveSurfaceTexture::WaveSurfaceTextureCascade::precomputeStaticSpectrum(vkw::CommandBuffer &buffer) {
 
+    m_spectrum_textures.update();
     m_spectrum_textures.dispatch(buffer);
 
 }
@@ -506,6 +589,11 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTexture
 
 }
 
+void WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::update() {
+    *m_globals_mapped = globalParameters;
+    m_global_params.flush();
+}
+
 FFT::FFT(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader) :
         m_permute_row_layout(device,
                              shaderLoader,
@@ -633,7 +721,8 @@ FFT::FFTColumn::FFTColumn(RenderEngine::ComputeLayout &layout, const Complex2DTe
 }
 
 WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicSpectrumTextures(
-        RenderEngine::ComputeLayout &layout, SpectrumTextures &spectrum, vkw::Device &device, uint32_t cascadeSize) :
+        RenderEngine::ComputeLayout &layout, SpectrumTextures &spectrum,
+        vkw::UniformBuffer<DynamicSpectrumParams> const &params, vkw::Device &device, uint32_t cascadeSize) :
         vkw::ColorImage2DArray<8>(device.getAllocator(),
                                   VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                                   VK_FORMAT_R32G32_SFLOAT, cascadeSize, cascadeSize, 1, VK_IMAGE_USAGE_STORAGE_BIT),
@@ -654,6 +743,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicS
     set().writeStorageImage(2, displacementZXdx);
     set().writeStorageImage(3, displacementYdxZdx);
     set().writeStorageImage(4, displacementYdzZdz);
+    set().write(5, params);
 
     auto queue = device.getComputeQueue();
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};

@@ -8,13 +8,19 @@ layout (binding = 1, rg32f) uniform image2D displacementXY;
 layout (binding = 2, rg32f) uniform image2D displacementZXdx;
 layout (binding = 3, rg32f) uniform image2D displacementYdxZdx;
 layout (binding = 4, rg32f) uniform image2D displacementYdzZdz;
-
-
-layout (binding = 3) uniform Globals
-{
+layout (binding = 5) uniform Ubo{
     float time;
-} flobals;
+    float strecth;
+} ubo;
 
+
+vec2 complexExponent(vec2 a){
+    return vec2(cos(a.y), sin(a.y)) * exp(a.x);
+}
+
+vec2 complexMultiply(vec2 a, vec2 b){
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
 
 
 void main(){
@@ -26,7 +32,10 @@ void main(){
     vec4 dat1 = imageLoad(staticSpectrum, ivec3(id, 1));
     vec4 dat2 = imageLoad(staticSpectrum, ivec3(revId, 1));
 
-    vec2 h = dat1.xy + dat2.zw;
+    float phase = wave.w * ubo.time;
+    vec2 phaseShifter = complexExponent(vec2(0.0f, phase));
+
+    vec2 h = complexMultiply(phaseShifter, dat1.xy) + complexMultiply(vec2(phaseShifter.x , -phaseShifter.y),dat2.zw);
     vec2 ih = vec2(-h.y, h.x);
 
     vec2 disX = ih * wave.x * wave.y;

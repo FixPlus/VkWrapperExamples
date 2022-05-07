@@ -62,6 +62,17 @@ public:
         return m_cascades.at(cascadeIndex).texture();
     }
 
+    struct GlobalParams {
+        uint32_t Size = 256;
+        float LengthScale = 100.0f;
+        float CutoffHigh = 3000.0f;
+        float CutoffLow = 0.1f;
+    };
+
+    GlobalParams &cascadeParams(uint32_t cascadeIndex) {
+        return m_cascades.at(cascadeIndex).params();
+    }
+
     size_t cascadesCount() const {
         return m_cascades.size();
     }
@@ -192,7 +203,20 @@ public:
         float peakOmega = 1.0f;
         float gamma = 0.1f;
         float shortWavesFade = 1.0f;
+        float GravityAcceleration = 9.8f;
+        float Depth = 200.0f;
     } spectrumParameters;
+
+    struct DynamicSpectrumParams {
+        float time;
+        float stretch;
+    } dynamicSpectrumParams;
+
+    void update(float deltaTime) {
+        dynamicSpectrumParams.time += deltaTime;
+        *m_dyn_params_mapped = dynamicSpectrumParams;
+        m_dyn_params.flush();
+    }
 
 
 private:
@@ -218,6 +242,7 @@ private:
                                   RenderEngine::ComputeLayout &dynSpectrumCompute,
                                   RenderEngine::ComputeLayout &combinerLayout,
                                   vkw::Device &device, vkw::UniformBuffer<SpectrumParameters> const &spectrumParams,
+                                  vkw::UniformBuffer<DynamicSpectrumParams> const &dynParams,
                                   uint32_t cascadeSize);
 
         void precomputeStaticSpectrum(vkw::CommandBuffer &buffer);
@@ -230,6 +255,10 @@ private:
 
         void combineFinalTexture(vkw::CommandBuffer &buffer);
 
+        GlobalParams &params() {
+            return m_spectrum_textures.globalParameters;
+        }
+
     private:
 
         class SpectrumTextures : public vkw::ColorImage2DArray<2>, public TestApp::PrecomputeImage {
@@ -238,16 +267,11 @@ private:
                              vkw::UniformBuffer<SpectrumParameters> const &spectrumParams, vkw::Device &device,
                              uint32_t cascadeSize);
 
-        private:
+            GlobalParams globalParameters{};
 
-            struct GlobalParams {
-                uint32_t Size = 256;
-                float LengthScale = 100.0f;
-                float CutoffHigh = 3000.0f;
-                float CutoffLow = 0.1f;
-                float GravityAcceleration = 9.8f;
-                float Depth = 200.0f;
-            } globalParameters;
+            void update();
+
+        private:
 
             class GaussTexture : public vkw::ColorImage2D {
             public:
@@ -261,6 +285,7 @@ private:
         class DynamicSpectrumTextures : public vkw::ColorImage2DArray<8>, public RenderEngine::Compute {
         public:
             DynamicSpectrumTextures(RenderEngine::ComputeLayout &layout, SpectrumTextures &spectrum,
+                                    vkw::UniformBuffer<DynamicSpectrumParams> const &params,
                                     vkw::Device &device, uint32_t cascadeSize);
         } m_dynamic_spectrum;
 
@@ -284,6 +309,8 @@ private:
 
     std::vector<WaveSurfaceTextureCascade> m_cascades;
     std::reference_wrapper<vkw::Device> m_device;
+    vkw::UniformBuffer<DynamicSpectrumParams> m_dyn_params;
+    DynamicSpectrumParams *m_dyn_params_mapped;
     FFT m_fft;
 };
 
@@ -377,11 +404,19 @@ private:
 class WaveSettings : public TestApp::GridSettings {
 public:
 
-    WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water,
+    WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water, WaveSurfaceTexture &texture,
                  std::map<std::string, std::reference_wrapper<WaterMaterial>> materials);
 
     WaterMaterial &pickedMaterial() const {
         return m_materials.at(m_materialNames.at(m_pickedMaterial));
+    }
+
+    bool needUpdateStaticSpectrum() const {
+        return m_need_update_static_spectrum;
+    }
+
+    void resetUpdateSpectrum() {
+        m_need_update_static_spectrum = false;
     }
 
     WaveSettings(WaveSettings &&another) noexcept;
@@ -393,10 +428,19 @@ protected:
     void onGui() override;
 
 private:
+    float m_gravity = 9.8f;
+    float m_wind_speed = 100.0f;
+    float m_fetch = 1.0f;
+    bool m_need_update_static_spectrum = false;
     std::reference_wrapper<WaterSurface> m_water;
+    std::reference_wrapper<WaveSurfaceTexture> m_texture;
     std::map<std::string, std::reference_wrapper<WaterMaterial>> m_materials;
     std::vector<const char *> m_materialNames;
     int m_pickedMaterial = 0;
+
+    void m_calculate_alpha();
+
+    void m_calculate_peak_frequency();
 };
 
 #endif //TESTAPP_WATERSURFACE_H

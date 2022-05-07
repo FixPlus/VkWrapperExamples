@@ -17,6 +17,8 @@ layout (binding = 2) uniform SpectrumParameters
     float peakOmega;
     float gamma;
     float shortWavesFade;
+    float GravityAcceleration;
+    float Depth;
 } spectrumParameters;
 
 layout (binding = 3) uniform GlobalParams
@@ -25,8 +27,6 @@ layout (binding = 3) uniform GlobalParams
     float LengthScale;
     float CutoffHigh;
     float CutoffLow;
-    float GravityAcceleration;
-    float Depth;
 };
 
 
@@ -135,22 +135,16 @@ void main()
     int nz = gl_GlobalInvocationID.y > (Size / 2) ? (int(gl_GlobalInvocationID.y) - int(Size)) : int(gl_GlobalInvocationID.y);
     vec2 k = vec2(nx, nz) * deltaK;
     float kLength = length(k);
-#if 0
-    if(nx == 5 && nz == 0 || (nx == -5 && nz == 0 ) ){
-        imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 1), vec4(0.5f , 0.0f, 0.0f, 0.0f));
-    } else{
-        imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 1), vec4(0.0f, 0.0f, 0.0f, 0.0f));
-    }
-    #endif
+
 #if 1
     if (kLength <= CutoffHigh && kLength >= CutoffLow)
     {
         float kAngle = atan(k.y / k.x);
-        float omega = Frequency(kLength, GravityAcceleration, Depth);
+        float omega = Frequency(kLength, spectrumParameters.GravityAcceleration, spectrumParameters.Depth);
         imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 0), vec4(k.x, 1 / kLength, k.y, omega));
-        float dOmegadk = FrequencyDerivative(kLength, GravityAcceleration, Depth);
+        float dOmegadk = FrequencyDerivative(kLength, spectrumParameters.GravityAcceleration, spectrumParameters.Depth);
 
-        float spectrum = JONSWAP(omega, GravityAcceleration, Depth)
+        float spectrum = JONSWAP(omega, spectrumParameters.GravityAcceleration, spectrumParameters.Depth)
         * DirectionSpectrum(kAngle, omega) * ShortWavesFade(kLength);
         vec2 noise = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy)).rg;
         vec2 harmonic = noise * sqrt(2 * spectrum * abs(dOmegadk) / kLength * deltaK * deltaK);

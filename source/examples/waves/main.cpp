@@ -167,7 +167,8 @@ int main() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
-    auto waveSettings = WaveSettings{gui, waves, {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
+    auto waveSettings = WaveSettings{gui, waves, waveSurfaceTexture,
+                                     {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
     auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
     auto skyboxSettings = SkyBoxSettings{gui, skybox, "Skybox"};
 
@@ -225,6 +226,7 @@ int main() {
         gui.push();
         globalState.update();
         skybox.update(window.camera());
+        waveSurfaceTexture.update(window.clock().frameTime());
         waves.update(window.clock().frameTime());
         waveMaterial.update();
         waveMaterialWireframe.update();
@@ -232,7 +234,11 @@ int main() {
         landMaterial.update();
         landMaterialWireframe.update();
         shadowPass.update(window.camera(), skybox.sunDirection());
-        waveSurfaceTexture.computeSpectrum();
+
+        if (waveSettings.needUpdateStaticSpectrum()) {
+            waveSurfaceTexture.computeSpectrum();
+            waveSettings.needUpdateStaticSpectrum();
+        }
 
         if (window.minimized()) {
             firstEncounter = true;
