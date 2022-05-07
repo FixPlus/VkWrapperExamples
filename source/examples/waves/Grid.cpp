@@ -4,14 +4,15 @@
 namespace TestApp {
     vkw::VertexInputStateCreateInfo<vkw::per_vertex<Grid::PrimitiveAttrs, 0>> Grid::m_vertexInputStateCreateInfo{};
 
-    GridSettings::GridSettings(GUIFrontEnd &gui, Grid &grid, const std::string &title): GUIWindow(gui, WindowSettings{.title=title}),
-                                                                                        m_grid(grid) {
+    GridSettings::GridSettings(GUIFrontEnd &gui, Grid &grid, const std::string &title) : GUIWindow(gui,
+                                                                                                   WindowSettings{.title=title}),
+                                                                                         m_grid(grid) {
 
     }
 
     void GridSettings::onGui() {
-        auto& grid = m_grid.get();
-        if(!ImGui::CollapsingHeader("Tile grid settings"))
+        auto &grid = m_grid.get();
+        if (!ImGui::CollapsingHeader("Tile grid settings"))
             return;
         ImGui::SliderInt("Tile cascades", &grid.cascades, 1, 15);
         ImGui::SliderInt("Cascade power", &grid.cascadePower, 1, 4);
@@ -23,13 +24,13 @@ namespace TestApp {
     }
 }
 
-TestApp::Grid::Grid(vkw::Device &device, bool cameraAligned):
+TestApp::Grid::Grid(vkw::Device &device, bool cameraAligned) :
         m_device(device),
         m_buffer(device,
                  2 * TILE_DIM * TILE_DIM,
                  VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY},
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT),
-        cameraAligned(cameraAligned){
+        cameraAligned(cameraAligned) {
 
     std::vector<PrimitiveAttrs> attrs{};
 
@@ -39,6 +40,7 @@ TestApp::Grid::Grid(vkw::Device &device, bool cameraAligned):
             PrimitiveAttrs attr{};
             attr.pos = glm::vec3((float) i * TILE_SIZE / (float) (TILE_DIM), 0.0f,
                                  (float) j * TILE_SIZE / (float) (TILE_DIM));
+            attr.uv = glm::vec2((float) i / (float) (TILE_DIM), (float) j / (float) (TILE_DIM));
             attrs.push_back(attr);
         }
 
@@ -47,15 +49,19 @@ TestApp::Grid::Grid(vkw::Device &device, bool cameraAligned):
         float connectVertexPos = ((float) (j) + 0.5f) * TILE_SIZE / (float) (TILE_DIM);
         // North Connect vertices
         attr.pos = glm::vec3(connectVertexPos, 0.0f, TILE_SIZE);
+        attr.uv = glm::vec2(connectVertexPos / TILE_SIZE, 1.0f);
         attrs.push_back(attr);
         // East Connect vertices
         attr.pos = glm::vec3(TILE_SIZE, 0.0f, connectVertexPos);
+        attr.uv = glm::vec2(1.0f, connectVertexPos / TILE_SIZE);
         attrs.push_back(attr);
         // South Connect vertices
         attr.pos = glm::vec3(connectVertexPos, 0.0f, 0.0f);
+        attr.uv = glm::vec2(connectVertexPos / TILE_SIZE, 0.0f);
         attrs.push_back(attr);
         // West Connect vertices
         attr.pos = glm::vec3(0.0f, 0.0f, connectVertexPos);
+        attr.uv = glm::vec2(0.0f, connectVertexPos / TILE_SIZE);
         attrs.push_back(attr);
     }
     m_buffer = TestApp::createStaticBuffer<vkw::VertexBuffer<PrimitiveAttrs>, PrimitiveAttrs>(
@@ -197,21 +203,21 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, glm::vec3
 
     int cascadeIndex = 0;
 
-
     auto baseTileSize = tileScale * TILE_SIZE;
-    if(!cameraAligned){
-        center = {glm::floor(center.x / (2.0f * baseTileSize)) * 2.0f * baseTileSize + baseTileSize, center.y, glm::floor(center.z / (2.0f * baseTileSize)) * 2.0f * baseTileSize + baseTileSize};
+    if (!cameraAligned) {
+        center = {glm::floor(center.x / (2.0f * baseTileSize)) * 2.0f * baseTileSize + baseTileSize, center.y,
+                  glm::floor(center.z / (2.0f * baseTileSize)) * 2.0f * baseTileSize + baseTileSize};
     }
 
     m_totalTiles = 0;
 
     float elevationFactor = 1.0f + glm::abs(center.y) * elevationScale;
-    if(!cameraAligned)
+    if (!cameraAligned)
         elevationFactor = 1.0f;
 
     auto heightBoundsL = heightBounds();
 
-    int cascadeHalfSize = (int)(glm::pow(2.0f, cascadePower));
+    int cascadeHalfSize = (int) (glm::pow(2.0f, cascadePower));
 
     for (int k = 0; k < cascades; ++k)
         for (int i = -cascadeHalfSize; i < cascadeHalfSize; ++i)
@@ -242,20 +248,21 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, glm::vec3
 
                 // Discard tiles that do not appear in camera frustum
                 if (camera.offBounds(tileTranslate + glm::vec3{-2.0f, heightBoundsL.first, -2.0f}, tileTranslate +
-                                                                                                    glm::vec3{
-                                                                                                            TILE_SIZE *
-                                                                                                            scale +
-                                                                                                            2.0f, heightBoundsL.second,
-                                                                                                            TILE_SIZE *
-                                                                                                            scale +
-                                                                                                            2.0f}))
+                                                                                                   glm::vec3{
+                                                                                                           TILE_SIZE *
+                                                                                                           scale +
+                                                                                                           2.0f,
+                                                                                                           heightBoundsL.second,
+                                                                                                           TILE_SIZE *
+                                                                                                           scale +
+                                                                                                           2.0f}))
                     continue;
 
                 auto &indexBuffer = m_full_tile(cside);
 
                 constants.translate = glm::vec2(tileTranslate.x, tileTranslate.z);
                 constants.scale = scale;
-                constants.cellSize = scale * TILE_SIZE * tileScale / (float)(TILE_DIM);
+                constants.cellSize = scale * tileScale * TILE_SIZE / (float) TILE_DIM;
 
                 buffer.commands().bindIndexBuffer(indexBuffer, 0);
 

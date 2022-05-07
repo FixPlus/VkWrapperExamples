@@ -133,22 +133,15 @@ int main() {
 
     auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass, skybox};
     auto waveSurfaceTexture = WaveSurfaceTexture(device, shaderLoader, 256);
-    auto waves = WaterSurface(device);
-    auto waveMaterial = WaterMaterial{device};
-    auto waveMaterialWireframe = WaterMaterial{device, true};
+    auto waves = WaterSurface(device, waveSurfaceTexture);
+    auto waveMaterial = WaterMaterial{device, waveSurfaceTexture};
+    auto waveMaterialWireframe = WaterMaterial{device, waveSurfaceTexture, true};
 
 
     auto land = LandSurface(device);
     auto landMaterial = LandMaterial{device};
     auto landMaterialWireframe = LandMaterial{device, true};
 
-    waves.ubo.waves[0].w = 0.180f;
-    waves.ubo.waves[1].w = 0.108f;
-    waves.ubo.waves[2].w = 0.412f;
-    waves.ubo.waves[3].w = 0.16f;
-
-    waves.ubo.waves[2].z = 0.01f;
-    waves.ubo.waves[3].z = 0.01f;
 
     window.camera().set(glm::vec3{0.0f, 25.0f, 0.0f});
     window.camera().setOrientation(172.0f, 15.0f, 0.0f);
@@ -157,7 +150,8 @@ int main() {
     // Compute queue and buffer
 
     auto computeQueue = device.getComputeQueue();
-    auto computeCommandPool = vkw::CommandPool(device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, computeQueue->familyIndex());
+    auto computeCommandPool = vkw::CommandPool(device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                                               computeQueue->familyIndex());
     auto computeCommandBuffer = vkw::PrimaryCommandBuffer(computeCommandPool);
 
     auto computeImageReady = vkw::Semaphore(device);
@@ -177,20 +171,21 @@ int main() {
     auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
     auto skyboxSettings = SkyBoxSettings{gui, skybox, "Skybox"};
 
-    shadowPass.onPass = [&land, &globalState, &landSettings](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
-        if(landSettings.enabled())
+    shadowPass.onPass = [&land, &globalState, &landSettings](RenderEngine::GraphicsRecordingState &state,
+                                                             const Camera &camera) {
+        if (landSettings.enabled())
             land.draw(state, globalState.camera().position(), camera);
     };
-    gui.customGui = [ &globalState, &skybox, &window]() {
+    gui.customGui = [&globalState, &skybox, &window]() {
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         static float splitL = window.camera().splitLambda();
-        if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
+        if (ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)) {
             window.camera().setSplitLambda(splitL);
         }
 
         static float farClip = window.camera().farClip();
-        if(ImGui::SliderFloat("Far clip", &farClip, window.camera().nearPlane(), window.camera().farPlane())){
+        if (ImGui::SliderFloat("Far clip", &farClip, window.camera().nearPlane(), window.camera().farPlane())) {
             window.camera().setFarClip(farClip);
         }
         ImGui::End();
@@ -200,9 +195,13 @@ int main() {
 
     computeCommandBuffer.begin(0);
 
-    waveSurfaceTexture.acquireOwnership(computeCommandBuffer, commandBuffer.queueFamily(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+    waveSurfaceTexture.acquireOwnership(computeCommandBuffer, commandBuffer.queueFamily(),
+                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+                                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
     waveSurfaceTexture.dispatch(computeCommandBuffer);
-    waveSurfaceTexture.releaseOwnership(computeCommandBuffer, commandBuffer.queueFamily(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    waveSurfaceTexture.releaseOwnership(computeCommandBuffer, commandBuffer.queueFamily(),
+                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+                                        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 
     computeCommandBuffer.end();
 
@@ -215,11 +214,10 @@ int main() {
         extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
         static bool firstEncounter = true;
-        if(!firstEncounter) {
+        if (!firstEncounter) {
             fence.wait();
             fence.reset();
-        }
-        else
+        } else
             firstEncounter = false;
 
         window.update();
@@ -267,11 +265,9 @@ int main() {
         recorder.reset();
 
 
-
         commandBuffer.begin(0);
 
         shadowPass.execute(commandBuffer, recorder);
-
 
 
         std::array<VkClearValue, 2> values{};
@@ -299,7 +295,9 @@ int main() {
         auto &fb = framebuffers.at(currentImage);
         auto renderArea = framebuffers.at(currentImage).getFullRenderArea();
 
-        waveSurfaceTexture.acquireOwnershipFrom(commandBuffer, computeCommandBuffer.queueFamily(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+        waveSurfaceTexture.acquireOwnershipFrom(commandBuffer, computeCommandBuffer.queueFamily(),
+                                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+                                                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 
         commandBuffer.beginRenderPass(lightPass, fb, renderArea, false, values.size(), values.data());
 
@@ -310,12 +308,12 @@ int main() {
 
         globalState.bind(recorder);
 
-        if(landSettings.enabled()) {
+        if (landSettings.enabled()) {
             recorder.setMaterial(landSettings.pickedMaterial().get());
             land.draw(recorder, globalState.camera().position(), globalState.camera());
         }
 
-        if(waveSettings.enabled()){
+        if (waveSettings.enabled()) {
             recorder.setMaterial(waveSettings.pickedMaterial().get());
             waves.draw(recorder, globalState.camera().position(), globalState.camera());
         }
@@ -326,15 +324,19 @@ int main() {
 
         commandBuffer.endRenderPass();
 
-        waveSurfaceTexture.releaseOwnershipTo(commandBuffer, computeCommandBuffer.queueFamily(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        waveSurfaceTexture.releaseOwnershipTo(commandBuffer, computeCommandBuffer.queueFamily(),
+                                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+                                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
         commandBuffer.end();
 
 
-        queue->submit(commandBuffer, {computeImageReady, presentComplete}, {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
+        queue->submit(commandBuffer, {computeImageReady, presentComplete},
+                      {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
                       {computeImageRelease, renderComplete});
 
-        computeQueue->submit(computeCommandBuffer, computeImageRelease, {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT}, computeImageReady, &fence);
+        computeQueue->submit(computeCommandBuffer, computeImageRelease, {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
+                             computeImageReady, &fence);
 
         queue->present(mySwapChain, renderComplete);
     }

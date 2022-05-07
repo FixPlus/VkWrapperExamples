@@ -2,16 +2,15 @@
 #include <random>
 
 
-WaterSurface::WaterSurface(vkw::Device &device) : TestApp::Grid(device), RenderEngine::GeometryLayout(device,
-                                                                                                      RenderEngine::GeometryLayout::CreateInfo{.vertexInputState = &m_vertexInputStateCreateInfo, .substageDescription={.shaderSubstageName="waves",
-                                                                                                              .setBindings = {
-                                                                                                                      vkw::DescriptorSetLayoutBinding{
-                                                                                                                              0,
-                                                                                                                              VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}, .pushConstants={
-                                                                                                                      VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=
-                                                                                                                      8 *
-                                                                                                                      sizeof(float)}}}, .maxGeometries=1}),
-                                                  m_geometry(device, *this) {
+WaterSurface::WaterSurface(vkw::Device &device, WaveSurfaceTexture &texture) : TestApp::Grid(device),
+                                                                               RenderEngine::GeometryLayout(device,
+                                                                                                            RenderEngine::GeometryLayout::CreateInfo{.vertexInputState = &m_vertexInputStateCreateInfo, .substageDescription={.shaderSubstageName="waves",
+                                                                                                                    .setBindings = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                                                                                                                    {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}, .pushConstants={
+                                                                                                                            VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=
+                                                                                                                            8 *
+                                                                                                                            sizeof(float)}}}, .maxGeometries=1}),
+                                                                               m_geometry(device, *this, texture) {
 
 }
 
@@ -20,17 +19,63 @@ void WaterSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer) {
     buffer.bindPipeline();
 }
 
-WaterSurface::Geometry::Geometry(vkw::Device &device, WaterSurface &surface) : RenderEngine::Geometry(surface),
-                                                                               m_ubo(device,
-                                                                                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                               m_ubo_mapped(m_ubo.map()) {
-    set().write(0, m_ubo);
+WaterSurface::Geometry::Geometry(vkw::Device &device, WaterSurface &surface, WaveSurfaceTexture &texture)
+        : RenderEngine::Geometry(surface),
+          m_ubo(device,
+                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+          m_ubo_mapped(m_ubo.map()),
+          m_sampler(m_sampler_create(device)) {
+    VkComponentMapping mapping{};
+    mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    auto &cascade = texture.cascade(0);
+
+    auto &displacement = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 0, mapping);
+    auto &derivatives = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 1, mapping);
+
+    set().write(0, displacement, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+    set().write(1, m_ubo);
+
 }
 
-WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMaterial) : RenderEngine::Material(
+vkw::Sampler WaterSurface::Geometry::m_sampler_create(vkw::Device &device) {
+    VkSamplerCreateInfo createInfo{};
+
+    createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    createInfo.pNext = nullptr;
+    createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.magFilter = VK_FILTER_LINEAR;
+    createInfo.minFilter = VK_FILTER_LINEAR;
+    createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    createInfo.anisotropyEnable = false;
+    createInfo.minLod = 0.0f;
+    createInfo.maxLod = 1.0f;
+
+
+    return {device, createInfo};
+}
+
+WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMaterial, WaveSurfaceTexture &texture)
+        : RenderEngine::Material(
         waterMaterial), m_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU}),
-                                                                                       m_mapped(m_buffer.map()) {
+          m_mapped(m_buffer.map()),
+          m_sampler(m_sampler_create(device)) {
+    VkComponentMapping mapping{};
+    mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    auto &tex = texture.cascade(0);
+    auto &derivatives = tex.getView<vkw::ColorImageView>(device, tex.format(), 1, mapping);
+
     set().write(0, m_buffer);
+    set().write(1, derivatives, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
 }
 
 WaveSettings::WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water,
@@ -50,38 +95,7 @@ void WaveSettings::onGui() {
 
     if (!ImGui::CollapsingHeader("Surface waves"))
         return;
-
-    static float dirs[4] = {33.402f, 103.918f, 68.66f, 50.103f};
-    static float wavenums[4] = {28.709f, 22.041f, 10.245f, 2.039f};
-    static bool firstSet = true;
-    for (int i = 0; i < 4; ++i) {
-        std::string header = "Wave #" + std::to_string(i);
-        if (firstSet) {
-            m_water.get().ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
-            m_water.get().ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
-
-        }
-        if (ImGui::TreeNode(header.c_str())) {
-            if (ImGui::SliderFloat("Direction", dirs + i, 0.0f, 360.0f)) {
-                m_water.get().ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
-                m_water.get().ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
-
-            }
-
-            if (ImGui::SliderFloat("Wavelength", wavenums + i, 0.5f, 100.0f)) {
-                m_water.get().ubo.waves[i].x = glm::sin(glm::radians(dirs[i])) * wavenums[i];
-                m_water.get().ubo.waves[i].y = glm::cos(glm::radians(dirs[i])) * wavenums[i];
-            }
-            ImGui::SliderFloat("Steepness", &m_water.get().ubo.waves[i].w, 0.0f, 1.0f);
-            ImGui::SliderFloat("Steepness decay factor", &m_water.get().ubo.waves[i].z, 0.0f, 1.0f);
-            ImGui::TreePop();
-        }
-
-    }
-
-    ImGui::SliderFloat("Gravitation", &m_water.get().ubo.params.x, 0.1f, 100.0f);
-
-    firstSet = false;
+    ImGui::SliderFloat("Scale", &m_water.get().ubo.scale, 0.0f, 1000.0f);
 
     ImGui::Combo("Materials", &m_pickedMaterial, m_materialNames.data(), m_materialNames.size());
 
@@ -697,4 +711,23 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::FinalTextureCombiner::FinalTextur
     set().writeStorageImage(4, disp);
     set().writeStorageImage(5, deriv);
 
+}
+
+vkw::Sampler WaterMaterial::Material::m_sampler_create(vkw::Device &device) {
+    VkSamplerCreateInfo createInfo{};
+
+    createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    createInfo.pNext = nullptr;
+    createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    createInfo.magFilter = VK_FILTER_LINEAR;
+    createInfo.minFilter = VK_FILTER_LINEAR;
+    createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    createInfo.anisotropyEnable = false;
+    createInfo.minLod = 0.0f;
+    createInfo.maxLod = 1.0f;
+
+
+    return {device, createInfo};
 }

@@ -9,13 +9,14 @@
 #include "GlobalLayout.h"
 #include "GUI.h"
 
-namespace TestApp{
+namespace TestApp {
 
-    class Grid{
+    class Grid {
     public:
         struct PrimitiveAttrs
-                : public vkw::AttributeBase<vkw::VertexAttributeType::VEC3F> {
+                : public vkw::AttributeBase<vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC2F> {
             glm::vec3 pos;
+            glm::vec2 uv;
         };
 
         static constexpr uint32_t TILE_DIM = 64;
@@ -34,6 +35,7 @@ namespace TestApp{
         }
 
         void draw(RenderEngine::GraphicsRecordingState &buffer, glm::vec3 center, Camera const &camera);
+
     private:
         enum class ConnectSide {
             NORTH = 0,
@@ -58,18 +60,20 @@ namespace TestApp{
 
         static vkw::VertexInputStateCreateInfo<vkw::per_vertex<PrimitiveAttrs, 0>> m_vertexInputStateCreateInfo;
 
-        virtual void preDraw(RenderEngine::GraphicsRecordingState &buffer){}
+        virtual void preDraw(RenderEngine::GraphicsRecordingState &buffer) {}
 
-        virtual std::pair<float, float> heightBounds() const { return {0.0f, 1.0f};};
+        virtual std::pair<float, float> heightBounds() const { return {0.0f, 1.0f}; };
     };
 
 
-    class GridSettings: public GUIWindow{
+    class GridSettings : public GUIWindow {
     public:
-        GridSettings(GUIFrontEnd& gui, Grid& grid, std::string const& title);
-        bool enabled() const{
+        GridSettings(GUIFrontEnd &gui, Grid &grid, std::string const &title);
+
+        bool enabled() const {
             return m_enabled;
         }
+
     protected:
         void onGui() override;
 

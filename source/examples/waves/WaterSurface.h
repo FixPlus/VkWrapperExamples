@@ -291,20 +291,17 @@ class WaterSurface : public TestApp::Grid, public RenderEngine::GeometryLayout {
 public:
 
     struct UBO {
-        glm::vec4 waves[4];
-        glm::vec4 params = glm::vec4{9.8f, 0.0f, 0.0f, 0.0f};
-        float time = 0.0f;
+        float scale;
     } ubo;
 
     bool wireframe = false;
 
     void update(float deltaTime) {
-        ubo.time += deltaTime;
         *m_geometry.m_ubo_mapped = ubo;
         m_geometry.m_ubo.flush();
     }
 
-    WaterSurface(vkw::Device &device);
+    WaterSurface(vkw::Device &device, WaveSurfaceTexture &texture);
 
 
 private:
@@ -312,8 +309,11 @@ private:
     struct Geometry : public RenderEngine::Geometry {
         vkw::UniformBuffer<UBO> m_ubo;
         UBO *m_ubo_mapped;
+        vkw::Sampler m_sampler;
 
-        Geometry(vkw::Device &device, WaterSurface &surface);
+        Geometry(vkw::Device &device, WaterSurface &surface, WaveSurfaceTexture &texture);
+
+        static vkw::Sampler m_sampler_create(vkw::Device &device);
     } m_geometry;
 
 protected:
@@ -325,19 +325,23 @@ protected:
 
 class WaterMaterial : public RenderEngine::MaterialLayout {
 public:
-    WaterMaterial(vkw::Device &device, bool wireframe = false) : RenderEngine::MaterialLayout(device,
-                                                                                              RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="water", .setBindings={
-                                                                                                      vkw::DescriptorSetLayoutBinding{
-                                                                                                              0,
-                                                                                                              VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .rasterizationState={
-                                                                                                      VK_FALSE,
-                                                                                                      VK_FALSE,
-                                                                                                      wireframe
-                                                                                                      ? VK_POLYGON_MODE_LINE
-                                                                                                      : VK_POLYGON_MODE_FILL}, .depthTestState=vkw::DepthTestStateCreateInfo{
-                                                                                                      VK_COMPARE_OP_LESS,
-                                                                                                      true}, .maxMaterials=1}),
-                                                                 m_material(device, *this) {
+    WaterMaterial(vkw::Device &device, WaveSurfaceTexture &texture, bool wireframe = false)
+            : RenderEngine::MaterialLayout(device,
+                                           RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="water", .setBindings={
+                                                   vkw::DescriptorSetLayoutBinding{
+                                                           0,
+                                                           VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                                   vkw::DescriptorSetLayoutBinding{
+                                                           1,
+                                                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .rasterizationState={
+                                                   VK_FALSE,
+                                                   VK_FALSE,
+                                                   wireframe
+                                                   ? VK_POLYGON_MODE_LINE
+                                                   : VK_POLYGON_MODE_FILL}, .depthTestState=vkw::DepthTestStateCreateInfo{
+                                                   VK_COMPARE_OP_LESS,
+                                                   true}, .maxMaterials=1}),
+              m_material(device, *this, texture) {
 
     };
 
@@ -361,7 +365,11 @@ private:
         vkw::UniformBuffer<WaterDescription> m_buffer;
         WaterDescription *m_mapped;
 
-        Material(vkw::Device &device, WaterMaterial &waterMaterial);
+        Material(vkw::Device &device, WaterMaterial &waterMaterial, WaveSurfaceTexture &texture);
+
+        static vkw::Sampler m_sampler_create(vkw::Device &device);
+
+        vkw::Sampler m_sampler;
     } m_material;
 
 };
