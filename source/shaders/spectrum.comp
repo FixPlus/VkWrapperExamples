@@ -131,11 +131,18 @@ float ShortWavesFade(float kLength)
 void main()
 {
     float deltaK = 2 * PI / LengthScale;
-    int nx = int(gl_GlobalInvocationID.x) - int(Size) / 2;
-    int nz = int(gl_GlobalInvocationID.y) - int(Size) / 2;
+    int nx = gl_GlobalInvocationID.x > (Size / 2) ? (int(gl_GlobalInvocationID.x) - int(Size)) : int(gl_GlobalInvocationID.x);
+    int nz = gl_GlobalInvocationID.y > (Size / 2) ? (int(gl_GlobalInvocationID.y) - int(Size)) : int(gl_GlobalInvocationID.y);
     vec2 k = vec2(nx, nz) * deltaK;
     float kLength = length(k);
-
+#if 0
+    if(nx == 5 && nz == 0 || (nx == -5 && nz == 0 ) ){
+        imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 1), vec4(0.5f , 0.0f, 0.0f, 0.0f));
+    } else{
+        imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 1), vec4(0.0f, 0.0f, 0.0f, 0.0f));
+    }
+    #endif
+#if 1
     if (kLength <= CutoffHigh && kLength >= CutoffLow)
     {
         float kAngle = atan(k.y / k.x);
@@ -144,13 +151,16 @@ void main()
         float dOmegadk = FrequencyDerivative(kLength, GravityAcceleration, Depth);
 
         float spectrum = JONSWAP(omega, GravityAcceleration, Depth)
-        /** DirectionSpectrum(kAngle, omega) * ShortWavesFade(kLength)*/;
+        * DirectionSpectrum(kAngle, omega) * ShortWavesFade(kLength);
         vec2 noise = imageLoad(inputImage, ivec2(gl_GlobalInvocationID.xy)).rg;
-        imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 1), vec4(noise * sqrt(2 * spectrum * abs(dOmegadk) / kLength * deltaK * deltaK), 0.0f, 0.0f));
+        vec2 harmonic = noise * sqrt(2 * spectrum * abs(dOmegadk) / kLength * deltaK * deltaK);
+        imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 1), vec4(harmonic, harmonic.x
+        , -harmonic.y));
     }
     else
     {
         imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 0), vec4(k.x, 1, k.y, 0));
         imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 1), vec4(0.0f));
     }
+    #endif
 }

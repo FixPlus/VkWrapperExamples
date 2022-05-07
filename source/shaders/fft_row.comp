@@ -1,0 +1,36 @@
+#version 450
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0, rg32f) uniform image2D computedImage;
+
+layout (push_constant) uniform PushConstants {
+    uint size;
+} pushConstants;
+
+
+#define PI 3.1415926
+
+vec2 complexExponent(vec2 a){
+    return vec2(cos(a.y), sin(a.y)) * exp(a.x);
+}
+
+vec2 complexMultiply(vec2 a, vec2 b){
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+void main(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    uint size = 32 * gl_NumWorkGroups.x;
+    uint offset = pushConstants.size;
+    uint locIndex = (offset == 1 ? 0 : id.x % offset);
+    uint index = locIndex + 2u * offset * (id.x / offset);
+
+    vec2 p = imageLoad(computedImage, ivec2(index, id.y)).rg;
+    vec2 twiddle = complexExponent(vec2(0.0f, -2.0f * PI * float(locIndex) / float(2 * offset)));
+    twiddle.y *= -1.0f;
+    vec2 q = complexMultiply(twiddle,imageLoad(computedImage, ivec2(index + offset, id.y)).rg);
+
+    memoryBarrier();
+
+    imageStore(computedImage, ivec2(index, id.y), vec4(p + q , 0.0f, 0.0f));
+    imageStore(computedImage, ivec2(index + offset, id.y), vec4(p - q, 0.0f, 0.0f));
+}

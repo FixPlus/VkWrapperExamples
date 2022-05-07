@@ -1,12 +1,81 @@
 #version 450
-
 layout (local_size_x = 16, local_size_y = 16) in;
 layout (binding = 0, rgba8) uniform image2DArray computedImage;
 layout (binding = 1, rgba32f) uniform readonly image2DArray inputImage;
 
-void main() {
-    vec4 res = vec4(gl_GlobalInvocationID.x % 2, gl_GlobalInvocationID.y % 2, 0.0f, 1.0f);
-    vec2 inputNums = imageLoad(inputImage, ivec3(gl_GlobalInvocationID.xy, 0)).rg;
-    res = res * vec4(inputNums, 1.0f, 1.0f);
-    imageStore(computedImage, ivec3(gl_GlobalInvocationID.xy, 0), res);
+layout (push_constant) uniform PushConstants {
+    uint size;
+} pushConstants;
+
+
+#define PI 3.1415926
+
+vec2 complexExponent(vec2 a){
+    return vec2(cos(a.y), sin(a.y)) * exp(a.x);
+}
+
+vec2 complexMultiply(vec2 a, vec2 b){
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+void permuteX(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+
+    uint size = 16 * gl_NumWorkGroups.x;
+
+    uint logSize = findMSB(size);
+
+
+    uint index = id.x;
+
+    uint indexRevBits = bitfieldReverse(index) >> (32u - logSize);
+
+    vec4 data = imageLoad(inputImage, ivec3(id, 1));
+
+    imageStore(computedImage, ivec3(indexRevBits, id.y, 1), data);
+}
+
+void permuteY(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+
+    uint size = 16 * gl_NumWorkGroups.x;
+
+    uint logSize = findMSB(size);
+
+    uint index = id.x;
+
+    uint indexRevBits = bitfieldReverse(index) >> (32u - logSize);
+
+    vec4 data = imageLoad(inputImage, ivec3(id.yx, 1));
+
+    imageStore(computedImage, ivec3(id.y, indexRevBits, 1), data);
+}
+
+void fftRow(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    uint size = 16 * gl_NumWorkGroups.x;
+    uint i = pushConstants.size;
+    uint offset = 1u << (i - 1u);
+    uint index = (offset == 1 ? 0 : id.x % offset) + offset * 2u * (id.x / offset);
+
+    vec2 p = imageLoad(computedImage, ivec3(index, id.y, 1)).rg;
+    vec2 q = complexMultiply(complexExponent(vec2(0.0f, -2.0f * PI * id.x / size)),imageLoad(computedImage, ivec3(index + offset, id.y, 1)).rg);
+
+
+    imageStore(computedImage, ivec3(index, id.y, 1), vec4(p + q , 0.0f, 0.0f));
+    imageStore(computedImage, ivec3(index + offset, id.y, 1), vec4(p - q, 0.0f, 0.0f));
+}
+
+void fftColumn(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    uint size = 16 * gl_NumWorkGroups.x;
+    uint i = pushConstants.size;
+    uint offset = 1u << (i - 1u);
+    uint index = (offset == 1 ? 0 : id.x % offset) + offset * 2u * (id.x / offset);
+
+    vec2 p = imageLoad(computedImage, ivec3(id.y, index, 1)).rg;
+    vec2 q = complexMultiply(complexExponent(vec2(0.0f, -2.0f * PI * id.x / size)),imageLoad(computedImage, ivec3(id.y, index + offset, 1)).rg);
+
+    imageStore(computedImage, ivec3(id.y, index, 1), vec4(p + q, 0.0f, 0.0f));
+    imageStore(computedImage, ivec3(id.y, index + offset, 1), vec4(p - q, 0.0f, 0.0f));
 }

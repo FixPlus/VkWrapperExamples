@@ -121,6 +121,6 @@ void TestApp::PrecomputeImage::acquireOwnershipFrom(vkw::CommandBuffer &buffer, 
 
 }
 
-void TestApp::PrecomputeImage::dispatch(vkw::CommandBuffer &buffer) const {
+void TestApp::PrecomputeImage::dispatch(vkw::CommandBuffer &buffer) {
    RenderEngine::Compute::dispatch(buffer, m_cached_group_size.first, m_cached_group_size.second);
 }

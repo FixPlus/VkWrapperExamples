@@ -1,0 +1,41 @@
+#version 450
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0, rg32f) uniform image2D computedImage;
+//layout (binding = 0, rg32f) uniform image2D computedImage;
+
+layout (push_constant) uniform PushConstants {
+    uint size;
+} pushConstants;
+
+
+#define PI 3.1415926
+
+vec2 complexExponent(vec2 a){
+    return vec2(cos(a.y), sin(a.y)) * exp(a.x);
+}
+
+vec2 complexMultiply(vec2 a, vec2 b){
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+void main(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+
+    uint size = 16 * gl_NumWorkGroups.x;
+
+    uint logSize = findMSB(size);
+
+    uint index = id.x;
+
+    uint indexRevBits = bitfieldReverse(index) >> (32u - logSize);
+
+    if(index > indexRevBits)
+        return;
+
+    vec4 data1 = imageLoad(computedImage, ivec2(id.yx));
+    vec4 data2 = imageLoad(computedImage, ivec2(id.y, indexRevBits));
+    memoryBarrier();
+
+    imageStore(computedImage, ivec2(id.y, indexRevBits), data1);
+    imageStore(computedImage, ivec2(id.yx), data2);
+}

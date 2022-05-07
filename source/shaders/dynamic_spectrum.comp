@@ -1,0 +1,47 @@
+#version 450
+
+#define PI 3.1415926
+
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0, rgba32f) uniform image2DArray staticSpectrum;
+layout (binding = 1, rg32f) uniform image2D displacementXY;
+layout (binding = 2, rg32f) uniform image2D displacementZXdx;
+layout (binding = 3, rg32f) uniform image2D displacementYdxZdx;
+layout (binding = 4, rg32f) uniform image2D displacementYdzZdz;
+
+
+layout (binding = 3) uniform Globals
+{
+    float time;
+} flobals;
+
+
+
+void main(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    uint size = 16 * gl_NumWorkGroups.x;
+    ivec2 revId = ivec2(gl_GlobalInvocationID.x == 0 ? 0 : size - gl_GlobalInvocationID.x,gl_GlobalInvocationID.y == 0 ? 0 : size - gl_GlobalInvocationID.y);
+
+    vec4 wave = imageLoad(staticSpectrum, ivec3(id, 0));
+    vec4 dat1 = imageLoad(staticSpectrum, ivec3(id, 1));
+    vec4 dat2 = imageLoad(staticSpectrum, ivec3(revId, 1));
+
+    vec2 h = dat1.xy + dat2.zw;
+    vec2 ih = vec2(-h.y, h.x);
+
+    vec2 disX = ih * wave.x * wave.y;
+    vec2 disY = h;
+    vec2 disZ = ih * wave.z * wave.y;
+
+    vec2 disXdx = -h * wave.x * wave.x * wave.y;
+    vec2 disYdx = ih * wave.x;
+    vec2 disZdx = -h * wave.x * wave.z * wave.y;
+
+    vec2 disYdz = ih * wave.z;
+    vec2 disZdz = -h * wave.z * wave.z * wave.y;
+
+    imageStore(displacementXY, ivec2(id), vec4(disX.x - disY.y, disX.y + disY.x, 0.0f, 0.0f));
+    imageStore(displacementZXdx, ivec2(id), vec4(disZ.x - disXdx.y, disZ.y + disXdx.x, 0.0f, 0.0f));
+    imageStore(displacementYdxZdx, ivec2(id), vec4(disYdx.x - disZdx.y, disYdx.y + disZdx.x, 0.0f, 0.0f));
+    imageStore(displacementYdzZdz, ivec2(id), vec4(disYdz.x - disZdz.y, disYdz.y + disZdz.x, 0.0f, 0.0f));
+}

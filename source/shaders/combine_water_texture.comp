@@ -1,0 +1,26 @@
+#version 450
+
+#define PI 3.1415926
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout (binding = 0, rg32f) uniform readonly image2D displacementXY;
+layout (binding = 1, rg32f) uniform image2D displacementZXdx;
+layout (binding = 2, rg32f) uniform image2D displacementYdxZdx;
+layout (binding = 3, rg32f) uniform image2D displacementYdzZdz;
+layout (binding = 4, rgba32f) uniform image2D displacement;
+layout (binding = 5, rgba32f) uniform image2D derivatives;
+
+void main(){
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    uint size = 16 * gl_NumWorkGroups.x;
+    vec2 disXY = imageLoad(displacementXY, ivec2(id)).rg;
+    vec2 disZXdx = imageLoad(displacementZXdx, ivec2(id)).rg;
+    vec2 YdxZdx = imageLoad(displacementYdxZdx, ivec2(id)).rg;
+    vec2 YdzZdz = imageLoad(displacementYdzZdz, ivec2(id)).rg;
+    vec4 disXYZ = vec4(disXY, disZXdx.x, 1.0f);
+    vec4 deriv = vec4(YdxZdx.x, YdzZdz.x, disZXdx.x, YdzZdz.y);
+
+    imageStore(displacement, ivec2(id), disXYZ);
+    imageStore(derivatives, ivec2(id), deriv);
+}

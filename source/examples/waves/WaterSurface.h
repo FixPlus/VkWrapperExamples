@@ -15,7 +15,45 @@
 #include "Grid.h"
 #include "Precompute.h"
 
-class WaveSurfaceTexture : public TestApp::PrecomputeImageLayout {
+using Complex2DTexture = vkw::ColorImage2DView;
+
+class FFT {
+public:
+    explicit FFT(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader);
+
+    void ftt(vkw::CommandBuffer &buffer, Complex2DTexture const &input, Complex2DTexture const &output);
+
+private:
+    class PermuteRow : public RenderEngine::Compute {
+    public:
+        PermuteRow(RenderEngine::ComputeLayout &layout, Complex2DTexture const &input, Complex2DTexture const &output);
+    };
+
+    class FFTRow : public RenderEngine::Compute {
+    public:
+        FFTRow(RenderEngine::ComputeLayout &layout, Complex2DTexture const &io);
+    };
+
+    class PermuteColumn : public RenderEngine::Compute {
+    public:
+        PermuteColumn(RenderEngine::ComputeLayout &layout, Complex2DTexture const &io);
+    };
+
+    class FFTColumn : public RenderEngine::Compute {
+    public:
+        FFTColumn(RenderEngine::ComputeLayout &layout, Complex2DTexture const &io);
+    };
+
+    RenderEngine::ComputeLayout m_permute_row_layout;
+    RenderEngine::ComputeLayout m_fft_row_layout;
+    RenderEngine::ComputeLayout m_permute_column_layout;
+    RenderEngine::ComputeLayout m_fft_column_layout;
+
+    std::map<std::pair<Complex2DTexture const *, Complex2DTexture const *>, std::tuple<PermuteRow, FFTRow, PermuteColumn, FFTColumn>> m_computes;
+
+};
+
+class WaveSurfaceTexture {
 public:
     WaveSurfaceTexture(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, uint32_t baseCascadeSize,
                        uint32_t cascades = 1);
@@ -28,19 +66,34 @@ public:
         return m_cascades.size();
     }
 
-    void dispatch(vkw::CommandBuffer &buffer) const {
-        for (auto &cascade: m_cascades)
-            cascade.dispatch(buffer);
-    }
+    void dispatch(vkw::CommandBuffer &buffer);
 
     void releaseOwnershipTo(vkw::CommandBuffer &buffer,
                             uint32_t computeFamilyIndex,
                             VkImageLayout incomingLayout,
                             VkAccessFlags incomingAccessMask,
                             VkPipelineStageFlags incomingStageMask) const {
-        for (auto &cascade: m_cascades)
-            cascade.releaseOwnershipTo(buffer, computeFamilyIndex, incomingLayout, incomingAccessMask,
-                                       incomingStageMask);
+        for (auto &cascade: m_cascades) {
+            auto &texture = cascade.texture();
+
+            VkImageMemoryBarrier transitLayout1{};
+            transitLayout1.image = texture;
+            transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            transitLayout1.pNext = nullptr;
+            transitLayout1.oldLayout = incomingLayout;
+            transitLayout1.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            transitLayout1.srcQueueFamilyIndex = buffer.queueFamily();
+            transitLayout1.dstQueueFamilyIndex = computeFamilyIndex;
+            transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            transitLayout1.subresourceRange.baseArrayLayer = 0;
+            transitLayout1.subresourceRange.baseMipLevel = 0;
+            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.levelCount = 1;
+            transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+            transitLayout1.srcAccessMask = incomingAccessMask;
+
+            buffer.imageMemoryBarrier(incomingStageMask, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, {transitLayout1});
+        }
     }
 
     void acquireOwnership(vkw::CommandBuffer &buffer,
@@ -48,8 +101,27 @@ public:
                           VkImageLayout incomingLayout,
                           VkAccessFlags incomingAccessMask,
                           VkPipelineStageFlags incomingStageMask) const {
-        for (auto &cascade: m_cascades)
-            cascade.acquireOwnership(buffer, incomingFamilyIndex, incomingLayout, incomingStageMask, incomingStageMask);
+        for (auto &cascade: m_cascades) {
+            auto &texture = cascade.texture();
+
+            VkImageMemoryBarrier transitLayout1{};
+            transitLayout1.image = texture;
+            transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            transitLayout1.pNext = nullptr;
+            transitLayout1.oldLayout = incomingLayout;
+            transitLayout1.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            transitLayout1.srcQueueFamilyIndex = incomingFamilyIndex;
+            transitLayout1.dstQueueFamilyIndex = buffer.queueFamily();
+            transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            transitLayout1.subresourceRange.baseArrayLayer = 0;
+            transitLayout1.subresourceRange.baseMipLevel = 0;
+            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.levelCount = 1;
+            transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+            transitLayout1.srcAccessMask = incomingAccessMask;
+
+            buffer.imageMemoryBarrier(incomingStageMask, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, {transitLayout1});
+        }
     }
 
 
@@ -58,8 +130,27 @@ public:
                           VkImageLayout acquireLayout,
                           VkAccessFlags acquireAccessMask,
                           VkPipelineStageFlags acquireStageMask) const {
-        for (auto &cascade: m_cascades)
-            cascade.releaseOwnership(buffer, acquireFamilyIndex, acquireLayout, acquireAccessMask, acquireStageMask);
+        for (auto &cascade: m_cascades) {
+            auto &texture = cascade.texture();
+
+            VkImageMemoryBarrier transitLayout1{};
+            transitLayout1.image = texture;
+            transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            transitLayout1.pNext = nullptr;
+            transitLayout1.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+            transitLayout1.newLayout = acquireLayout;
+            transitLayout1.srcQueueFamilyIndex = buffer.queueFamily();
+            transitLayout1.dstQueueFamilyIndex = acquireFamilyIndex;
+            transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            transitLayout1.subresourceRange.baseArrayLayer = 0;
+            transitLayout1.subresourceRange.baseMipLevel = 0;
+            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.levelCount = 1;
+            transitLayout1.dstAccessMask = acquireAccessMask;
+            transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+
+            buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, acquireStageMask, {transitLayout1});
+        }
     }
 
     void acquireOwnershipFrom(vkw::CommandBuffer &buffer,
@@ -67,24 +158,39 @@ public:
                               VkImageLayout acquireLayout,
                               VkAccessFlags acquireAccessMask,
                               VkPipelineStageFlags acquireStageMask) const {
-        for (auto &cascade: m_cascades)
-            cascade.acquireOwnershipFrom(buffer, computeFamilyIndex, acquireLayout, acquireAccessMask,
-                                         acquireStageMask);
+        for (auto &cascade: m_cascades) {
+            auto &texture = cascade.texture();
+
+            VkImageMemoryBarrier transitLayout1{};
+            transitLayout1.image = texture;
+            transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            transitLayout1.pNext = nullptr;
+            transitLayout1.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+            transitLayout1.newLayout = acquireLayout;
+            transitLayout1.srcQueueFamilyIndex = computeFamilyIndex;
+            transitLayout1.dstQueueFamilyIndex = buffer.queueFamily();
+            transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            transitLayout1.subresourceRange.baseArrayLayer = 0;
+            transitLayout1.subresourceRange.baseMipLevel = 0;
+            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.levelCount = 1;
+            transitLayout1.dstAccessMask = acquireAccessMask;
+            transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+
+            buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, acquireStageMask, {transitLayout1});
+        }
     }
 
-    void computeSpectrum() {
-        for (auto &cascade: m_cascades)
-            cascade.computeSpectrum();
-    }
+    void computeSpectrum();
 
     struct SpectrumParameters {
-        float scale = 10.0f;
+        float scale = 0.01f;
         float angle = 0.0f;
         float spreadBlend = 0.3f;
         float swell = 0.0f;
-        float alpha = 100.0f;
+        float alpha = 1.0f;
         float peakOmega = 1.0f;
-        float gamma =1.0f;
+        float gamma = 0.1f;
         float shortWavesFade = 1.0f;
     } spectrumParameters;
 
@@ -98,31 +204,47 @@ private:
             return m_surfaceTexture;
         }
 
+        vkw::ColorImage2DArrayInterface const &texture() const {
+            return m_surfaceTexture;
+        }
+
     private:
         vkw::ColorImage2DArray<2> m_surfaceTexture;
     };
 
-    class WaveSurfaceTextureCascade : public WaveSurfaceTextureCascadeImageHandler, public TestApp::PrecomputeImage {
+    class WaveSurfaceTextureCascade : public WaveSurfaceTextureCascadeImageHandler {
     public:
         WaveSurfaceTextureCascade(WaveSurfaceTexture &parent, TestApp::PrecomputeImageLayout &spectrumPrecomputeLayout,
-                                  vkw::Device &device, vkw::UniformBuffer<SpectrumParameters> const& spectrumParams, uint32_t cascadeSize);
+                                  RenderEngine::ComputeLayout &dynSpectrumCompute,
+                                  RenderEngine::ComputeLayout &combinerLayout,
+                                  vkw::Device &device, vkw::UniformBuffer<SpectrumParameters> const &spectrumParams,
+                                  uint32_t cascadeSize);
 
-        void computeSpectrum();
+        void precomputeStaticSpectrum(vkw::CommandBuffer &buffer);
+
+        void computeSpectrum(vkw::CommandBuffer &commandBuffer);
+
+        vkw::ColorImage2DArrayInterface &spectrum() {
+            return m_dynamic_spectrum;
+        }
+
+        void combineFinalTexture(vkw::CommandBuffer &buffer);
 
     private:
 
         class SpectrumTextures : public vkw::ColorImage2DArray<2>, public TestApp::PrecomputeImage {
         public:
-            SpectrumTextures(TestApp::PrecomputeImageLayout &spectrumPrecomputeLayout, vkw::UniformBuffer<SpectrumParameters> const& spectrumParams, vkw::Device &device,
+            SpectrumTextures(TestApp::PrecomputeImageLayout &spectrumPrecomputeLayout,
+                             vkw::UniformBuffer<SpectrumParameters> const &spectrumParams, vkw::Device &device,
                              uint32_t cascadeSize);
 
         private:
 
             struct GlobalParams {
                 uint32_t Size = 256;
-                float LengthScale = 1.0f;
+                float LengthScale = 100.0f;
                 float CutoffHigh = 3000.0f;
-                float CutoffLow = 3.0f;
+                float CutoffLow = 0.1f;
                 float GravityAcceleration = 9.8f;
                 float Depth = 200.0f;
             } globalParameters;
@@ -133,20 +255,36 @@ private:
             } m_gauss_texture;
 
             vkw::UniformBuffer<GlobalParams> m_global_params;
-            GlobalParams* m_globals_mapped;
+            GlobalParams *m_globals_mapped;
         } m_spectrum_textures;
 
+        class DynamicSpectrumTextures : public vkw::ColorImage2DArray<8>, public RenderEngine::Compute {
+        public:
+            DynamicSpectrumTextures(RenderEngine::ComputeLayout &layout, SpectrumTextures &spectrum,
+                                    vkw::Device &device, uint32_t cascadeSize);
+        } m_dynamic_spectrum;
 
+        class FinalTextureCombiner : public RenderEngine::Compute {
+        public:
+            FinalTextureCombiner(RenderEngine::ComputeLayout &layout, DynamicSpectrumTextures &specTex,
+                                 WaveSurfaceTextureCascade &final, vkw::Device &device);
+        } m_texture_combiner;
 
+        size_t cascade_size;
         std::reference_wrapper<vkw::Device> m_device;
+        std::reference_wrapper<TestApp::PrecomputeImageLayout> m_layout;
     };
 
     TestApp::PrecomputeImageLayout m_spectrum_precompute_layout;
+    RenderEngine::ComputeLayout m_dyn_spectrum_gen_layout;
+    RenderEngine::ComputeLayout m_combiner_layout;
 
     vkw::UniformBuffer<SpectrumParameters> m_spectrum_params;
-    SpectrumParameters* m_params_mapped;
+    SpectrumParameters *m_params_mapped;
 
     std::vector<WaveSurfaceTextureCascade> m_cascades;
+    std::reference_wrapper<vkw::Device> m_device;
+    FFT m_fft;
 };
 
 class WaterSurface : public TestApp::Grid, public RenderEngine::GeometryLayout {
