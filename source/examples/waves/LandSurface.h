@@ -45,7 +45,7 @@ namespace TestApp{
                                                                                                           VK_FALSE,
                                                                                                           wireframe
                                                                                                           ? VK_POLYGON_MODE_LINE
-                                                                                                          : VK_POLYGON_MODE_FILL}, .depthTestState=vkw::DepthTestStateCreateInfo{
+                                                                                                          : VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, .depthTestState=vkw::DepthTestStateCreateInfo{
                                                                                                           VK_COMPARE_OP_LESS,
                                                                                                           true}, .maxMaterials=1}),
                                                                      m_material(device, *this) {

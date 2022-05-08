@@ -1,8 +1,6 @@
-//
-// Created by Бушев Дмитрий on 18.03.2022.
-//
-
 #include "Utils.h"
+#include <vkw/Sampler.hpp>
+
 namespace TestApp{
     vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height) {
         VmaAllocationCreateInfo createInfo{};
@@ -39,5 +37,23 @@ namespace TestApp{
         queue->waitIdle();
 
         return depthMap;
+    }
+
+    vkw::Sampler createDefaultSampler(vkw::Device& device){
+        VkSamplerCreateInfo createInfo{};
+
+        createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        createInfo.pNext = nullptr;
+        createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        createInfo.magFilter = VK_FILTER_LINEAR;
+        createInfo.minFilter = VK_FILTER_LINEAR;
+        createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        createInfo.anisotropyEnable = false;
+        createInfo.minLod = 0.0f;
+        createInfo.maxLod = 1.0f;
+
+        return vkw::Sampler{device, createInfo};
     }
 }

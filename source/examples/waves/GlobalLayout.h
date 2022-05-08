@@ -28,10 +28,15 @@ public:
                     .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                   {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                                   {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                                  {3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                  {3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                  {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
                      .pass=pass,
-                     .subpass=subpass,
-                     .blendStates={{m_getBlendState(), 0}}},
+                     .subpass=subpass
+#if 1
+                             ,
+                     .blendStates={{m_getBlendState(), 0}}
+#endif
+                    },
                      1),
             m_camera(camera),
             m_light(device, m_light_layout, shadowPass, skyBox),
@@ -108,6 +113,7 @@ private:
             set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, shadowMap.arrayLayers(), mapping), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
             set().write(2, shadowPass.ubo());
             set().write(3, skyBox.atmoBuffer());
+            set().write(4, skyBox.outScatterTexture(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
         }
 
         vkw::Sampler m_sampler;

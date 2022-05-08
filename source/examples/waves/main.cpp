@@ -96,6 +96,8 @@ int main() {
 
     // to support wireframe display
     deviceDesc.enableFeature(vkw::feature::fillModeNonSolid{});
+    // to support anisotropy filtering in ocean
+    deviceDesc.enableFeature(vkw::feature::samplerAnisotropy{});
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 
@@ -129,7 +131,9 @@ int main() {
 
     window.setContext(gui);
 
-    auto skybox = SkyBox{device, lightPass, 0};
+    auto skybox = SkyBox{device, lightPass, 0, shaderLoader};
+    skybox.update(window.camera());
+    skybox.recomputeOutScatter();
 
     auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass, skybox};
     auto waveSurfaceTexture = WaveSurfaceTexture(device, shaderLoader, 256);
@@ -234,10 +238,15 @@ int main() {
         landMaterial.update();
         landMaterialWireframe.update();
         shadowPass.update(window.camera(), skybox.sunDirection());
+        //skybox.recomputeOutScatter();
 
         if (waveSettings.needUpdateStaticSpectrum()) {
             waveSurfaceTexture.computeSpectrum();
             waveSettings.needUpdateStaticSpectrum();
+        }
+
+        if(skyboxSettings.needRecomputeOutScatter()){
+            skybox.recomputeOutScatter();
         }
 
         if (window.minimized()) {

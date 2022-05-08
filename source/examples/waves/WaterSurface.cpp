@@ -52,7 +52,8 @@ vkw::Sampler WaterSurface::Geometry::m_sampler_create(vkw::Device &device) {
     createInfo.magFilter = VK_FILTER_LINEAR;
     createInfo.minFilter = VK_FILTER_LINEAR;
     createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    createInfo.anisotropyEnable = false;
+    createInfo.anisotropyEnable = true;
+    createInfo.maxAnisotropy = device.physicalDevice().properties().limits.maxSamplerAnisotropy;
     createInfo.minLod = 0.0f;
     createInfo.maxLod = 1.0f;
 
@@ -88,6 +89,9 @@ WaveSettings::WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water, WaveS
     for (auto &material: m_materials) {
         m_materialNames.emplace_back(material.first.c_str());
     }
+
+    m_calculate_alpha();
+    m_calculate_peak_frequency();
 }
 
 void WaveSettings::onGui() {
@@ -814,7 +818,8 @@ vkw::Sampler WaterMaterial::Material::m_sampler_create(vkw::Device &device) {
     createInfo.magFilter = VK_FILTER_LINEAR;
     createInfo.minFilter = VK_FILTER_LINEAR;
     createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    createInfo.anisotropyEnable = false;
+    createInfo.anisotropyEnable = true;
+    createInfo.maxAnisotropy = device.physicalDevice().properties().limits.maxSamplerAnisotropy;
     createInfo.minLod = 0.0f;
     createInfo.maxLod = 1.0f;
 

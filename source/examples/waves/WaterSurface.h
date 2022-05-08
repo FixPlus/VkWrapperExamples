@@ -202,7 +202,7 @@ public:
         float alpha = 1.0f;
         float peakOmega = 1.0f;
         float gamma = 0.1f;
-        float shortWavesFade = 1.0f;
+        float shortWavesFade = 0.05f;
         float GravityAcceleration = 9.8f;
         float Depth = 200.0f;
     } spectrumParameters;
@@ -318,7 +318,7 @@ class WaterSurface : public TestApp::Grid, public RenderEngine::GeometryLayout {
 public:
 
     struct UBO {
-        float scale;
+        float scale = 100.0f;
     } ubo;
 
     bool wireframe = false;
@@ -365,7 +365,7 @@ public:
                                                    VK_FALSE,
                                                    wireframe
                                                    ? VK_POLYGON_MODE_LINE
-                                                   : VK_POLYGON_MODE_FILL}, .depthTestState=vkw::DepthTestStateCreateInfo{
+                                                   : VK_POLYGON_MODE_FILL,VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, .depthTestState=vkw::DepthTestStateCreateInfo{
                                                    VK_COMPARE_OP_LESS,
                                                    true}, .maxMaterials=1}),
               m_material(device, *this, texture) {
@@ -430,8 +430,8 @@ protected:
 private:
     float m_gravity = 9.8f;
     float m_wind_speed = 100.0f;
-    float m_fetch = 1.0f;
-    bool m_need_update_static_spectrum = false;
+    float m_fetch = 100000.0f;
+    bool m_need_update_static_spectrum = true;
     std::reference_wrapper<WaterSurface> m_water;
     std::reference_wrapper<WaveSurfaceTexture> m_texture;
     std::map<std::string, std::reference_wrapper<WaterMaterial>> m_materials;

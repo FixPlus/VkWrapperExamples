@@ -1,0 +1,82 @@
+#version 450
+
+#define PI 3.1415926
+
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0) uniform Atmosphere{
+    vec4 K; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
+    vec4 params; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
+    int samples;
+} atmosphere;
+
+layout (binding = 1, rgba32f) uniform image2D outscatterTexture;
+#if 0
+vec3 outScattering(float height, float psi){
+    float samples = atmosphere.samples;
+    float atmosphereDepth = (atmosphere.params.y - height) / atmosphere.params.y * (1.0f + psi);
+    float stepDistance = atmosphereDepth / samples;
+    vec3 ret = vec3(0);
+    vec3 K = atmosphere.K.xyz;
+    float H0 = atmosphere.params.z;
+    for(int i = 0; i < samples; ++i){
+        float currentHeight = height / atmosphere.params.y + i * stepDistance * cos(psi);
+        ret += 4.0f * PI * K * exp(-currentHeight/ H0) * stepDistance;
+    }
+
+    return ret;
+}
+#else
+vec3 outScattering(float height, float psi){
+
+    psi = PI - psi;
+
+    float samples =  50; //atmosphere.samples;
+    float toCenterOfPlanet = height + atmosphere.params.x;
+    float toAtmospherePeak = atmosphere.params.y - height;
+    float outerRadius = atmosphere.params.x + atmosphere.params.y;
+
+    float cos2Psi = cos(psi) * cos(psi);
+    float sin2Psi = 1.0f - cos2Psi;
+
+    float atmosphereDepth;
+
+    if(psi < asin(atmosphere.params.x / (toCenterOfPlanet)) - 0.01f){
+        // Ray intersect with planet
+        atmosphereDepth = cos(psi) * (toCenterOfPlanet) - sqrt(cos2Psi * atmosphere.params.x * atmosphere.params.x - sin2Psi * (2.0f * atmosphere.params.x * height + height * height));
+    } else{
+        // Ray goes only through atmosphere
+        atmosphereDepth = cos(psi) * toCenterOfPlanet + sqrt(cos2Psi * outerRadius * outerRadius + sin2Psi * (2.0f * outerRadius * toAtmospherePeak - toAtmospherePeak * toAtmospherePeak));
+    }
+
+    if(height < 0.0f && psi < PI / 2.0f){
+        atmosphereDepth = 0.0f;
+    }
+    float stepDistance = atmosphereDepth / samples;
+    vec3 ret = vec3(0);
+    vec3 K = atmosphere.K.xyz;
+    float H0 = atmosphere.params.z;
+    for(int i = 0; i < samples; ++i){
+        float accDistance = stepDistance * i;
+        float currentHeight = sqrt(toCenterOfPlanet * toCenterOfPlanet + accDistance * accDistance - 2.0f * cos(psi) * toCenterOfPlanet * accDistance) - atmosphere.params.x;
+        currentHeight /= atmosphere.params.y;
+
+        ret +=  4.0f * PI * K * exp(-currentHeight/ H0) * stepDistance / atmosphere.params.y;
+    }
+
+    return ret;
+}
+#endif
+void main(){
+
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    uint sizeX = 16 * gl_NumWorkGroups.x;
+    uint sizeY = 16 * gl_NumWorkGroups.y;
+
+    float psi = float(id.y) / float(sizeY) * PI;
+    float height = (float(id.x) / float(sizeX) * 1.1f - 0.1f)* atmosphere.params.y;
+
+    vec3 scatter = outScattering(height, psi);
+
+    imageStore(outscatterTexture, id, vec4(scatter, 1.0f));
+
+}

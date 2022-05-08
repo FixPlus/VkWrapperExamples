@@ -27,6 +27,8 @@ layout (set = 2, binding = 2) uniform Atmosphere{
     int samples;
 } atmosphere;
 
+layout(set = 2, binding = 3) uniform sampler2D outScatterTexture;
+
 vec3 rayDirection(){
     float fov = globals.params.x;
     float ratio = globals.params.y;
@@ -59,33 +61,12 @@ float phaseFunction(float psi, float g){
     return (3.0f * (1 - g * g) / (2.0f * (2.0f + g * g))) * (1 + cosPsi * cosPsi) / pow(1 + g * g - 2.0f * g * cosPsi, 3.0f / 2.0f);
 }
 
-vec3 outScattering(float height, float psi){
-    float samples = atmosphere.samples;
-    float atmosphereDepth = (atmosphere.params.y - height) / atmosphere.params.y * (1.0f + psi);
-    float stepDistance = atmosphereDepth / samples;
-    vec3 ret = vec3(0);
-    vec3 K = atmosphere.K.xyz;
-    float H0 = atmosphere.params.z;
-    for(int i = 0; i < samples; ++i){
-        float currentHeight = height / atmosphere.params.y + i * stepDistance * cos(psi);
-        ret += 4.0f * PI * K * exp(-currentHeight/ H0) * stepDistance;
-    }
-
-    return ret;
+float blockedByPlanet(float height, float psi){
+    return height < 0.0f || psi < asin(atmosphere.params.x / (atmosphere.params.x + height)) - 0.01f ? 0.0f: 1.0f;
 }
-vec3 outScatteringTwoPoints(float height1, float height2, float distance){
-    float samples = atmosphere.samples;
-    float stepDistance = distance / atmosphere.params.y / samples;
-    float stepHeight = (height2 - height1) / samples / atmosphere.params.y;
-    vec3 ret = vec3(0);
-    vec3 K = atmosphere.K.xyz;
-    float H0 = atmosphere.params.z;
-    for(int i = 0; i < samples; ++i){
-        float currentHeight = height1 / atmosphere.params.y + i * stepHeight;
-        ret += 4.0f * PI * K * exp(-currentHeight/ H0) * stepDistance;
-    }
 
-    return ret;
+vec2 scatterTexCoords(float height, float psi){
+    return vec2((height + 0.1f * atmosphere.params.y) / (1.1f * atmosphere.params.y), psi / PI);
 }
 vec3 inScatter(float height, vec2 sphCoords, float distance){
     float samples = atmosphere.samples;
@@ -104,21 +85,52 @@ vec3 inScatter(float height, vec2 sphCoords, float distance){
     vec3 ret = vec3(0.0f);
     vec3 sunIrradiance = sun.color.xyz * sun.params.z;
     float angle = ray.y > 0.0f ? sphCoords.y : PI - sphCoords.y;
+    float toCenterOfPlanet = height + atmosphere.params.x;
+    float toCenterOfPlanet2 = toCenterOfPlanet * toCenterOfPlanet;
 
     for(int i = 0; i < samples; ++i){
-        float currentHeight = (height + i * cos(sphCoords.y) * stepPerSample) / atmosphere.params.y;
-        float curHeightNonNorm = height + i * cos(sphCoords.y) * stepPerSample;
-        ret += exp(-currentHeight/H0)  * stepPerSample / atmosphere.params.y * exp(-outScattering(curHeightNonNorm, sun.params.y) - abs(outScatteringTwoPoints(height, curHeightNonNorm, i * stepPerSample)));
+        float accDist = stepPerSample * i;
+        float curHeightNonNorm  = sqrt(toCenterOfPlanet2 + accDist * accDist - 2.0f * cos(PI - sphCoords.y) * toCenterOfPlanet * accDist) - atmosphere.params.x;
+        float currentHeight = curHeightNonNorm / atmosphere.params.y;
+
+        float curPsi = acos((-toCenterOfPlanet2 + accDist * accDist + (atmosphere.params.x + curHeightNonNorm) * (atmosphere.params.x + curHeightNonNorm))/(2.0f * accDist * (atmosphere.params.x + curHeightNonNorm)));
+
+        ret += blockedByPlanet(curHeightNonNorm, PI - sun.params.y) * exp(-currentHeight/H0)  * stepPerSample / atmosphere.params.y *
+        exp(-vec3(texture(outScatterTexture,scatterTexCoords(curHeightNonNorm, sun.params.y)).rgb) -
+        abs(vec3(texture(outScatterTexture, scatterTexCoords(height , sphCoords.y > PI / 2.0f ? PI -  sphCoords.y :  sphCoords.y))).rgb -
+            vec3(texture(outScatterTexture, scatterTexCoords(curHeightNonNorm , sphCoords.y > PI / 2.0f ? PI -  curPsi : curPsi))).rgb));
     }
 
-    ret = sunIrradiance * ret * (atmosphere.K.xyz * phaseReleigh + atmosphere.K.w * phaseMie);
+    ret = sunIrradiance * ret * (atmosphere.K.xyz * phaseReleigh + vec3(atmosphere.K.w * phaseMie));
 
     return ret;
 
 }
 
+float atmoDepth(float height, float psi){
+    psi = PI -psi;
+    float toCenterOfPlanet = height + atmosphere.params.x;
+    float toAtmospherePeak = atmosphere.params.y - height;
+    float outerRadius = atmosphere.params.y + atmosphere.params.x;
+    float atmosphereDepth;
+    float cos2Psi = cos(psi) * cos(psi);
+    float sin2Psi = 1.0f - cos2Psi;
+
+    if(psi < asin(atmosphere.params.x / (toCenterOfPlanet)) - 0.01f){
+        // Ray intersect with planet
+        atmosphereDepth = cos(psi) * (toCenterOfPlanet) - sqrt(cos2Psi * atmosphere.params.x * atmosphere.params.x - sin2Psi * (2.0f * atmosphere.params.x * height + height * height));
+    } else{
+        // Ray goes only through atmosphere
+        atmosphereDepth = cos(psi) * toCenterOfPlanet + sqrt(cos2Psi * outerRadius * outerRadius + sin2Psi * (2.0f * outerRadius * toAtmospherePeak - toAtmospherePeak * toAtmospherePeak));
+    }
+
+    return atmosphereDepth;
+}
 vec4 skyColor(vec2 sphCoords){
-    float atmosphereDepth = (atmosphere.params.y - globals.cameraPos.y) * (1.0f + sphCoords.y);
+    float height = globals.cameraPos.x;
+    float atmosphereDepth = atmoDepth(globals.cameraPos.x, sphCoords.y);
+
+    //float atmosphereDepth = (atmosphere.params.y - globals.cameraPos.y) * (1.0f + sphCoords.y);
     return vec4(inScatter(globals.cameraPos.y, sphCoords, atmosphereDepth), 1.0f);
 }
 
