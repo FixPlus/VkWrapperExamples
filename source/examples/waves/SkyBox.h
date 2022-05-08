@@ -16,11 +16,10 @@ public:
     SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpass, RenderEngine::ShaderLoaderInterface& shaderLoader);
 
     struct UBO{
-        glm::vec4 viewportYAxis;
-        glm::vec4 viewportXAxis;
-        glm::vec4 viewportDirectionAxis;
-        glm::vec4 cameraPos = glm::vec4(0.0f);
-        glm::vec4 params;
+        glm::mat4 invProjView;
+        glm::vec4 cameraPos;
+        float near_plane;
+        float far_plane;
     } ubo;
 
     struct Sun{
@@ -38,13 +37,10 @@ public:
 
     void update(TestApp::CameraPerspective const& camera) {
 
-        ubo.params.x = camera.fov();
-        ubo.params.y = camera.ratio();
-        auto viewDirNormalized = glm::normalize(camera.viewDirection());
-        ubo.viewportDirectionAxis = glm::vec4(viewDirNormalized, 0.0f);
-        auto xDirNormalized = glm::normalize(glm::cross(viewDirNormalized, glm::vec3(0.0f, 1.0f, 0.0f)));
-        ubo.viewportXAxis = glm::vec4(xDirNormalized, 0.0f);
-        ubo.viewportYAxis = glm::vec4(glm::cross(xDirNormalized, viewDirNormalized), 0.0f);
+        ubo.invProjView = glm::inverse(camera.projection() * camera.cameraSpace());
+        ubo.far_plane = camera.farPlane();
+        ubo.near_plane = camera.nearPlane();
+        ubo.cameraPos = glm::vec4(camera.position(), 1.0f);
 
         *m_material.m_mapped = ubo;
         *m_material.m_material_mapped = sun;

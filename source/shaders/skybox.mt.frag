@@ -9,11 +9,10 @@ layout (location = 3) in vec3 inWorldNormal;
 layout (location = 4) in vec3 inViewPos;
 
 layout (set = 2,binding = 0) uniform Globals{
-    vec4 viewportYAxis;
-    vec4 viewportXAxis;
-    vec4 viewportDirectionAxis;
+    mat4 invProjView;
     vec4 cameraPos;
-    vec4 params; // x - fov, y - ratio
+    float near;
+    float far;
 } globals;
 
 layout (set = 2, binding = 1) uniform Sun{
@@ -30,12 +29,9 @@ layout (set = 2, binding = 2) uniform Atmosphere{
 layout(set = 2, binding = 3) uniform sampler2D outScatterTexture;
 
 vec3 rayDirection(){
-    float fov = globals.params.x;
-    float ratio = globals.params.y;
-    vec3 ret = vec3(globals.viewportDirectionAxis + globals.viewportXAxis * tan(fov * ratio / 2.0f * (inUVW.x * 2.0f - 1.0f)) + globals.viewportYAxis * tan(fov / 2.0f * (inUVW.y * 2.0f - 1.0f)));
-    ret = normalize(ret);
-    ret.y *= -1.0f;
-    return ret;
+    vec3 ray = (globals.invProjView * vec4((2.0f * inUVW.xy - vec2(1.0f)) * (globals.far - globals.near), globals.far + globals.near, globals.far - globals.near)).xyz;
+    ray = normalize(ray);
+    return ray;
 }
 
 #define PI 3.141592
@@ -127,10 +123,8 @@ float atmoDepth(float height, float psi){
     return atmosphereDepth;
 }
 vec4 skyColor(vec2 sphCoords){
-    float height = globals.cameraPos.x;
+    float height = globals.cameraPos.y;
     float atmosphereDepth = atmoDepth(globals.cameraPos.x, sphCoords.y);
-
-    //float atmosphereDepth = (atmosphere.params.y - globals.cameraPos.y) * (1.0f + sphCoords.y);
     return vec4(inScatter(globals.cameraPos.y, sphCoords, atmosphereDepth), 1.0f);
 }
 
@@ -138,6 +132,5 @@ vec4 skyColor(vec2 sphCoords){
 SurfaceInfo Material(){
     SurfaceInfo ret;
     ret.albedo = skyColor(sphericalCoords(rayDirection()));
-    //ret.albedo = vec4((PI + sphericalCoords(rayDirection()).x) / (2.0f * PI), 0.0f, 0.0f, 1.0f);
     return ret;
 }
