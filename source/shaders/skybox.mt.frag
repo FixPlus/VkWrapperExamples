@@ -46,7 +46,7 @@ vec2 sphericalCoords(vec3 rayDir){
     float phi = asin(sinVal);
     if(planeProj.y < 0.0f)
         phi = sign(planeProj.x) * PI - phi;
-
+    phi = phi + PI;
 
     return vec2(phi, psi);
 }

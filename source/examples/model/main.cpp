@@ -10,7 +10,8 @@
 #include "GUI.h"
 #include "AssetPath.inc"
 #include "Model.h"
-
+#include "GlobalLayout.h"
+#include "SkyBox.h"
 using namespace TestApp;
 
 class GUI : public GUIFrontEnd, public GUIBackend {
@@ -67,148 +68,6 @@ protected:
 private:
     std::reference_wrapper<TestApp::SceneProjector> m_window;
 
-};
-
-class GlobalLayout {
-public:
-
-    struct Sun{
-        glm::vec4 color = glm::vec4(1.0f);
-        glm::vec4 params = glm::vec4(1.0f);
-    } sun;
-
-    struct Atmosphere{
-        glm::vec4 K =  glm::vec4{0.1f, 0.2f, 0.8f, 0.5f}; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
-        glm::vec4 params = glm::vec4{1000000.0f, 10000.0f, 0.05f, -0.999f}; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
-        int samples = 20;
-    } atmosphere;
-
-    GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera, ShadowRenderPass& shadowPass) :
-            m_camera_projection_layout(device,
-                                       RenderEngine::SubstageDescription{.shaderSubstageName="perspective", .setBindings={
-                                               vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
-                                       1),
-            m_light_layout(device,
-                           RenderEngine::LightingLayout::CreateInfo{
-                .substageDescription=RenderEngine::SubstageDescription{
-                    .shaderSubstageName="sunlightShadow",
-                    .setBindings={
-                            {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                            {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                            {2,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                            {3,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
-                    .pass=pass,
-                    .subpass=subpass},
-                           1),
-            m_camera(camera),
-            m_light(device, m_light_layout, shadowPass),
-            m_camera_projection(device, m_camera_projection_layout) {
-    }
-
-    void bind(RenderEngine::GraphicsRecordingState &state) const {
-        state.setProjection(m_camera_projection);
-        state.setLighting(m_light);
-    }
-
-    void update() {
-        m_light.update(sun, atmosphere);
-        m_camera_projection.update(m_camera);
-    }
-
-    TestApp::Camera const &camera() const {
-        return m_camera.get();
-    }
-
-    glm::vec3 sunDirection() const{
-        return glm::vec3{glm::sin(sun.params.x) * glm::sin(sun.params.y), glm::cos(sun.params.y), glm::cos(sun.params.x) * glm::sin(sun.params.y)};
-    }
-private:
-    RenderEngine::ProjectionLayout m_camera_projection_layout;
-
-    struct CameraProjection : public RenderEngine::Projection {
-        struct ProjectionUniform {
-            glm::mat4 perspective;
-            glm::mat4 cameraSpace;
-        } ubo;
-
-        CameraProjection(vkw::Device &device, RenderEngine::ProjectionLayout &layout) : RenderEngine::Projection(
-                layout), uniform(device,
-                                 VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                                        mapped(uniform.map()) {
-            set().write(0, uniform);
-            *mapped = ubo;
-            uniform.flush();
-        }
-
-        void update(TestApp::Camera const &camera) {
-            ubo.perspective = camera.projection();
-            ubo.cameraSpace = camera.cameraSpace();
-            *mapped = ubo;
-            uniform.flush();
-        }
-
-        vkw::UniformBuffer<ProjectionUniform> uniform;
-        ProjectionUniform *mapped;
-    } m_camera_projection;
-
-    RenderEngine::LightingLayout m_light_layout;
-
-    struct Light : public RenderEngine::Lighting {
-
-
-        Light(vkw::Device &device, RenderEngine::LightingLayout &layout, ShadowRenderPass& shadowPass)
-                : RenderEngine::Lighting(layout), sun(device,
-                                                          VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                  sun_mapped(sun.map()),
-                  m_sampler(m_create_sampler(device)),
-                  atmo(device,
-                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                  atmo_mapped(atmo.map()){
-            set().write(0, sun);
-            VkComponentMapping mapping;
-            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-            auto& shadowMap = shadowPass.shadowMap();
-            set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, TestApp::SHADOW_CASCADES_COUNT,
-                                                                       mapping),
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
-            set().write(2, shadowPass.ubo());
-            set().write(3, atmo);
-        }
-
-        void update(Sun const &sun, Atmosphere const &atmo) const {
-            *sun_mapped = sun;
-            *atmo_mapped = atmo;
-        }
-
-        vkw::UniformBuffer<Sun> sun;
-        vkw::UniformBuffer<Atmosphere> atmo;
-        vkw::Sampler m_sampler;
-        Sun *sun_mapped;
-        Atmosphere *atmo_mapped;
-    private:
-        static vkw::Sampler m_create_sampler(vkw::Device& device){
-            VkSamplerCreateInfo createInfo{};
-            createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            createInfo.pNext = nullptr;
-            createInfo.minFilter = VK_FILTER_LINEAR;
-            createInfo.magFilter = VK_FILTER_LINEAR;
-            createInfo.minLod = 0.0f;
-            createInfo.maxLod = 1.0f;
-            createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-            createInfo.anisotropyEnable = false;
-
-            return {device, createInfo};
-        }
-    } m_light;
-
-    std::reference_wrapper<TestApp::Camera const> m_camera;
 };
 
 std::vector<std::filesystem::path> listAvailableModels(std::filesystem::path const &root) {
@@ -278,7 +137,9 @@ int main() {
 
     auto shadowPass = ShadowRenderPass{device};
 
-    auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass};
+    auto skybox = SkyBox{device, lightPass, 0, shaderLoader};
+    auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass, skybox};
+    auto skyboxSettings = SkyBoxSettings{gui, skybox, "Sky box"};
 
     auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
 
@@ -352,19 +213,7 @@ int main() {
         ImGui::End();
 
         ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        if(ImGui::CollapsingHeader("Sun")) {
-            ImGui::ColorEdit4("color", &globalState.sun.color.x);
-            ImGui::SliderFloat("irradiance", &globalState.sun.params.z, 0.1f, 1000.0f);
-            ImGui::SliderFloat("lon", &globalState.sun.params.x, 0.0f, glm::pi<float>() * 2.0f);
-            ImGui::SliderFloat("lat", &globalState.sun.params.y, 0.0f, glm::pi<float>());
-        }
-        if(ImGui::CollapsingHeader("Atmosphere")){
-            ImGui::SliderFloat4("K", &globalState.atmosphere.K.x, 0.0f, 1.0f);
-            ImGui::SliderFloat("H0", &globalState.atmosphere.params.z, 0.0f, 1.0f);
-            ImGui::SliderFloat("Atmosphere height", &globalState.atmosphere.params.y, 0.0f, 10000.0f);
-            ImGui::SliderFloat("g", &globalState.atmosphere.params.w, -1.0f, 0.0f);
-            ImGui::SliderInt("samples", &globalState.atmosphere.samples, 5, 50);
-        }
+
         static float splitL = window.camera().splitLambda();
         if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
             window.camera().setSplitLambda(splitL);
@@ -409,7 +258,12 @@ int main() {
         gui.push();
         globalState.update();
         recorder.reset();
-        shadowPass.update(window.camera(), glm::vec3{globalState.sunDirection()});
+        shadowPass.update(window.camera(), skybox.sunDirection());
+        skybox.update(window.camera());
+        globalState.update();
+        if(skyboxSettings.needRecomputeOutScatter()){
+            skybox.recomputeOutScatter();
+        }
 
         if (window.minimized())
             continue;
@@ -470,6 +324,8 @@ int main() {
 
         commandBuffer.setViewports({viewport}, 0);
         commandBuffer.setScissors({scissor}, 0);
+
+        skybox.draw(recorder);
 
         globalState.bind(recorder);
 
