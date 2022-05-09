@@ -3,12 +3,10 @@
 #include "MaterialLightingInterface.h.glsl"
 
 
-layout (set = 3,binding = 0) uniform Globals{
-    vec4 lightDir;
-    vec4 skyColor;
-    vec4 lightColor;
-    float fogginess;
-} globals;
+layout (set = 3,binding = 0) uniform Sun{
+    vec4 color;
+    vec4 params; // x - phi, y - psi, z - distance
+} sun;
 
 layout (location = 0) out vec4 outFragColor;
 
@@ -52,7 +50,7 @@ vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float
     float dotNV = clamp(dot(N, V), 0.0, 1.0);
     float dotNL = clamp(dot(N, L), 0.0, 1.0);
 
-    vec3 lightColor = globals.lightColor.xyz;
+    vec3 lightColor = sun.color.xyz;
 
     vec3 color = vec3(0.0);
 
@@ -73,6 +71,7 @@ vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float
 
 void Lighting(SurfaceInfo surfaceInfo){
 
+    vec4 lightDir = vec4(sin(sun.params.x) * cos(sun.params.y), cos(sun.params.x) * cos(sun.params.y), sin(sun.params.y), 0.0f);
     vec3 normal = normalize( surfaceInfo.normal );
     vec3 N = normal;
     vec4 cameraDir = vec4(surfaceInfo.position - surfaceInfo.cameraOffset, 1.0f);
@@ -82,21 +81,21 @@ void Lighting(SurfaceInfo surfaceInfo){
     F0 = mix(F0, surfaceInfo.albedo.xyz, surfaceInfo.metallic);
 
     vec3 Lo = vec3(0.0);
-    vec3 L = normalize(vec3(globals.lightDir));
+    vec3 L = normalize(vec3(lightDir));
     Lo += specularContribution(L, V, N, F0, surfaceInfo.metallic, surfaceInfo.roughness, surfaceInfo.albedo.xyz);
 
     vec3 F = F_SchlickR(max(dot(N, V), 0.0), F0, surfaceInfo.roughness);
 
-    float fog = 1.0f - exp(-length(cameraDir) / globals.fogginess);
+    float fog = 1.0f - exp(-length(cameraDir) / 1000.0f);
     float diffuseFactor =  dot(L, normal);
     diffuseFactor = (diffuseFactor + 1.0f) / 2.0f;
     diffuseFactor = diffuseFactor * 0.4f + 0.2f;
-    vec3 diffuse = surfaceInfo.albedo.xyz * globals.lightColor.xyz * diffuseFactor;
+    vec3 diffuse = surfaceInfo.albedo.xyz * sun.color.xyz * diffuseFactor;
     vec4 reflectDir = vec4(reflect(normalize(cameraDir).xyz, normal), 0.0f);
-    float reflect = clamp(dot(normalize(reflectDir), normalize(globals.lightDir)), 0.05f, 1.0f);
+    float reflect = clamp(dot(normalize(reflectDir), normalize(lightDir)), 0.05f, 1.0f);
     reflect -= 0.05f;
     reflect = pow(reflect, 32.0f) * 2.2f;
-    vec3 specular = globals.skyColor.xyz * F;//globals.skyColor.xyz * reflect * (1.0f - surfaceInfo.roughness);
+    vec3 specular = sun.color.xyz * F;
     // Ambient part
     vec3 kD = 1.0 - F;
     kD *= 1.0 - surfaceInfo.metallic;
@@ -104,19 +103,8 @@ void Lighting(SurfaceInfo surfaceInfo){
 
     vec3 color = ambient + Lo;
 
-
-
-#if 0
-    float angle = clamp(dot(normalize(cameraDir).xyz, -normal), 0.0f, 1.0f);
-    angle = pow(angle, 1.0f / 2.0f);
-    vec4 baseColor = surfaceInfo.albedo * angle + globals.skyColor * (1.0f - angle);
-    outFragColor = baseColor;
-    //outFragColor *= diffuse;
-    outFragColor += reflect * globals.lightColor;
-    //fog = 0.0f;
-#endif
     outFragColor = vec4(color, surfaceInfo.albedo.a);
 
-    outFragColor = outFragColor * (1.0f - fog) + globals.skyColor * fog;
+    outFragColor = outFragColor * (1.0f - fog) + vec4(1.0f) * fog;
 
 }

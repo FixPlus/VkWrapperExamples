@@ -136,6 +136,7 @@ int main() {
     skybox.recomputeOutScatter();
 
     auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass, skybox};
+    auto globalStateSettings = GlobalLayoutSettings{gui, globalState};
     auto waveSurfaceTexture = WaveSurfaceTexture(device, shaderLoader, 256);
     auto waves = WaterSurface(device, waveSurfaceTexture);
     auto waveMaterial = WaterMaterial{device, waveSurfaceTexture};
@@ -238,11 +239,10 @@ int main() {
         landMaterial.update();
         landMaterialWireframe.update();
         shadowPass.update(window.camera(), skybox.sunDirection());
-        //skybox.recomputeOutScatter();
 
         if (waveSettings.needUpdateStaticSpectrum()) {
             waveSurfaceTexture.computeSpectrum();
-            waveSettings.needUpdateStaticSpectrum();
+            waveSettings.resetUpdateSpectrum();
         }
 
         if(skyboxSettings.needRecomputeOutScatter()){
@@ -319,9 +319,10 @@ int main() {
         commandBuffer.setViewports({viewport}, 0);
         commandBuffer.setScissors({scissor}, 0);
 
-        skybox.draw(recorder);
+        if(!globalStateSettings.useSimpleLighting())
+            skybox.draw(recorder);
 
-        globalState.bind(recorder);
+        globalState.bind(recorder, globalStateSettings.useSimpleLighting());
 
         if (landSettings.enabled()) {
             recorder.setMaterial(landSettings.pickedMaterial().get());

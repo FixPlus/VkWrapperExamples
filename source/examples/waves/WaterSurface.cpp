@@ -52,8 +52,10 @@ vkw::Sampler WaterSurface::Geometry::m_sampler_create(vkw::Device &device) {
     createInfo.magFilter = VK_FILTER_LINEAR;
     createInfo.minFilter = VK_FILTER_LINEAR;
     createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    createInfo.anisotropyEnable = true;
-    createInfo.maxAnisotropy = device.physicalDevice().properties().limits.maxSamplerAnisotropy;
+    if(device.physicalDevice().enabledFeatures().samplerAnisotropy) {
+        createInfo.anisotropyEnable = true;
+        createInfo.maxAnisotropy = device.physicalDevice().properties().limits.maxSamplerAnisotropy;
+    }
     createInfo.minLod = 0.0f;
     createInfo.maxLod = 1.0f;
 
@@ -818,8 +820,10 @@ vkw::Sampler WaterMaterial::Material::m_sampler_create(vkw::Device &device) {
     createInfo.magFilter = VK_FILTER_LINEAR;
     createInfo.minFilter = VK_FILTER_LINEAR;
     createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    createInfo.anisotropyEnable = true;
-    createInfo.maxAnisotropy = device.physicalDevice().properties().limits.maxSamplerAnisotropy;
+    if(device.physicalDevice().enabledFeatures().samplerAnisotropy) {
+        createInfo.anisotropyEnable = true;
+        createInfo.maxAnisotropy = device.physicalDevice().properties().limits.maxSamplerAnisotropy;
+    }
     createInfo.minLod = 0.0f;
     createInfo.maxLod = 1.0f;
 
