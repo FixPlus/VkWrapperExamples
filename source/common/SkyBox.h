@@ -28,9 +28,9 @@ public:
     } sun;
 
     struct Atmosphere{
-        glm::vec4 K =  glm::vec4{0.15f, 0.404f, 0.532f, 0.02f}; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
-        glm::vec4 params = glm::vec4{1000000.0f, 100000.0f, 0.05f, -0.999f}; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
-        int samples = 50;
+        glm::vec4 K =  glm::vec4{0.02f, 0.085f, 0.128f, 0.04f}; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
+        glm::vec4 params = glm::vec4{1000000.0f, 100000.0f, 0.25f, -0.9999f}; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
+        int samples = 10;
     } atmosphere;
 
     void draw(RenderEngine::GraphicsRecordingState &buffer);

@@ -78,7 +78,7 @@ vec3 inScatter(float height, vec2 sphCoords, float distance){
     float phaseMie = phaseFunction(sunPsi, atmosphere.params.w);
     float phaseReleigh = phaseFunction(sunPsi, 0.0f);
     float H0 = atmosphere.params.z;
-    vec3 ret = vec3(0.0f);
+    vec4 ret = vec4(0.0f);
     vec3 sunIrradiance = sun.color.xyz * sun.params.z;
     float angle = ray.y > 0.0f ? sphCoords.y : PI - sphCoords.y;
     float toCenterOfPlanet = height + atmosphere.params.x;
@@ -92,14 +92,14 @@ vec3 inScatter(float height, vec2 sphCoords, float distance){
         float curPsi = acos((-toCenterOfPlanet2 + accDist * accDist + (atmosphere.params.x + curHeightNonNorm) * (atmosphere.params.x + curHeightNonNorm))/(2.0f * accDist * (atmosphere.params.x + curHeightNonNorm)));
 
         ret += blockedByPlanet(curHeightNonNorm, PI - sun.params.y) * exp(-currentHeight/H0)  * stepPerSample / atmosphere.params.y *
-        exp(-vec3(texture(outScatterTexture,scatterTexCoords(curHeightNonNorm, sun.params.y)).rgb) -
-        abs(vec3(texture(outScatterTexture, scatterTexCoords(height , sphCoords.y > PI / 2.0f ? PI -  sphCoords.y :  sphCoords.y))).rgb -
-            vec3(texture(outScatterTexture, scatterTexCoords(curHeightNonNorm , sphCoords.y > PI / 2.0f ? PI -  curPsi : curPsi))).rgb));
+        exp(-vec4(texture(outScatterTexture,scatterTexCoords(curHeightNonNorm, sun.params.y))) -
+        abs(vec4(texture(outScatterTexture, scatterTexCoords(height , sphCoords.y > PI / 2.0f ? PI -  sphCoords.y :  sphCoords.y))) -
+            vec4(texture(outScatterTexture, scatterTexCoords(curHeightNonNorm , sphCoords.y > PI / 2.0f ? PI -  curPsi : curPsi)))));
     }
 
-    ret = sunIrradiance * ret * (atmosphere.K.xyz * phaseReleigh + vec3(atmosphere.K.w * phaseMie));
+    //ret.xyz -= vec3(ret.w);
 
-    return ret;
+    return sunIrradiance  * (atmosphere.K.xyz * ret.xyz * phaseReleigh + vec3(ret.w * atmosphere.K.w * phaseMie));
 
 }
 

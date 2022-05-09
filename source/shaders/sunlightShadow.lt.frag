@@ -113,7 +113,20 @@ float getShadow(SurfaceInfo surfaceInfo){
 
 #define PI 3.141592
 
+vec2 scatterTexCoords(float height, float psi){
+    return vec2((height + 0.1f * atmosphere.params.y) / (1.1f * atmosphere.params.y), psi / PI);
+}
 
+vec4 outScatterDirection(float initialHeight, float psi, float distance){
+    float toCenterOfPlanet = initialHeight + atmosphere.params.x;
+    float toCenterOfPlanet2 = toCenterOfPlanet * toCenterOfPlanet;
+    float destinationHeight  = sqrt(toCenterOfPlanet2 + distance * distance - 2.0f * cos(PI - psi) * toCenterOfPlanet * distance) - atmosphere.params.x;
+
+    float destPsi = acos((-toCenterOfPlanet2 + distance * distance + (atmosphere.params.x + destinationHeight) * (atmosphere.params.x + destinationHeight))/(2.0f * distance * (atmosphere.params.x + destinationHeight)));
+
+    return exp(-abs(vec4(texture(outScatterTexture, scatterTexCoords(initialHeight, (psi > PI / 2.0f ? PI -  psi :  psi) ))) -
+    vec4(texture(outScatterTexture, scatterTexCoords(destinationHeight, (psi > PI / 2.0f ? PI -  destPsi : destPsi) )))));
+}
     // Atmosphere processing
 
 vec2 sphericalCoords(vec3 rayDir){
@@ -137,9 +150,7 @@ float phaseFunction(float psi, float g){
     return (3.0f * (1 - g * g) / (2.0f * (2.0f + g * g))) * (1 + cosPsi * cosPsi) / pow(1 + g * g - 2.0f * g * cosPsi, 3.0f / 2.0f);
 }
 
-vec2 scatterTexCoords(float height, float psi){
-    return vec2((height + 0.1f * atmosphere.params.y) / (1.1f * atmosphere.params.y), psi / PI);
-}
+
 
 
 float atmoDepth(float height, float psi){
@@ -165,7 +176,7 @@ float atmoDepth(float height, float psi){
 
 vec3 inScatter(float height, vec2 sphCoords, float distance, vec3 initPos, vec3 cameraPos){
 
-    vec3 ret = vec3(0.0f);
+    vec4 ret = vec4(0.0f);
 
     float samples = atmosphere.samples;
     float stepPerSample = distance / samples;
@@ -198,37 +209,15 @@ vec3 inScatter(float height, vec2 sphCoords, float distance, vec3 initPos, vec3 
         if(getShadowInPos(currentPos, cameraPos) > 0.5f)
             ret += (curHeightNonNorm < -0.1f * atmosphere.params.y || PI - sun.params.y < asin(atmosphere.params.x / (atmosphere.params.x + curHeightNonNorm)) - 0.01f ? 0.0f: 1.0f) *
             exp(-currentHeight/H0)  * stepPerSample / atmosphere.params.y *
-            exp(-vec3(texture(outScatterTexture, scatterTexCoords(curHeightNonNorm, sun.params.y)).rgb) -
-            abs(vec3(texture(outScatterTexture, scatterTexCoords(height, (sphCoords.y > PI / 2.0f ? PI -  sphCoords.y :  sphCoords.y) ))).rgb -
-            vec3(texture(outScatterTexture, scatterTexCoords(curHeightNonNorm, (sphCoords.y > PI / 2.0f ? PI -  curPsi : curPsi) ))).rgb));
+            exp(-vec4(texture(outScatterTexture, scatterTexCoords(curHeightNonNorm, sun.params.y))) -
+            abs(vec4(texture(outScatterTexture, scatterTexCoords(height, (sphCoords.y > PI / 2.0f ? PI -  sphCoords.y :  sphCoords.y) ))) -
+            vec4(texture(outScatterTexture, scatterTexCoords(curHeightNonNorm, (sphCoords.y > PI / 2.0f ? PI -  curPsi : curPsi) )))));
 
     }
 
-    ret = sunIrradiance * ret * (atmosphere.K.xyz * phaseReleigh + vec3(atmosphere.K.w * phaseMie));
 
-    return ret;
+    return sunIrradiance * (atmosphere.K.xyz * ret.xyz * phaseReleigh + vec3(atmosphere.K.w * ret.w * phaseMie));
 
-}
-
-
-
-// Normal Distribution function --------------------------------------
-float D_GGX(float dotNH, float roughness)
-{
-    float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
-    float denom = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
-    return (alpha2)/(PI * denom*denom);
-}
-
-// Geometric Shadowing function --------------------------------------
-float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
-{
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
-    float GL = dotNL / (dotNL * (1.0 - k) + k);
-    float GV = dotNV / (dotNV * (1.0 - k) + k);
-    return GL * GV;
 }
 
 // Fresnel function ----------------------------------------------------
@@ -240,31 +229,6 @@ vec3 F_Schlick(float cosTheta, vec3 F0)
 vec3 F_SchlickR(float cosTheta, vec3 F0, float roughness)
 {
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
-}
-
-vec3 specularContribution(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float roughness, vec3 albedo, vec3 lightColor)
-{
-    // Precalculate vectors and dot products
-    vec3 H = normalize (V + L);
-    float dotNH = clamp(dot(N, H), 0.0, 1.0);
-    float dotNV = clamp(dot(N, V), 0.0, 1.0);
-    float dotNL = clamp(dot(N, L), 0.0, 1.0);
-
-    vec3 color = vec3(0.0);
-
-    if (dotNL > 0.0) {
-        // D = Normal distribution (Distribution of the microfacets)
-        float D = D_GGX(dotNH, roughness);
-        // G = Geometric shadowing term (Microfacets shadowing)
-        float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
-        // F = Fresnel factor (Reflectance depending on angle of incidence)
-        vec3 F = F_Schlick(dotNV, F0);
-        vec3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001) * lightColor;
-        vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
-        color += (kD * albedo / PI + spec) * dotNL;
-    }
-
-    return color;
 }
 
 void Lighting(SurfaceInfo surfaceInfo){
@@ -300,7 +264,7 @@ void Lighting(SurfaceInfo surfaceInfo){
     ambientColor = (1.0f - transit) * ambientColor + groundColor * transit;
     vec3 diffuse = surfaceInfo.albedo.xyz * (clamp(ambientColor, 0.0f, 0.3f) + clamp(sunIrradiance * clamp(dot(L, N), 0.0f, 1.0f), 0.0f, 0.4f));
 
-    vec3 specular = (clamp(sunIrradiance, 0.0f, 1.0f) * pow(clamp(dot(L, -reflectDir.xyz), 0.0f, 1.0f), 128.0f) + clamp(ambientColor, 0.0f, 1.0f)) * F;
+    vec3 specular = (clamp(sunIrradiance, 0.0f, 1.0f) * pow(clamp(dot(L, -reflectDir.xyz), 0.0f, 1.0f), 128.0f) + 0.3f * clamp(ambientColor, 0.0f, 1.0f)) * F;
 
     // Ambient part
     vec3 kD = 1.0 - F;
@@ -314,8 +278,10 @@ void Lighting(SurfaceInfo surfaceInfo){
 
 
     vec2 sphereCoords = sphericalCoords(vec3(V.x, -V.y, V.z));
-    outFragColor = vec4(outFragColor.xyz/* * exp(-abs(texture(outScatterTexture, scatterTexCoords(surfaceInfo.position.y, sun.params.y)).rgb - texture(outScatterTexture, scatterTexCoords(surfaceInfo.position.y, sun.params.y)).rgb)) */, surfaceInfo.albedo.a);
-    //outFragColor += vec4(inScatter(cameraHeight, sphereCoords, length(cameraDir), surfaceInfo.cameraOffset, surfaceInfo.cameraOffset), 0.0f);
-    //outFragColor = vec4(specular, 1.0f);
+
+
+    vec4 outScatter = outScatterDirection(surfaceInfo.position.y, PI - sphereCoords.y, length(cameraDir));
+    outFragColor = vec4(outFragColor.xyz * outScatter.xyz * outScatter.w, surfaceInfo.albedo.a);
+    outFragColor += vec4(inScatter(cameraHeight, sphereCoords, length(cameraDir), surfaceInfo.cameraOffset, surfaceInfo.cameraOffset), 0.0f);
 
 }

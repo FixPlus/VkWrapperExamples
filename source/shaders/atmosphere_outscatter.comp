@@ -26,7 +26,7 @@ vec3 outScattering(float height, float psi){
     return ret;
 }
 #else
-vec3 outScattering(float height, float psi){
+vec4 outScattering(float height, float psi){
 
     psi = PI - psi;
 
@@ -52,8 +52,8 @@ vec3 outScattering(float height, float psi){
         atmosphereDepth = 0.0f;
     }
     float stepDistance = atmosphereDepth / samples;
-    vec3 ret = vec3(0);
-    vec3 K = atmosphere.K.xyz;
+    vec4 ret = vec4(0);
+    vec4 K = atmosphere.K;
     float H0 = atmosphere.params.z;
     for(int i = 0; i < samples; ++i){
         float accDistance = stepDistance * i;
@@ -75,8 +75,8 @@ void main(){
     float psi = float(id.y) / float(sizeY) * PI;
     float height = (float(id.x) / float(sizeX) * 1.1f - 0.1f)* atmosphere.params.y;
 
-    vec3 scatter = outScattering(height, psi);
+    vec4 scatter = outScattering(height, psi);
 
-    imageStore(outscatterTexture, id, vec4(scatter, 1.0f));
+    imageStore(outscatterTexture, id, vec4(scatter));
 
 }
