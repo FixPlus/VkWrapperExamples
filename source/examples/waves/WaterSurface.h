@@ -233,7 +233,7 @@ private:
         }
 
     private:
-        vkw::ColorImage2DArray<2> m_surfaceTexture;
+        vkw::ColorImage2DArray<3> m_surfaceTexture;
     };
 
     class WaveSurfaceTextureCascade : public WaveSurfaceTextureCascadeImageHandler {
@@ -360,6 +360,9 @@ public:
                                                            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                                    vkw::DescriptorSetLayoutBinding{
                                                            1,
+                                                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                                   vkw::DescriptorSetLayoutBinding{
+                                                           2,
                                                            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .rasterizationState={
                                                    VK_FALSE,
                                                    VK_FALSE,

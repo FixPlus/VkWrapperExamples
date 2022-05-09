@@ -183,6 +183,7 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, glm::vec3
         glm::vec2 translate;
         float scale = 1.0f;
         float cellSize;
+        glm::vec4 arbitraryData;
     } constants;
 
 #if 0
@@ -263,6 +264,7 @@ void TestApp::Grid::draw(RenderEngine::GraphicsRecordingState &buffer, glm::vec3
                 constants.translate = glm::vec2(tileTranslate.x, tileTranslate.z);
                 constants.scale = scale;
                 constants.cellSize = scale * tileScale * TILE_SIZE / (float) TILE_DIM;
+                constants.arbitraryData = arbitraryData(constants.translate, constants.translate + glm::vec2{scale * TILE_SIZE});
 
                 buffer.commands().bindIndexBuffer(indexBuffer, 0);
 

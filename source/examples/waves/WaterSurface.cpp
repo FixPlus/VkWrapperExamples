@@ -76,9 +76,10 @@ WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMater
 
     auto &tex = texture.cascade(0);
     auto &derivatives = tex.getView<vkw::ColorImageView>(device, tex.format(), 1, mapping);
-
+    auto &turbulence = tex.getView<vkw::ColorImageView>(device, tex.format(), 2, mapping);
     set().write(0, m_buffer);
     set().write(1, derivatives, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+    set().write(2, turbulence, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
 }
 
 WaveSettings::WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water, WaveSurfaceTexture &texture,
@@ -299,7 +300,8 @@ WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::Shader
                               {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-                              {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1),
+                              {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+                              {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1),
         m_dyn_params(device,
                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
         m_dyn_params_mapped(m_dyn_params.map()) {
@@ -799,6 +801,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::FinalTextureCombiner::FinalTextur
     auto &dis4 = specTex.getView<vkw::ColorImageView>(device, specTex.format(), 7, mappping);
     auto &disp = final.texture().getView<vkw::ColorImageView>(device, final.texture().format(), 0, mappping);
     auto &deriv = final.texture().getView<vkw::ColorImageView>(device, final.texture().format(), 1, mappping);
+    auto &turbulence = final.texture().getView<vkw::ColorImageView>(device, final.texture().format(), 2, mappping);
 
     set().writeStorageImage(0, dis1);
     set().writeStorageImage(1, dis2);
@@ -806,6 +809,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::FinalTextureCombiner::FinalTextur
     set().writeStorageImage(3, dis4);
     set().writeStorageImage(4, disp);
     set().writeStorageImage(5, deriv);
+    set().writeStorageImage(6, turbulence);
 
 }
 

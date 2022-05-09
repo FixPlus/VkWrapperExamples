@@ -61,6 +61,7 @@ namespace TestApp {
         static vkw::VertexInputStateCreateInfo<vkw::per_vertex<PrimitiveAttrs, 0>> m_vertexInputStateCreateInfo;
 
         virtual void preDraw(RenderEngine::GraphicsRecordingState &buffer) {}
+        virtual glm::vec4 arbitraryData(glm::vec2 tileBegin,  glm::vec2 tileEnd) { return glm::vec4{0.0f}; };
 
         virtual std::pair<float, float> heightBounds() const { return {0.0f, 1.0f}; };
     };

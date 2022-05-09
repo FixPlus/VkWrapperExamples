@@ -10,8 +10,11 @@ layout (binding = 2, rg32f) uniform image2D displacementYdxZdx;
 layout (binding = 3, rg32f) uniform image2D displacementYdzZdz;
 layout (binding = 4, rgba32f) uniform image2D displacement;
 layout (binding = 5, rgba32f) uniform image2D derivatives;
+layout (binding = 6, rgba32f) uniform image2D turbulence;
 
 void main(){
+    float Lambda = 1.0f;
+    float DeltaTime = 0.25f;
     ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
     uint size = 16 * gl_NumWorkGroups.x;
     vec2 disXY = imageLoad(displacementXY, ivec2(id)).rg;
@@ -19,8 +22,11 @@ void main(){
     vec2 YdxZdx = imageLoad(displacementYdxZdx, ivec2(id)).rg;
     vec2 YdzZdz = imageLoad(displacementYdzZdz, ivec2(id)).rg;
     vec4 disXYZ = vec4(disXY, disZXdx.x, 1.0f);
-    vec4 deriv = vec4(YdxZdx.x, YdzZdz.x, disZXdx.x, YdzZdz.y);
+    vec4 deriv = vec4(YdxZdx.x, YdzZdz.x, disZXdx.y, YdzZdz.y);
+    float jacobian = (1 + Lambda * disZXdx.y) * (1 + Lambda * YdzZdz.y) - Lambda * Lambda * YdxZdx.y * YdxZdx.y;
+    float turb = DeltaTime * 0.5 / max(jacobian, 0.5);
 
     imageStore(displacement, ivec2(id), disXYZ);
     imageStore(derivatives, ivec2(id), deriv);
+    imageStore(turbulence, id, vec4(min(turb, jacobian)));
 }
