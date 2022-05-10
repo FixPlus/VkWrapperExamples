@@ -62,12 +62,22 @@ public:
         return m_cascades.at(cascadeIndex).texture();
     }
 
+
+
     struct GlobalParams {
         uint32_t Size = 256;
         float LengthScale = 100.0f;
         float CutoffHigh = 3000.0f;
         float CutoffLow = 0.1f;
     };
+
+    struct UBO {
+        glm::vec4 scale = glm::vec4{100.0f};
+    } ubo;
+
+    vkw::UniformBuffer<UBO> const& scalesBuffer() const{
+        return m_scales_buffer;
+    }
 
     GlobalParams &cascadeParams(uint32_t cascadeIndex) {
         return m_cascades.at(cascadeIndex).params();
@@ -195,7 +205,7 @@ public:
     void computeSpectrum();
 
     struct SpectrumParameters {
-        float scale = 0.01f;
+        float scale = 0.1f;
         float angle = 0.0f;
         float spreadBlend = 0.3f;
         float swell = 0.0f;
@@ -216,6 +226,8 @@ public:
         dynamicSpectrumParams.time += deltaTime;
         *m_dyn_params_mapped = dynamicSpectrumParams;
         m_dyn_params.flush();
+        *m_scales_buffer_mapped = ubo;
+        m_scales_buffer.flush();
     }
 
 
@@ -243,7 +255,7 @@ private:
                                   RenderEngine::ComputeLayout &combinerLayout,
                                   vkw::Device &device, vkw::UniformBuffer<SpectrumParameters> const &spectrumParams,
                                   vkw::UniformBuffer<DynamicSpectrumParams> const &dynParams,
-                                  uint32_t cascadeSize);
+                                  uint32_t cascadeSize, float cascadeScale);
 
         void precomputeStaticSpectrum(vkw::CommandBuffer &buffer);
 
@@ -265,7 +277,7 @@ private:
         public:
             SpectrumTextures(TestApp::PrecomputeImageLayout &spectrumPrecomputeLayout,
                              vkw::UniformBuffer<SpectrumParameters> const &spectrumParams, vkw::Device &device,
-                             uint32_t cascadeSize);
+                             uint32_t cascadeSize, float cascadeScale);
 
             GlobalParams globalParameters{};
 
@@ -307,6 +319,9 @@ private:
     vkw::UniformBuffer<SpectrumParameters> m_spectrum_params;
     SpectrumParameters *m_params_mapped;
 
+    vkw::UniformBuffer<UBO> m_scales_buffer;
+    UBO* m_scales_buffer_mapped;
+
     std::vector<WaveSurfaceTextureCascade> m_cascades;
     std::reference_wrapper<vkw::Device> m_device;
     vkw::UniformBuffer<DynamicSpectrumParams> m_dyn_params;
@@ -317,15 +332,12 @@ private:
 class WaterSurface : public TestApp::Grid, public RenderEngine::GeometryLayout {
 public:
 
-    struct UBO {
-        float scale = 100.0f;
-    } ubo;
+
 
     bool wireframe = false;
 
     void update(float deltaTime) {
-        *m_geometry.m_ubo_mapped = ubo;
-        m_geometry.m_ubo.flush();
+
     }
 
     WaterSurface(vkw::Device &device, WaveSurfaceTexture &texture);
@@ -334,8 +346,6 @@ public:
 private:
 
     struct Geometry : public RenderEngine::Geometry {
-        vkw::UniformBuffer<UBO> m_ubo;
-        UBO *m_ubo_mapped;
         vkw::Sampler m_sampler;
 
         Geometry(vkw::Device &device, WaterSurface &surface, WaveSurfaceTexture &texture);
@@ -352,28 +362,7 @@ protected:
 
 class WaterMaterial : public RenderEngine::MaterialLayout {
 public:
-    WaterMaterial(vkw::Device &device, WaveSurfaceTexture &texture, bool wireframe = false)
-            : RenderEngine::MaterialLayout(device,
-                                           RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="water", .setBindings={
-                                                   vkw::DescriptorSetLayoutBinding{
-                                                           0,
-                                                           VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                                                   vkw::DescriptorSetLayoutBinding{
-                                                           1,
-                                                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                                   vkw::DescriptorSetLayoutBinding{
-                                                           2,
-                                                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .rasterizationState={
-                                                   VK_FALSE,
-                                                   VK_FALSE,
-                                                   wireframe
-                                                   ? VK_POLYGON_MODE_LINE
-                                                   : VK_POLYGON_MODE_FILL,VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, .depthTestState=vkw::DepthTestStateCreateInfo{
-                                                   VK_COMPARE_OP_LESS,
-                                                   true}, .maxMaterials=1}),
-              m_material(device, *this, texture) {
-
-    };
+    WaterMaterial(vkw::Device &device, WaveSurfaceTexture &texture, bool wireframe = false);
 
     struct WaterDescription {
         glm::vec4 deepWaterColor = glm::vec4(0.0f, 0.01f, 0.3f, 1.0f);

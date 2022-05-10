@@ -137,7 +137,7 @@ int main() {
 
     auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass, skybox};
     auto globalStateSettings = GlobalLayoutSettings{gui, globalState};
-    auto waveSurfaceTexture = WaveSurfaceTexture(device, shaderLoader, 256);
+    auto waveSurfaceTexture = WaveSurfaceTexture(device, shaderLoader, 256, 3);
     auto waves = WaterSurface(device, waveSurfaceTexture);
     auto waveMaterial = WaterMaterial{device, waveSurfaceTexture};
     auto waveMaterialWireframe = WaterMaterial{device, waveSurfaceTexture, true};

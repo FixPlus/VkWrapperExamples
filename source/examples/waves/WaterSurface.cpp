@@ -5,8 +5,10 @@
 WaterSurface::WaterSurface(vkw::Device &device, WaveSurfaceTexture &texture) : TestApp::Grid(device),
                                                                                RenderEngine::GeometryLayout(device,
                                                                                                             RenderEngine::GeometryLayout::CreateInfo{.vertexInputState = &m_vertexInputStateCreateInfo, .substageDescription={.shaderSubstageName="waves",
-                                                                                                                    .setBindings = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                                                                                                                    {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}, .pushConstants={
+                                                                                                                    .setBindings = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                                                                                                                    {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                                                                                                                    {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                                                                                                                                    {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}, .pushConstants={
                                                                                                                             VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=
                                                                                                                             8 *
                                                                                                                             sizeof(float)}}}, .maxGeometries=1}),
@@ -21,9 +23,6 @@ void WaterSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer) {
 
 WaterSurface::Geometry::Geometry(vkw::Device &device, WaterSurface &surface, WaveSurfaceTexture &texture)
         : RenderEngine::Geometry(surface),
-          m_ubo(device,
-                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-          m_ubo_mapped(m_ubo.map()),
           m_sampler(m_sampler_create(device)) {
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -31,13 +30,17 @@ WaterSurface::Geometry::Geometry(vkw::Device &device, WaterSurface &surface, Wav
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto &cascade = texture.cascade(0);
+    set().write(0, texture.scalesBuffer());
 
-    auto &displacement = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 0, mapping);
-    auto &derivatives = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 1, mapping);
+    auto cascadeCount = texture.cascadesCount();
+    for(int i = 0; i < cascadeCount; ++i){
+        auto &cascade = texture.cascade(i);
+        auto &displacement = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 0, mapping);
+        auto &derivatives = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 1, mapping);
+        set().write(i + 1, displacement, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+    }
 
-    set().write(0, displacement, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
-    set().write(1, m_ubo);
+
 
 }
 
@@ -62,6 +65,28 @@ vkw::Sampler WaterSurface::Geometry::m_sampler_create(vkw::Device &device) {
 
     return {device, createInfo};
 }
+WaterMaterial::WaterMaterial(vkw::Device &device, WaveSurfaceTexture &texture, bool wireframe)
+: RenderEngine::MaterialLayout(device,
+        RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="water", .setBindings={
+        {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+        {1,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+        {2,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        {3,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        {4,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        {5,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        {6,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        {7,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
+                                                 .rasterizationState={
+        VK_FALSE,
+        VK_FALSE,
+        wireframe
+        ? VK_POLYGON_MODE_LINE
+        : VK_POLYGON_MODE_FILL,VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, .depthTestState=vkw::DepthTestStateCreateInfo{
+        VK_COMPARE_OP_LESS,
+        true}, .maxMaterials=1}),
+m_material(device, *this, texture) {
+
+};
 
 WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMaterial, WaveSurfaceTexture &texture)
         : RenderEngine::Material(
@@ -74,12 +99,17 @@ WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMater
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto &tex = texture.cascade(0);
-    auto &derivatives = tex.getView<vkw::ColorImageView>(device, tex.format(), 1, mapping);
-    auto &turbulence = tex.getView<vkw::ColorImageView>(device, tex.format(), 2, mapping);
+
     set().write(0, m_buffer);
-    set().write(1, derivatives, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
-    set().write(2, turbulence, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+    set().write(1, texture.scalesBuffer());
+    auto cascadeCount = texture.cascadesCount();
+    for(int i = 0; i < cascadeCount; ++i) {
+        auto &tex = texture.cascade(i);
+        auto &derivatives = tex.getView<vkw::ColorImageView>(device, tex.format(), 1, mapping);
+        auto &turbulence = tex.getView<vkw::ColorImageView>(device, tex.format(), 2, mapping);
+        set().write(2 + i, derivatives, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+        set().write(2 + cascadeCount + i, turbulence, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+    }
 }
 
 WaveSettings::WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water, WaveSurfaceTexture &texture,
@@ -102,7 +132,6 @@ void WaveSettings::onGui() {
 
     if (!ImGui::CollapsingHeader("Surface waves"))
         return;
-    ImGui::SliderFloat("Scale", &m_water.get().ubo.scale, 0.0f, 1000.0f);
     ImGui::SliderFloat("Stretch", &m_texture.get().dynamicSpectrumParams.stretch, 0.0f, 10.0f);
 
     m_need_update_static_spectrum =
@@ -148,7 +177,7 @@ void WaveSettings::onGui() {
     ImGui::Text("alpha: %.3f, peak omega %.3f", m_texture.get().spectrumParameters.alpha, m_texture.get().spectrumParameters.peakOmega);
 
     for (int i = 0; i < m_texture.get().cascadesCount(); ++i) {
-        if (!ImGui::CollapsingHeader(("Cascade" + std::to_string(i)).c_str()))
+        if (!ImGui::TreeNode(("Cascade" + std::to_string(i)).c_str()))
             continue;
         auto &params = m_texture.get().cascadeParams(i);
 
@@ -157,9 +186,11 @@ void WaveSettings::onGui() {
         m_need_update_static_spectrum = ImGui::SliderFloat("Cutoff high", &params.CutoffHigh, 200.0f, 10000.0f) ||
                                         m_need_update_static_spectrum;
         if (ImGui::SliderFloat("Scale", &params.LengthScale, 10.0f, 1000.0f)) {
+            *(&m_texture.get().ubo.scale.x + i) = params.LengthScale;
             m_need_update_static_spectrum = true;
-            m_water.get().ubo.scale = params.LengthScale;
         }
+
+        ImGui::TreePop();
     }
 
     if (m_need_update_static_spectrum) {
@@ -292,7 +323,7 @@ WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::Shader
                               {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-                              {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1),
+                              {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, cascades),
         m_combiner_layout(device, shaderLoader, RenderEngine::SubstageDescription{
                 .shaderSubstageName="combine_water_texture",
                 .setBindings={{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
@@ -301,15 +332,27 @@ WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::Shader
                               {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
                               {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-                              {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1),
+                              {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, cascades),
         m_dyn_params(device,
                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        m_dyn_params_mapped(m_dyn_params.map()) {
+        m_dyn_params_mapped(m_dyn_params.map()),
+        m_scales_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+        m_scales_buffer_mapped{m_scales_buffer.map()}{
 
+    m_cascades.reserve(cascades);
 
+    float cascadeSizes[3] = {491.0f, 41.0f, 11.0f};
+    float cutoffsLow[3] = {0.01f, 3.0f, 7.0f};
+    float cutoffsHigh[3] = {3.0f, 7.0f, 300.0f};
     for (int i = 0; i < cascades; ++i) {
-        m_cascades.emplace_back(*this, m_spectrum_precompute_layout, m_dyn_spectrum_gen_layout, m_combiner_layout,
-                                device, m_spectrum_params, m_dyn_params, baseCascadeSize / (1u << i));
+
+        auto& cascade = m_cascades.emplace_back(*this, m_spectrum_precompute_layout, m_dyn_spectrum_gen_layout, m_combiner_layout,
+                                device, m_spectrum_params, m_dyn_params, baseCascadeSize, cascadeSizes[i]);
+        *(&ubo.scale.x + i) = cascade.params().LengthScale;
+        cascade.params().CutoffHigh = cutoffsHigh[i];
+        cascade.params().CutoffLow = cutoffsLow[i];
+
+
     }
 
     computeSpectrum();
@@ -345,9 +388,9 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::WaveSurfaceTextureCascade(WaveSur
                                                                          vkw::Device &device,
                                                                          vkw::UniformBuffer<SpectrumParameters> const &spectrumParams,
                                                                          vkw::UniformBuffer<DynamicSpectrumParams> const &dynParams,
-                                                                         uint32_t cascadeSize) :
+                                                                         uint32_t cascadeSize, float cascadeScale) :
         WaveSurfaceTextureCascadeImageHandler(device, cascadeSize),
-        m_spectrum_textures(spectrumPrecomputeLayout, spectrumParams, device, cascadeSize),
+        m_spectrum_textures(spectrumPrecomputeLayout, spectrumParams, device, cascadeSize, cascadeScale),
         m_device(device),
         m_layout(spectrumPrecomputeLayout),
         m_dynamic_spectrum(dynSpectrumCompute, m_spectrum_textures, dynParams, device, cascadeSize),
@@ -534,7 +577,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
 
 WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTextures(
         TestApp::PrecomputeImageLayout &spectrumPrecomputeLayout,
-        vkw::UniformBuffer<SpectrumParameters> const &spectrumParams, vkw::Device &device, uint32_t cascadeSize)
+        vkw::UniformBuffer<SpectrumParameters> const &spectrumParams, vkw::Device &device, uint32_t cascadeSize, float cascadeScale)
         : vkw::ColorImage2DArray<2>{device.getAllocator(),
                                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                                     VK_FORMAT_R32G32B32A32_SFLOAT,
@@ -547,6 +590,8 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTexture
           m_global_params(device,
                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
           m_globals_mapped(m_global_params.map()) {
+    globalParameters.Size = cascadeSize;
+    globalParameters.LengthScale = (float)cascadeScale;
     VkImageMemoryBarrier transitLayout1{};
     transitLayout1.image = *this;
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;

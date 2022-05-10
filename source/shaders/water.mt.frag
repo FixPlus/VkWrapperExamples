@@ -13,8 +13,16 @@ layout (set = 2, binding = 0) uniform Waves{
     vec2 metallicRoughness;
 }waves;
 
-layout (set = 2, binding = 1) uniform sampler2D derivativesMap;
-layout (set = 2, binding = 2) uniform sampler2D turbulenceMap;
+layout (set = 2, binding = 1) uniform Ubo{
+    vec4 scales;
+} ubo;
+
+layout (set = 2, binding = 2) uniform sampler2D derivativesMap1;
+layout (set = 2, binding = 3) uniform sampler2D derivativesMap2;
+layout (set = 2, binding = 4) uniform sampler2D derivativesMap3;
+layout (set = 2, binding = 5) uniform sampler2D turbulenceMap1;
+layout (set = 2, binding = 6) uniform sampler2D turbulenceMap2;
+layout (set = 2, binding = 7) uniform sampler2D turbulenceMap3;
 
 SurfaceInfo Material(){
 
@@ -22,15 +30,17 @@ SurfaceInfo Material(){
     SurfaceInfo ret;
 
     ret.position = inWorldPos;
-    vec4 derivatives = texture(derivativesMap, inUVW.xy);
-    float turbulence = texture(turbulenceMap, inUVW.xy).r;
+    vec4 derivatives = texture(derivativesMap1, inUVW.xy / ubo.scales.x) + texture(derivativesMap2, inUVW.xy / ubo.scales.y)  + texture(derivativesMap3, inUVW.xy / ubo.scales.z);
+    float turbulence = texture(turbulenceMap1, inUVW.xy / ubo.scales.x).r + texture(turbulenceMap2, inUVW.xy / ubo.scales.y).r + texture(turbulenceMap3, inUVW.xy / ubo.scales.z).r;
+    turbulence *=2.0f;
+    turbulence = clamp(turbulence, 0.0f, 1.0f);
     vec3 binormal = normalize(vec3(1.0f, derivatives.x * 1.0f, 0.0f));
     vec3 tangent = normalize(vec3(0.0f, derivatives.y * 1.0f, 1.0f));
-    ret.albedo = vec4(0.0f, 0.0f, 1.0f, 1.0f) * (1.0f - turbulence * 4.0f) + vec4(1.0f) * turbulence * 4.0f; //vec4(1.0f, 1.0f - turbulence * 4.0f, 1.0f - turbulence * 4.0f, 1.0f);
+    ret.albedo = vec4(0.0f, 0.0f, 1.0f, 1.0f) * (1.0f - turbulence) + vec4(1.0f) * turbulence;
     ret.normal = normalize(cross( binormal, tangent));
     ret.cameraOffset = inViewPos;
-    ret.metallic =  (1.0f - turbulence * 4.0f);
-    ret.roughness = turbulence * 4.0f;
+    ret.metallic =  (1.0f - turbulence);
+    ret.roughness = turbulence;
 
     return ret;
 }

@@ -2,7 +2,7 @@
 
 TestApp::PrecomputeImageLayout::PrecomputeImageLayout(vkw::Device& device,
                                                       RenderEngine::ShaderLoaderInterface& shaderLoader, RenderEngine::SubstageDescription stageDescription, uint32_t xGroupSize, uint32_t yGroupSize):
-                                                      RenderEngine::ComputeLayout(device, shaderLoader, m_emplace_image_binding(stageDescription), 1),
+                                                      RenderEngine::ComputeLayout(device, shaderLoader, m_emplace_image_binding(stageDescription), 10),
                                                       m_xGroupSize(xGroupSize),
                                                       m_yGroupSize(yGroupSize)
 {
