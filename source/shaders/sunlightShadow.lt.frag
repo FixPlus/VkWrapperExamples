@@ -262,7 +262,7 @@ void Lighting(SurfaceInfo surfaceInfo){
     vec3 ambientColor = inScatter(fragmentHeight, reflectSpherical, atmoDepth(fragmentHeight, reflectSpherical.y), surfaceInfo.position, surfaceInfo.cameraOffset);
     float transit = clamp((reflectSpherical.y - PI / 4.0f) / (PI / 4.0f), 0.0f, 1.0f);
     ambientColor = (1.0f - transit) * ambientColor + groundColor * transit;
-    vec3 diffuse = surfaceInfo.albedo.xyz * (clamp(ambientColor, 0.0f, 0.3f) + clamp(sunIrradiance * clamp(dot(L, N), 0.0f, 1.0f), 0.0f, 0.4f));
+    vec3 diffuse = surfaceInfo.albedo.xyz * (clamp(ambientColor, 0.0f, 0.3f) + clamp(clamp(sunIrradiance, 0.0f, 1.0f) * clamp(dot(L, N), 0.0f, 1.0f), 0.0f, 0.4f));
 
     vec3 specular = (clamp(sunIrradiance, 0.0f, 1.0f) * pow(clamp(dot(L, -reflectDir.xyz), 0.0f, 1.0f), 128.0f) + 0.3f * clamp(ambientColor, 0.0f, 1.0f)) * F;
 
