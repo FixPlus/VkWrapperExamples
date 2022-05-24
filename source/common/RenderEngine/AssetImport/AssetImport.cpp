@@ -209,7 +209,7 @@ RenderEngine::ShaderImporter::ShaderImporter(vkw::Device &device, std::string co
         AssetImporterBase(rootDirectory), m_device(device), m_context(SPV_ENV_VULKAN_1_0),
         m_message_consumer([](spv_message_level_t messageLevel, const char* message, const spv_position_t position, const char*){
             if(messageLevel == SPV_MSG_ERROR){
-                std::cerr <<"SPIRV-Link failed. Error message:" + std::string(message);
+                std::cerr <<"SPIRV-Link failed. Error message: " + std::string(message) << std::endl;
             }
         }),
         m_general_vert(read_binary<uint32_t>("general.vert.spv")),
@@ -221,9 +221,9 @@ std::vector<uint32_t> RenderEngine::ShaderImporter::m_link(std::vector<std::vect
     std::vector<uint32_t const*> bin_refs{};
     std::vector<size_t> bin_sizes{};
 
-    for(int i = 0; i < binaries.size(); ++i){
-        bin_refs.push_back(binaries[i]->data());
-        bin_sizes.push_back(binaries[i]->size());
+    for(auto binary : binaries){
+        bin_refs.push_back(binary->data());
+        bin_sizes.push_back(binary->size());
     }
     std::vector<uint32_t> ret{};
     auto result = spvtools::Link(m_context, bin_refs.data(), bin_sizes.data(), binaries.size(), &ret);

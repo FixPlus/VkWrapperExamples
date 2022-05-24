@@ -24,9 +24,11 @@ void main(){
     vec4 disXYZ = vec4(disXY, disZXdx.x, 1.0f);
     vec4 deriv = vec4(YdxZdx.x, YdzZdz.x, disZXdx.y, YdzZdz.y);
     float jacobian = (1 + Lambda * disZXdx.y) * (1 + Lambda * YdzZdz.y) - Lambda * Lambda * YdxZdx.y * YdxZdx.y;
-    float turb = DeltaTime * 0.5 / max(jacobian, 0.5);
+    float initTurb = imageLoad(turbulence, id).x;
+    initTurb *= exp(-(DeltaTime/0.2f));
+    initTurb = max(initTurb, DeltaTime * 0.5 / max(jacobian, 0.5));
 
     imageStore(displacement, ivec2(id), disXYZ);
     imageStore(derivatives, ivec2(id), deriv);
-    imageStore(turbulence, id, vec4(min(turb, jacobian)));
+    imageStore(turbulence, id, vec4(min(initTurb, jacobian)));
 }

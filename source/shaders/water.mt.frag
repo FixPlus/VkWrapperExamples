@@ -33,7 +33,7 @@ SurfaceInfo Material(){
     vec4 derivatives = texture(derivativesMap1, inUVW.xy / ubo.scales.x) + texture(derivativesMap2, inUVW.xy / ubo.scales.y)  + texture(derivativesMap3, inUVW.xy / ubo.scales.z);
     float turbulence = texture(turbulenceMap1, inUVW.xy / ubo.scales.x).r + texture(turbulenceMap2, inUVW.xy / ubo.scales.y).r + texture(turbulenceMap3, inUVW.xy / ubo.scales.z).r;
     turbulence *= 2.0f;
-    turbulence = pow(turbulence, 4.0f);
+    turbulence = pow(turbulence, 8.0f);
     turbulence = clamp(turbulence, 0.0f, 1.0f);
     turbulence *= 0.8f;
     vec3 binormal = normalize(vec3(1.0f, derivatives.x * 1.0f, 0.0f));
@@ -41,8 +41,8 @@ SurfaceInfo Material(){
     ret.albedo = vec4(1.0f);
     ret.normal = -normalize(cross( binormal, tangent));
     ret.cameraOffset = inViewPos;
-    ret.metallic =  (1.0f - turbulence);
-    ret.roughness = turbulence;
+    ret.metallic =  0.8f - turbulence;
+    ret.roughness = 0.25f + clamp(turbulence, 0.0f, 1.0f);
 
     return ret;
 }

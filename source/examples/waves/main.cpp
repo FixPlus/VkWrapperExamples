@@ -80,7 +80,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, true);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, vulkanLib.hasLayer("VK_LAYER_KHRONOS_validation"));
 
     auto devs = renderInstance.enumerateAvailableDevices();
 
@@ -96,8 +96,9 @@ int main() {
 
     // to support wireframe display
     deviceDesc.enableFeature(vkw::feature::fillModeNonSolid{});
-    // to support anisotropy filtering in ocean
-    deviceDesc.enableFeature(vkw::feature::samplerAnisotropy{});
+    // to support anisotropy filtering (if possible) in ocean
+    if(deviceDesc.isFeatureSupported(vkw::feature::samplerAnisotropy{}))
+        deviceDesc.enableFeature(vkw::feature::samplerAnisotropy{});
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 

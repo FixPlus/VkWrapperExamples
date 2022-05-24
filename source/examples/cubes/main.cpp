@@ -265,7 +265,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, true);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, vulkanLib.hasLayer("VK_LAYER_KHRONOS_validation"));
 
     std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
                   [](vkw::Instance::extension_const_iterator::value_type const &ext) {

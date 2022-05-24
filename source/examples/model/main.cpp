@@ -90,7 +90,7 @@ int main() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, true);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, vulkanLib.hasLayer("VK_LAYER_KHRONOS_validation"));
 
     auto devs = renderInstance.enumerateAvailableDevices();
 
