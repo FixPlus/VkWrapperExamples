@@ -6,6 +6,7 @@
 #include "RenderEngine/RecordingState.h"
 #include "RenderEngine/AssetImport/AssetImport.h"
 #include <glm/glm.hpp>
+#include <GUI.h>
 #include "Camera.h"
 
 namespace TestApp{
@@ -20,10 +21,11 @@ namespace TestApp{
 
         struct UBO
         {
-            glm::vec4 viewPos = glm::vec4{0.0f};
-            glm::vec4 viewDir = glm::vec4{1.0f, 0.0f, 0.0f, 0.0f};
-            glm::vec4 viewRef1 = glm::vec4{0.0f, 1.0f, 0.0f, 0.0f};
-            glm::vec4 viewRef2 = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f};
+            glm::mat4 invProjView;
+            glm::vec4 cameraPos;
+            float near_plane;
+            float far_plane;
+            glm::vec2 pad;
             glm::vec4 lightPos = glm::vec4{1.0f, 0.0f, 1.0f, 0.0f};
             glm::vec4 params = glm::vec4{1.0f};
             float shadowOption = -1.0f; // < 0 == shadow off ; >= 0 == shadow on
@@ -52,6 +54,15 @@ namespace TestApp{
         RenderEngine::LightingLayout m_lighting_layout;
         RenderEngine::Lighting m_lighting;
 
+    };
+
+    class FractalSettings: public GUIWindow{
+    public:
+        FractalSettings(GUIFrontEnd &gui, Fractal& fractal);
+    protected:
+        void onGui() override;
+    private:
+        std::reference_wrapper<Fractal> m_fractal;
     };
 }
 #endif //TESTAPP_FRACTAL_H

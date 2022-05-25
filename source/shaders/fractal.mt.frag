@@ -6,10 +6,11 @@ layout (binding = 1, set = 2) uniform sampler2D samplerColor1;
 
 layout (binding = 0, set = 2) uniform UBO
 {
-    vec4 viewPos;
-    vec4 viewDir;
-    vec4 viewRef1;
-    vec4 viewRef2;
+    mat4 invProjView;
+    vec4 cameraPos;
+    float near;
+    float far;
+    vec2 pad;
     vec4 lightPos;
     vec4 params;
     float shadowOption; // < 0 == shadow off ; >= 0 == shadow on
@@ -35,8 +36,8 @@ vec4 mirrorNormals[NUM_OF_MIRRORS] =   {vec4(-1.0f, 0.0f, -1.0f, 0.0f), vec4(1.0
 vec4(0.0f, -1.0f, 0.0f, 0.0f), vec4(-1.0f, -1.0f, 0.0f, 0.0f), vec4(1.0f, -1.0f, 0.0f, 0.0f),
 vec4(-1.0f, 0.0f, 0.0f, 0.0f)};
 
-#define SPOUNGE_UNIT 10.0f
-#define RANK 9.0f
+#define SPOUNGE_UNIT 1.0f
+#define RANK 11.0f
 
 
 #define SHAPE_CUBE 1
@@ -44,7 +45,7 @@ vec4(-1.0f, 0.0f, 0.0f, 0.0f)};
 
 vec4 ShapeOffset(vec4 pos){ //x y z for vector, a for length
     #ifdef SHAPE_BALL
-    float new_len = length(pos) - 0.5f;
+    float new_len = length(pos.xyz) - 0.5f;
     vec3 dir = normalize(pos.xyz);
     return vec4(dir, max(0.0f, new_len));
     #elif SHAPE_CUBE
@@ -60,7 +61,7 @@ vec4 ShapeOffset(vec4 pos){ //x y z for vector, a for length
     float divZ = pos.z > 0.5f ? (pos.z - 0.5f) : (pos.z < -0.5f ? pos.z + 0.5f : 0.0f);
     return vec4(dir, sqrt(divX * divX + divY * divY + divZ * divZ));
     #elif SHAPE_TORUS
-
+    pos.w = 0.0f;
     vec4 ret;
 
     vec4 torusFaceNormal = vec4(1.0f, 0.0f, 0.0f, 0.0f);
@@ -264,7 +265,7 @@ vec4 closestNormal(vec4 pos){
 }
 
 vec4 getMarchDirection(){
-    vec4 dir = ubo.viewDir + (ubo.viewRef1 * tan((inUVW.x - 0.5f) * 16.0f / 9.0f * FOV)) + (ubo.viewRef2 * tan((inUVW.y - 0.5f) * FOV));
+    vec4 dir = vec4((ubo.invProjView * vec4((2.0f * inUVW.xy - vec2(1.0f)) * (ubo.far - ubo.near), ubo.far + ubo.near, ubo.far - ubo.near)).xyz, 0.0f);
     dir = normalize(dir);
     return dir;
 }
@@ -280,7 +281,7 @@ vec4 fractal(){
 
 
     vec4 dir = getMarchDirection(); //direction od ray shooting out of camera
-    vec4 curPos = ubo.viewPos; // contains the posirion of ray's front point
+    vec4 curPos = ubo.cameraPos; // contains the posirion of ray's front point
 
 
     int n = 0; //count of steps

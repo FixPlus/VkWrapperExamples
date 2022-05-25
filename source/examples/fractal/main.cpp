@@ -57,6 +57,7 @@ protected:
 
         ImGui::SliderFloat("Cam rotate inertia", &camera.rotateInertia, 0.1f, 5.0f);
         ImGui::SliderFloat("Mouse sensitivity", &m_window.get().mouseSensitivity, 1.0f, 10.0f);
+        ImGui::SliderFloat("Camera speed", &m_window.get().camera().force, 20.0f, 1000.0f);
 
         ImGui::End();
 
@@ -127,6 +128,7 @@ int main(){
     auto renderComplete = vkw::Semaphore{device};
 
     auto fractal = Fractal{device, lightPass, 0, textureLoader};
+    auto fractalSettings = FractalSettings{gui, fractal};
 
     while(!window.shouldClose()){
         window.pollEvents();

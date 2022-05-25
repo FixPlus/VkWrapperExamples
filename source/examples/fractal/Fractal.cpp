@@ -27,10 +27,18 @@ void TestApp::Fractal::draw(RenderEngine::GraphicsRecordingState &recorder) {
 }
 
 void TestApp::Fractal::update(const TestApp::CameraPerspective &camera) {
-    ubo.viewPos = glm::vec4{camera.position(), 1.0f};
-    ubo.viewDir = glm::vec4{-camera.viewDirection(), 0.0f};
-    ubo.viewRef1 = glm::vec4{glm::normalize(glm::cross(-camera.viewDirection(), glm::vec3{0.0f, 1.0f, 0.0f})), 0.0f};
-    ubo.viewRef2 = glm::vec4{glm::cross(-camera.viewDirection(), glm::vec3{ubo.viewRef1}), 0.0f};
+    ubo.near_plane = camera.nearPlane();
+    ubo.far_plane = camera.farPlane();
+    glm::mat4 view = glm::mat4(1.0f);
+
+    view = glm::rotate(view, glm::radians(camera.psi()),
+                         glm::vec3(1.0f, 0.0f, 0.0f));
+    view = glm::rotate(view, glm::radians(camera.phi()),
+                         glm::vec3(0.0f, 1.0f, 0.0f));
+    view = glm::rotate(view, glm::radians(camera.tilt()),
+                         glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.invProjView = glm::inverse(camera.projection() * view);
+    ubo.cameraPos = glm::vec4(camera.position(), 1.0f);
     m_material.update(ubo);
 }
 
@@ -57,4 +65,12 @@ TestApp::Fractal::FractalMaterial::FractalMaterial(RenderEngine::MaterialLayout 
 void TestApp::Fractal::FractalMaterial::update(const TestApp::Fractal::UBO &ubo) {
     *m_mapped = ubo;
     m_buffer.flush();
+}
+
+TestApp::FractalSettings::FractalSettings(TestApp::GUIFrontEnd &gui, TestApp::Fractal &fractal):
+        GUIWindow(gui, WindowSettings{.title="Fractal",.autoSize=true}), m_fractal(fractal){}
+
+void TestApp::FractalSettings::onGui() {
+    ImGui::SliderFloat("Mutate", &m_fractal.get().ubo.params.x, -2.0f, 2.0f);
+
 }
