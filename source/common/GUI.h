@@ -192,11 +192,11 @@ namespace TestApp {
         friend class GUIFrontEnd;
         std::reference_wrapper<GUIFrontEnd> m_parent;
         bool m_opened = true;
-        ImGuiWindowFlags m_flags;
+        WindowSettings m_settings;
+        ImGuiWindowFlags m_flags{};
 
         void m_compileFlags();
 
-        WindowSettings m_settings;
         void drawWindow();
     protected:
 

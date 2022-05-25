@@ -459,6 +459,7 @@ namespace TestApp {
     }
 
     GUIWindow::GUIWindow(GUIFrontEnd& parent, WindowSettings settings): m_parent(parent), m_settings(std::move(settings)){
+        m_compileFlags();
         m_parent.get().m_windows.emplace(this);
     }
 
