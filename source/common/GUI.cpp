@@ -444,6 +444,13 @@ namespace TestApp {
         return io.WantCaptureMouse;
     }
 
+    void WindowIO::mouseScroll(double xOffset, double yOffset) {
+        ImGui::SetCurrentContext(m_context);
+        auto& io = ImGui::GetIO();
+
+        io.AddMouseWheelEvent(xOffset, yOffset);
+    }
+
     GUIBackend::Material::Material(vkw::Device &device, RenderEngine::MaterialLayout &layout,
                                    const vkw::Image2DView &texture, const vkw::Sampler &sampler): RenderEngine::Material(layout) {
         auto* pTexture = &texture;

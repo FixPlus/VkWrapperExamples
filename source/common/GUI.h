@@ -58,6 +58,8 @@ namespace TestApp {
 
         void charInput(unsigned int codepoint) override;
 
+        void mouseScroll(double xOffset, double yOffset) override;
+
         void onPollEvents() override;
 
     private:

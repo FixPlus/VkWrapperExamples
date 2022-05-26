@@ -163,6 +163,8 @@ namespace RenderEngine {
 
         virtual void mouseInput(int button, int action, int mods) {}
 
+        virtual void mouseScroll(double xOffset, double yOffset) {};
+
         virtual void charInput(unsigned int codepoint) {}
 
         virtual void onPollEvents() {};
@@ -189,6 +191,10 @@ namespace RenderEngine {
         static void character_callback(GLFWwindow* window, unsigned int codepoint)
         {
             m_windowMap.at(window)->charInput(codepoint);
+        }
+
+        static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+            m_windowMap.at(window)->mouseScroll(xoffset, yoffset);
         }
 
         static void initImpl();

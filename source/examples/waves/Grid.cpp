@@ -5,7 +5,9 @@ namespace TestApp {
     vkw::VertexInputStateCreateInfo<vkw::per_vertex<Grid::PrimitiveAttrs, 0>> Grid::m_vertexInputStateCreateInfo{};
 
     GridSettings::GridSettings(GUIFrontEnd &gui, Grid &grid, const std::string &title) : GUIWindow(gui,
-                                                                                                   WindowSettings{.title=title}),
+                                                                                                   WindowSettings{.title=title,
+                                                                                                                  .resizable=true,
+                                                                                                                  .autoSize=false}),
                                                                                          m_grid(grid) {
 
     }
