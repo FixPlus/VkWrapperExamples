@@ -44,6 +44,7 @@
 #include "AssetPath.inc"
 #include "Utils.h"
 #include "ShadowPass.h"
+#include "RenderEngine/Window/Boxer.h"
 
 using namespace TestApp;
 
@@ -255,7 +256,7 @@ private:
     } m_material;
 };
 
-int main() {
+int runCubes() {
 
 
     // 1. Create Instance and Window
@@ -602,4 +603,21 @@ int main() {
     device.waitIdle();
 
     return 0;
+}
+
+
+
+int main(){
+    try{
+        runCubes();
+    }
+    catch(vkw::VulkanError& e){
+        RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(vkw::Error& e){
+        RenderEngine::Boxer::show(e.what(), "vkw::Error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(std::runtime_error& e){
+        RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
+    }
 }

@@ -9,6 +9,7 @@
 #include "AssetPath.inc"
 #include <Queue.hpp>
 #include "Fractal.h"
+#include "RenderEngine/Window/Boxer.h"
 
 using namespace TestApp;
 
@@ -69,7 +70,7 @@ private:
 
 };
 
-int main(){
+int runFractal(){
 
     TestApp::SceneProjector window{800, 600, "Fractal"};
 
@@ -224,4 +225,20 @@ int main(){
     device.waitIdle();
 
     return 0;
+
+}
+
+int main(){
+    try{
+        runFractal();
+    }
+    catch(vkw::VulkanError& e){
+        RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(vkw::Error& e){
+        RenderEngine::Boxer::show(e.what(), "vkw::Error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(std::runtime_error& e){
+        RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
+    }
 }

@@ -16,6 +16,7 @@
 #include "LandSurface.h"
 #include "SkyBox.h"
 #include "ShadowPass.h"
+#include "RenderEngine/Window/Boxer.h"
 
 using namespace TestApp;
 
@@ -75,7 +76,7 @@ private:
 
 };
 
-int main() {
+int runWaves() {
     TestApp::SceneProjector window{800, 600, "Waves"};
 
     vkw::Library vulkanLib{};
@@ -365,4 +366,20 @@ int main() {
     device.waitIdle();
 
     return 0;
+}
+
+
+int main(){
+    try{
+        runWaves();
+    }
+    catch(vkw::VulkanError& e){
+        RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(vkw::Error& e){
+        RenderEngine::Boxer::show(e.what(), "vkw::Error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(std::runtime_error& e){
+        RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
+    }
 }

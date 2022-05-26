@@ -12,6 +12,8 @@
 #include "Model.h"
 #include "GlobalLayout.h"
 #include "SkyBox.h"
+#include "RenderEngine/Window/Boxer.h"
+
 using namespace TestApp;
 
 class GUI : public GUIFrontEnd, public GUIBackend {
@@ -85,7 +87,7 @@ std::vector<std::filesystem::path> listAvailableModels(std::filesystem::path con
     return ret;
 }
 
-int main() {
+int runModel() {
     TestApp::SceneProjector window{800, 600, "Model"};
 
     vkw::Library vulkanLib{};
@@ -349,5 +351,21 @@ int main() {
     device.waitIdle();
 
     return 0;
+}
+
+
+int main(){
+    try{
+        runModel();
+    }
+    catch(vkw::VulkanError& e){
+        RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(vkw::Error& e){
+        RenderEngine::Boxer::show(e.what(), "vkw::Error", RenderEngine::Boxer::Style::Error);
+    }
+    catch(std::runtime_error& e){
+        RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
+    }
 }
 
