@@ -45,10 +45,12 @@ void TestApp::Fractal::update(const TestApp::CameraPerspective &camera) {
 TestApp::Fractal::FractalMaterial::FractalMaterial(RenderEngine::MaterialLayout &parent, vkw::Device &device,
                                                    RenderEngine::TextureLoader &textureLoader):
         RenderEngine::Material(parent),
-        m_texture(textureLoader.loadTexture("image")),
+        m_texture(textureLoader.loadTexture("image", 8)),
+        m_sampler_with_mips(TestApp::createDefaultSampler(device, 8)),
         m_sampler(TestApp::createDefaultSampler(device)),
         m_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU,.requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        m_mapped(m_buffer.map()){
+        m_mapped(m_buffer.map()),
+        m_device(device){
 
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -56,7 +58,7 @@ TestApp::Fractal::FractalMaterial::FractalMaterial(RenderEngine::MaterialLayout 
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto& texView = m_texture.getView<vkw::ColorImageView>(device, m_texture.format(), mapping);
+    auto& texView = m_texture.getView<vkw::ColorImageView>(device, m_texture.format(), mapping, 0, m_texture.mipLevels());
 
     set().write(1, texView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
     set().write(0, m_buffer);
@@ -67,10 +69,28 @@ void TestApp::Fractal::FractalMaterial::update(const TestApp::Fractal::UBO &ubo)
     m_buffer.flush();
 }
 
+void TestApp::Fractal::FractalMaterial::switchSamplerMode() {
+
+    VkComponentMapping mapping{};
+    mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    m_sampler_mode = !m_sampler_mode;
+
+    auto& texView = m_texture.getView<vkw::ColorImageView>(m_device, m_texture.format(), mapping, 0, m_texture.mipLevels());
+
+    set().write(1, texView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler_mode? m_sampler_with_mips : m_sampler);
+
+}
+
 TestApp::FractalSettings::FractalSettings(TestApp::GUIFrontEnd &gui, TestApp::Fractal &fractal):
         GUIWindow(gui, WindowSettings{.title="Fractal",.autoSize=true}), m_fractal(fractal){}
 
 void TestApp::FractalSettings::onGui() {
     ImGui::SliderFloat("Mutate", &m_fractal.get().ubo.params.x, -2.0f, 2.0f);
-
+    if(ImGui::Checkbox("Use mipmaps", &m_sampler_mode)){
+        m_fractal.get().switchSamplerMode();
+    }
 }

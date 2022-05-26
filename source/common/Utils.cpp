@@ -39,7 +39,7 @@ namespace TestApp{
         return depthMap;
     }
 
-    vkw::Sampler createDefaultSampler(vkw::Device& device){
+    vkw::Sampler createDefaultSampler(vkw::Device& device, int mipLevels){
         VkSamplerCreateInfo createInfo{};
 
         createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -49,10 +49,10 @@ namespace TestApp{
         createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         createInfo.magFilter = VK_FILTER_LINEAR;
         createInfo.minFilter = VK_FILTER_LINEAR;
-        createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         createInfo.anisotropyEnable = false;
         createInfo.minLod = 0.0f;
-        createInfo.maxLod = 1.0f;
+        createInfo.maxLod = mipLevels;
 
         return vkw::Sampler{device, createInfo};
     }

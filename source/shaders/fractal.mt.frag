@@ -328,7 +328,7 @@ vec4 fractal(){
     else{
         vec4 fog = color;
         float foggy = pow(totalRayLength, 3.0) / pow(maxLength, 3.0);
-        float mip = 0.0f;//foggy * 9.0f;
+        float mip = foggy * 8.0f;
         //ambient occlusion calculated from number of steps
         float occlusion = 1.0f - pow(2.715, -35.0f/float(n));
         //float occlusion = 1.0f - 0.8f * float(n) / float(maxSteps);

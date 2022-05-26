@@ -19,6 +19,10 @@ namespace TestApp{
 
         void draw(RenderEngine::GraphicsRecordingState& recorder);
 
+        void switchSamplerMode(){
+            m_material.switchSamplerMode();
+        }
+
         struct UBO
         {
             glm::mat4 invProjView;
@@ -44,11 +48,15 @@ namespace TestApp{
 
             void update(UBO const& ubo);
 
+            void switchSamplerMode();
         private:
             vkw::UniformBuffer<UBO> m_buffer;
             UBO* m_mapped;
             vkw::ColorImage2D m_texture;
             vkw::Sampler m_sampler;
+            vkw::Sampler m_sampler_with_mips;
+            bool m_sampler_mode = false;
+            std::reference_wrapper<vkw::Device> m_device;
         } m_material;
 
         RenderEngine::LightingLayout m_lighting_layout;
@@ -62,6 +70,7 @@ namespace TestApp{
     protected:
         void onGui() override;
     private:
+        bool m_sampler_mode = false;
         std::reference_wrapper<Fractal> m_fractal;
     };
 }
