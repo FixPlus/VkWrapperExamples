@@ -45,8 +45,8 @@ void TestApp::Fractal::update(const TestApp::CameraPerspective &camera) {
 TestApp::Fractal::FractalMaterial::FractalMaterial(RenderEngine::MaterialLayout &parent, vkw::Device &device,
                                                    RenderEngine::TextureLoader &textureLoader):
         RenderEngine::Material(parent),
-        m_texture(textureLoader.loadTexture("image", 8)),
-        m_sampler_with_mips(TestApp::createDefaultSampler(device, 8)),
+        m_texture(textureLoader.loadTexture("image", 10)),
+        m_sampler_with_mips(TestApp::createDefaultSampler(device, 10)),
         m_sampler(TestApp::createDefaultSampler(device)),
         m_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU,.requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
         m_mapped(m_buffer.map()),
@@ -89,7 +89,7 @@ TestApp::FractalSettings::FractalSettings(TestApp::GUIFrontEnd &gui, TestApp::Fr
         GUIWindow(gui, WindowSettings{.title="Fractal",.autoSize=true}), m_fractal(fractal){}
 
 void TestApp::FractalSettings::onGui() {
-    ImGui::SliderFloat("Mutate", &m_fractal.get().ubo.params.x, -2.0f, 2.0f);
+    ImGui::SliderFloat("Mutate", &m_fractal.get().ubo.params.x, 0.0f, 2.0f);
     if(ImGui::Checkbox("Use mipmaps", &m_sampler_mode)){
         m_fractal.get().switchSamplerMode();
     }
