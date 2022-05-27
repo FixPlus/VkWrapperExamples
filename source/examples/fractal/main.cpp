@@ -150,8 +150,10 @@ int runFractal(){
         recorder.reset();
         fractal.update(window.camera());
 
-        if (window.minimized())
+        if (window.minimized()){
+            firstEncounter = true;
             continue;
+        }
 
         try {
             mySwapChain.acquireNextImage(presentComplete, 1000);

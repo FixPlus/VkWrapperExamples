@@ -267,8 +267,10 @@ int runModel() {
             skybox.recomputeOutScatter();
         }
 
-        if (window.minimized())
+        if (window.minimized()){
+            firstEncounter = true;
             continue;
+        }
 
         try {
             mySwapChain.acquireNextImage(presentComplete, 1000);
