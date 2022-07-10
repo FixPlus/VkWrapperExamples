@@ -128,7 +128,7 @@ int runFractal(){
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
-    auto fractal = Fractal{device, lightPass, 0, textureLoader};
+    auto fractal = Fractal{device, lightPass, 0, textureLoader, framebuffers.front().extents().width, framebuffers.front().extents().height};
     auto fractalSettings = FractalSettings{gui, fractal};
 
     while(!window.shouldClose()){
@@ -171,6 +171,7 @@ int runFractal(){
                                                             vkw::Image2DArrayViewConstRefArray{attachment,
                                                                                                mySwapChain.depthAttachment()}});
                 }
+                fractal.resizeOffscreenBuffer(extents.width, extents.height);
                 firstEncounter = true;
                 continue;
             } else {
@@ -199,6 +200,8 @@ int runFractal(){
 
 
         commandBuffer.begin(0);
+
+        fractal.drawOffscreen(commandBuffer, pipelinePool);
 
         auto currentImage = mySwapChain.currentImage();
 

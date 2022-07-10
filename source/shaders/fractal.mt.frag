@@ -40,7 +40,7 @@ vec4(-1.0f, 0.0f, 0.0f, 0.0f)};
 #define RANK 11.0f
 
 
-#define SHAPE_CUBE 1
+#define SHAPE_BALL 1
 
 
 vec4 ShapeOffset(vec4 pos){ //x y z for vector, a for length
@@ -286,6 +286,7 @@ vec4 fractal(){
 
     int n = 0; //count of steps
     float totalRayLength = 0.0f; // counter for ray length
+    float depth = 0.0f; // accum for depth
 
 
     float temp; // used to temproary contaion ED for each step
@@ -324,8 +325,10 @@ vec4 fractal(){
         //color = color + mix * inUVW.y;
         vec4 sunCol = vec4(sun, sun, sun * 0.8f, 0.0f);
         outFragColor = (color + sunCol); //+ glowCol * glowing;
+        depth = maxLength;
     }
     else{
+        depth = totalRayLength;
         vec4 fog = color;
         float foggy = pow(totalRayLength, 3.0) / pow(maxLength, 3.0);
         float mip = foggy * 8.0f;
@@ -415,13 +418,14 @@ vec4 fractal(){
         //outFragColor = texture(samplerColor1, vec2(inUVW.x, inUVW.y), 0.0f);
     }
 
+    outFragColor.w = depth;
     return outFragColor;
 }
 
 SurfaceInfo Material(){
     SurfaceInfo ret;
     ret.albedo = fractal();
-    ret.cameraOffset = inViewPos;
+    ret.cameraOffset.x = ret.albedo.a;
 
     return ret;
 }

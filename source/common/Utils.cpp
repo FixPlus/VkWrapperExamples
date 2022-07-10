@@ -56,4 +56,30 @@ namespace TestApp{
 
         return vkw::Sampler{device, createInfo};
     }
+
+    void doTransitLayout(vkw::ImageInterface& image, vkw::Device& device, VkImageLayout from, VkImageLayout to){
+        VkImageMemoryBarrier transitLayout{};
+        transitLayout.image = image;
+        transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        transitLayout.pNext = nullptr;
+        transitLayout.oldLayout = from;
+        transitLayout.newLayout = to;
+        transitLayout.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        transitLayout.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        transitLayout.subresourceRange = image.completeSubresourceRange();
+        transitLayout.dstAccessMask = 0;
+        transitLayout.srcAccessMask = 0;
+
+        auto queue = device.getTransferQueue();
+        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+        auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
+
+        transferCommand.begin(0);
+        transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                           {transitLayout});
+        transferCommand.end();
+
+        queue->submit(transferCommand);
+        queue->waitIdle();
+    }
 }

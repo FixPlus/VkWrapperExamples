@@ -8,20 +8,26 @@
 #include <glm/glm.hpp>
 #include <GUI.h>
 #include "Camera.h"
+#include "vkw/FrameBuffer.hpp"
+
 
 namespace TestApp{
 
     class Fractal{
     public:
-        Fractal(vkw::Device& device, vkw::RenderPass& pass, uint32_t subpass, RenderEngine::TextureLoader& textureLoader);
+        Fractal(vkw::Device& device, vkw::RenderPass& pass, uint32_t subpass, RenderEngine::TextureLoader& textureLoader, uint32_t texWidth, uint32_t texHeight);
 
         void update(TestApp::CameraPerspective const& camera);
+
+        void drawOffscreen(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool);
 
         void draw(RenderEngine::GraphicsRecordingState& recorder);
 
         void switchSamplerMode(){
             m_material.switchSamplerMode();
         }
+
+        void resizeOffscreenBuffer(uint32_t width, uint32_t height);
 
         struct UBO
         {
@@ -35,7 +41,56 @@ namespace TestApp{
             float shadowOption = -1.0f; // < 0 == shadow off ; >= 0 == shadow on
         } ubo;
 
+        struct FilterUBO{
+            float distance = 0.0f;
+        } filter;
+
     private:
+        class RenderPassAttachments{
+        public:
+            explicit RenderPassAttachments(vkw::Device& device);
+
+            vkw::AttachmentDescription const& colorAttachment() const{
+                return m_attachments.at(0);
+            }
+            vkw::AttachmentDescription const& depthAttachment() const{
+                return m_attachments.at(1);
+            }
+
+        private:
+            std::array<vkw::AttachmentDescription, 2> m_attachments;
+        };
+
+        class RenderPass: public RenderPassAttachments, public vkw::RenderPass{
+        public:
+            explicit RenderPass(vkw::Device& device);
+        private:
+            vkw::RenderPassCreateInfo m_compileRenderPassInfo();
+        } m_offscreenPass;
+
+        class OffscreenBufferImages{
+        public:
+            OffscreenBufferImages(vkw::Device& device, uint32_t width, uint32_t height);
+
+            vkw::ColorImage2D& colorTarget() {
+                return m_colorTarget;
+            };
+
+            vkw::ColorImage2D& depthTarget() {
+                return m_depthTarget;
+            }
+        private:
+            vkw::ColorImage2D m_colorTarget;
+            vkw::ColorImage2D m_depthTarget;
+        };
+
+        class OffscreenBuffer: public OffscreenBufferImages, public vkw::FrameBuffer{
+        public:
+            OffscreenBuffer(vkw::Device& device, RenderPass& pass, uint32_t width, uint32_t height);
+        };
+
+        std::unique_ptr<OffscreenBuffer> m_offscreenBuffer;
+
         RenderEngine::GeometryLayout m_geom_layout;
         RenderEngine::Geometry m_geometry;
         RenderEngine::ProjectionLayout m_projection_layout;
@@ -59,9 +114,29 @@ namespace TestApp{
             std::reference_wrapper<vkw::Device> m_device;
         } m_material;
 
+        RenderEngine::LightingLayout m_offscreen_lighting_layout;
+        RenderEngine::Lighting m_offscreen_lighting;
+
         RenderEngine::LightingLayout m_lighting_layout;
         RenderEngine::Lighting m_lighting;
 
+        RenderEngine::MaterialLayout m_filter_layout;
+
+        class FilterMaterial: public RenderEngine::Material{
+        public:
+            FilterMaterial(RenderEngine::MaterialLayout& parent, vkw::Device& device, OffscreenBuffer& offscreenBuffer);
+
+            void update(FilterUBO const& ubo);
+
+            void rewriteOffscreenTextures(OffscreenBuffer& offscreenBuffer, vkw::Device& device);
+
+        private:
+            vkw::UniformBuffer<FilterUBO> m_buffer;
+            FilterUBO* m_mapped;
+            vkw::Sampler m_sampler;
+        } m_filter_material;
+
+        std::reference_wrapper<vkw::Device> m_device;
     };
 
     class FractalSettings: public GUIWindow{
@@ -71,6 +146,7 @@ namespace TestApp{
         void onGui() override;
     private:
         bool m_sampler_mode = false;
+        bool m_fxaa_on = false;
         std::reference_wrapper<Fractal> m_fractal;
     };
 }

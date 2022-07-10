@@ -60,5 +60,7 @@ namespace TestApp{
 
     vkw::Sampler createDefaultSampler(vkw::Device& device, int mipLevels = 1);
 
+    void doTransitLayout(vkw::ImageInterface& image, vkw::Device& device, VkImageLayout from, VkImageLayout to);
+
 }
 #endif //TESTAPP_UTILS_H
