@@ -68,7 +68,8 @@ namespace TestApp {
 
     class GUIBackend : virtual public GUIBase {
     public:
-        using TextureView = vkw::Image2DView const*;
+        using Texture = vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>;
+        using TextureView = vkw::ImageView<vkw::COLOR, vkw::V2D>;
 
         GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, RenderEngine::TextureLoader textureLoader);
 
@@ -105,7 +106,7 @@ namespace TestApp {
 
         struct Material: public RenderEngine::Material{
         public:
-            Material(vkw::Device& device, RenderEngine::MaterialLayout& layout, vkw::Image2DView const& texture, vkw::Sampler const& sampler);
+            Material(vkw::Device& device, RenderEngine::MaterialLayout& layout, TextureView const& texture, vkw::Sampler const& sampler);
         };
 
         RenderEngine::LightingLayout m_lightingLayout;
@@ -126,9 +127,11 @@ namespace TestApp {
         ImDrawVert *m_vertices_mapped;
         ImDrawIdx *m_indices_mapped;
 
-        std::map<TextureView, Material> m_materials{};
+        std::map<TextureView const*, Material> m_materials{};
 
-        std::map<TextureView, vkw::ColorImage2D> m_font_textures{};
+        std::map<TextureView const*, Texture> m_font_textures{};
+
+        std::vector<std::unique_ptr<TextureView>> m_views_storage;
 
     };
 

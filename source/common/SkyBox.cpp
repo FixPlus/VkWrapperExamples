@@ -22,12 +22,7 @@ SkyBox::SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpas
                       VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
         m_atmo_mapped(m_atmo_buffer.map()),
         m_material(device, m_material_layout, m_atmo_buffer, outScatterTexture()),
-        m_out_scatter_texture(device, shaderLoader, m_atmo_buffer, 2048, 2048),
-        m_scatter_view(m_out_scatter_texture.getView<vkw::ColorImageView>(m_device, m_out_scatter_texture.format(), VkComponentMapping{
-                                                            .r=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                            .g=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                            .b=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                            .a=VK_COMPONENT_SWIZZLE_IDENTITY}))
+        m_out_scatter_texture(device, shaderLoader, m_atmo_buffer, 2048, 2048)
 {
 }
 
@@ -64,22 +59,23 @@ void SkyBoxSettings::onGui() {
 
 SkyBox::OutScatterTexture::OutScatterTexture(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, vkw::UniformBuffer<Atmosphere> const& atmo,
                                              uint32_t psiRate, uint32_t heightRate):
-                                             vkw::ColorImage2D{device.getAllocator(),
+                                             vkw::Image<vkw::COLOR, vkw::I2D>{device.getAllocator(),
                                                                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-                                                               VK_FORMAT_R32G32B32A32_SFLOAT, heightRate, psiRate, 1, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT},
+                                                               VK_FORMAT_R32G32B32A32_SFLOAT, heightRate, psiRate, 1, 1, 1, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT},
                                              RenderEngine::ComputeLayout(device,
                                                                          shaderLoader,
                                                                          RenderEngine::SubstageDescription{
                                                                             .shaderSubstageName="atmosphere_outscatter",
                                                                             .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1),
-                                             RenderEngine::Compute(static_cast<RenderEngine::ComputeLayout&>(*this)){
+                                             RenderEngine::Compute(static_cast<RenderEngine::ComputeLayout&>(*this)),
+                                             m_view(device, *this, format()){
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto& scatterView = getView<vkw::ColorImageView>(device, format(), mapping);
+    auto& scatterView = m_view;
     set().write(0, atmo);
     set().writeStorageImage(1, scatterView);
 

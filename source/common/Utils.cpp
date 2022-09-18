@@ -2,11 +2,11 @@
 #include <vkw/Sampler.hpp>
 
 namespace TestApp{
-    vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height) {
+    vkw::Image<vkw::DEPTH, vkw::I2D, vkw::SINGLE> createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height) {
         VmaAllocationCreateInfo createInfo{};
         createInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-        auto depthMap = vkw::DepthStencilImage2D{device.getAllocator(), createInfo, VK_FORMAT_D32_SFLOAT, width,
-                                                 height, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
+        auto depthMap = vkw::Image<vkw::DEPTH, vkw::I2D, vkw::SINGLE>{device.getAllocator(), createInfo, VK_FORMAT_D32_SFLOAT, width,
+                                                 height, 1, 1, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
 
         VkImageMemoryBarrier transitLayout{};
         transitLayout.image = depthMap;

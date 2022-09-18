@@ -66,6 +66,7 @@ namespace TestApp {
             Light(vkw::Device &device, RenderEngine::LightingLayout &layout, TestApp::ShadowRenderPass &shadowPass,
                   const SkyBox &skyBox);
 
+            vkw::ImageView<vkw::DEPTH, vkw::V2DA> m_shadow_map;
             vkw::Sampler m_sampler;
         private:
             static vkw::Sampler m_create_sampler(vkw::Device &device);

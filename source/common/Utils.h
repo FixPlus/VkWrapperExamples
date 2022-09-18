@@ -56,7 +56,7 @@ namespace TestApp{
         return ret;
     }
 
-    vkw::DepthStencilImage2D createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height);
+    vkw::Image<vkw::DEPTH, vkw::I2D, vkw::SINGLE> createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height);
 
     vkw::Sampler createDefaultSampler(vkw::Device& device, int mipLevels = 1);
 

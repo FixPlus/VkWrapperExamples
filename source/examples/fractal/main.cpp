@@ -246,4 +246,7 @@ int main(){
     catch(std::runtime_error& e){
         RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
     }
+    catch(std::logic_error& e){
+        RenderEngine::Boxer::show(e.what(), "Internal error", RenderEngine::Boxer::Style::Error);
+    }
 }

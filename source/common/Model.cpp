@@ -674,7 +674,11 @@ TestApp::ModelMaterialLayout::ModelMaterialLayout(vkw::Device &device) :
 }
 
 TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, DefaultTexturePool& pool, ModelMaterialLayout &layout, MaterialInfo info)
-        : RenderEngine::Material(layout), m_info(info) {
+        : RenderEngine::Material(layout), m_info(info),
+          m_colorMapView(device, info.colorMap ? *info.colorMap : pool.colorMap(), info.colorMap ? info.colorMap->format() : pool.colorMap().format()),
+          m_normalMapView(device, info.normalMap ? *info.normalMap : pool.normalMap(), info.normalMap ? info.normalMap->format() : pool.normalMap().format()),
+          m_mrMapView(device, info.metallicRoughnessMap ? *info.metallicRoughnessMap : pool.metallicRoughnessMap(), info.metallicRoughnessMap ? info.metallicRoughnessMap->format() : pool.metallicRoughnessMap().format())
+{
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -684,11 +688,11 @@ TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, DefaultTexturePool& p
     auto* normalMap = info.normalMap ? info.normalMap : &pool.colorMap();
     auto* mrMap = info.metallicRoughnessMap ? info.metallicRoughnessMap : &pool.metallicRoughnessMap();
 
-    set().write(0, colorMap->getView<vkw::ColorImageView>(device, colorMap->format(), mapping),
+    set().write(0, m_colorMapView,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
-    set().write(1, normalMap->getView<vkw::ColorImageView>(device, normalMap->format(), mapping),
+    set().write(1, m_normalMapView,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
-    set().write(2, mrMap->getView<vkw::ColorImageView>(device, mrMap->format(), mapping),
+    set().write(2, m_mrMapView,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
 }
 
@@ -713,9 +717,9 @@ void TestApp::ModelGeometry::update() {
 }
 
 TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t textureDim):
-        m_colorMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
-        m_normalMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
-        m_metallicRoughnessMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
+        m_colorMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, 1, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
+        m_normalMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, 1, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
+        m_metallicRoughnessMap(device.getAllocator(), VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},VK_FORMAT_R8G8B8A8_UNORM, textureDim, textureDim, 1, 1, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
 
 {
     vkw::Buffer<uint32_t> stageBuffer{device, textureDim * textureDim, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU,.requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}};

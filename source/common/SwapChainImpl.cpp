@@ -58,13 +58,14 @@ namespace TestApp{
             mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
             for (auto &image: m_images) {
-                m_image_views.emplace_back(image.getView<vkw::ColorImageView>(device, image.format(), 0, 1, mapping));
+                m_image_views.emplace_back(device, image, image.format(), 0u, 1u, 0u, 1u, mapping);
             }
 
             auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
             m_depth.emplace(TestApp::createDepthStencilImage(device, extents.width, extents.height));
-            m_depth_view.emplace(m_depth->getView<vkw::DepthImageView>(device, mapping, m_depth->format()));
+            m_depth_view = std::make_unique<vkw::ImageView<vkw::DEPTH, vkw::V2DA>>(device, m_depth.value(), m_depth->format(), 0u, 1u, mapping);
+
     }
 
     VkSwapchainCreateInfoKHR SwapChainImpl::compileInfo(vkw::Device &device, vkw::Surface &surface, bool vsync) {

@@ -62,8 +62,8 @@ public:
         return m_atmo_buffer;
     }
 
-    vkw::ColorImage2DView const& outScatterTexture() const{
-        return m_scatter_view.get();
+    vkw::ImageView<vkw::COLOR, vkw::V2D> const& outScatterTexture() const{
+        return m_out_scatter_texture.m_view;
     }
 
     glm::vec3 sunDirection() const{
@@ -87,14 +87,17 @@ private:
     vkw::UniformBuffer<Atmosphere> m_atmo_buffer;
     Atmosphere* m_atmo_mapped;
 
-    class OutScatterTexture: public vkw::ColorImage2D, public RenderEngine::ComputeLayout, public RenderEngine::Compute{
+    class OutScatterTexture: public vkw::Image<vkw::COLOR, vkw::I2D>, public RenderEngine::ComputeLayout, public RenderEngine::Compute{
     public:
+
+        vkw::ImageView<vkw::COLOR, vkw::V2D> m_view;
+
         OutScatterTexture(vkw::Device& device, RenderEngine::ShaderLoaderInterface& shaderLoader, vkw::UniformBuffer<Atmosphere> const& atmo, uint32_t psiRate, uint32_t heightRate);
 
         void recompute(vkw::Device& buffer);
     } m_out_scatter_texture;
 
-    std::reference_wrapper<vkw::ColorImage2DView const> m_scatter_view;
+
 
     struct Material : RenderEngine::Material {
         vkw::UniformBuffer<UBO> m_buffer;
@@ -104,7 +107,7 @@ private:
         Sun* m_material_mapped;
 
 
-        Material(vkw::Device &device, RenderEngine::MaterialLayout &layout, vkw::UniformBuffer<Atmosphere> const& atmoBuf, vkw::ColorImage2DView const& outScatterTexture) : RenderEngine::Material(layout),
+        Material(vkw::Device &device, RenderEngine::MaterialLayout &layout, vkw::UniformBuffer<Atmosphere> const& atmoBuf, vkw::ImageView<vkw::COLOR, vkw::V2D> const& outScatterTexture) : RenderEngine::Material(layout),
                                                                               m_buffer(device,
                                                                                        VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
                                                                               m_mapped(m_buffer.map()),

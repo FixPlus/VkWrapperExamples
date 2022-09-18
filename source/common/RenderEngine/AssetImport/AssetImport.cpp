@@ -15,7 +15,7 @@ bool RenderEngine::AssetImporterBase::try_open(const std::string &filename) cons
 }
 
 
-vkw::ColorImage2D
+vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>
 RenderEngine::TextureLoader::loadTexture(const std::string &name, int mipLevels, VkImageLayout finalLayout, VkImageUsageFlags imageUsage,
                                     VmaMemoryUsage memUsage) const {
     std::set<std::string> fileExtensions = {"png", "jpg", "jpeg"};
@@ -43,7 +43,7 @@ RenderEngine::TextureLoader::loadTexture(const std::string &name, int mipLevels,
 
 
     try {
-        vkw::ColorImage2D ret = loadTexture(imageData, width, height, mipLevels, finalLayout, imageUsage, memUsage);
+        vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE> ret = loadTexture(imageData, width, height, mipLevels, finalLayout, imageUsage, memUsage);
         stbi_image_free(imageData);
         return ret;
     } catch (std::runtime_error &e) {
@@ -52,7 +52,7 @@ RenderEngine::TextureLoader::loadTexture(const std::string &name, int mipLevels,
     }
 
 }
-static void generateMipMaps(vkw::CommandBuffer& buffer, vkw::ColorImage2D& image, int mipLevels){
+static void generateMipMaps(vkw::CommandBuffer& buffer, vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>& image, int mipLevels){
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.image = image;
@@ -112,7 +112,7 @@ static void generateMipMaps(vkw::CommandBuffer& buffer, vkw::ColorImage2D& image
 
 }
 
-vkw::ColorImage2D
+vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>
 RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t textureWidth, size_t textureHeight, int mipLevels,
                                     VkImageLayout finalLayout, VkImageUsageFlags imageUsage,
                                     VmaMemoryUsage memUsage) const {
@@ -135,8 +135,8 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
     if(mipLevels > 1)
         transferUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
-    auto ret = vkw::ColorImage2D{m_device.get().getAllocator(), allocInfo, VK_FORMAT_R8G8B8A8_UNORM,
-                                 static_cast<uint32_t>(textureWidth), static_cast<uint32_t>(textureHeight), static_cast<uint32_t>(mipLevels),
+    auto ret = vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>{m_device.get().getAllocator(), allocInfo, VK_FORMAT_R8G8B8A8_UNORM,
+                                 static_cast<uint32_t>(textureWidth), static_cast<uint32_t>(textureHeight), 1, 1, static_cast<uint32_t>(mipLevels),
                                  transferUsage | imageUsage};
 
     VkImageMemoryBarrier transitLayout1{};

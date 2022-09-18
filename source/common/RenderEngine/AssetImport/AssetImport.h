@@ -54,12 +54,12 @@ namespace RenderEngine {
         TextureLoader(vkw::Device &device, std::string const &rootDirectory) :
                 AssetImporterBase(rootDirectory), m_device(device) {}
 
-        vkw::ColorImage2D loadTexture(const unsigned char *texture, size_t textureWidth, size_t textureHeight, int mipLevels = 1,
+        vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE> loadTexture(const unsigned char *texture, size_t textureWidth, size_t textureHeight, int mipLevels = 1,
                                       VkImageLayout finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                       VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_SAMPLED_BIT,
                                       VmaMemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY) const;
 
-        vkw::ColorImage2D
+        vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>
         loadTexture(std::string const &name, int mipLevels = 1, VkImageLayout finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_SAMPLED_BIT,
                     VmaMemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY) const;

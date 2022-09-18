@@ -33,6 +33,9 @@ namespace TestApp {
         LAST = 7
     };
 
+    using Texture2D = vkw::Image<vkw::COLOR, vkw::I2D>;
+    using Texture2DView = vkw::ImageView<vkw::COLOR, vkw::V2D>;
+
     struct ModelAttributes : public vkw::AttributeBase<vkw::VertexAttributeType::VEC4F, vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC3F,
             vkw::VertexAttributeType::VEC2F, vkw::VertexAttributeType::VEC4F, vkw::VertexAttributeType::VEC4F, vkw::VertexAttributeType::VEC4F> {
         glm::vec4 pos;
@@ -123,9 +126,9 @@ namespace TestApp {
     class DefaultTexturePool;
 
     struct MaterialInfo {
-        vkw::ColorImage2D *colorMap = nullptr;
-        vkw::ColorImage2D *normalMap = nullptr;
-        vkw::ColorImage2D *metallicRoughnessMap = nullptr;
+        Texture2D *colorMap = nullptr;
+        Texture2D *normalMap = nullptr;
+        Texture2D *metallicRoughnessMap = nullptr;
         vkw::Sampler const *sampler;
 
         auto operator<=>(MaterialInfo const &another) const = default;
@@ -147,6 +150,10 @@ namespace TestApp {
         }
 
     private:
+        Texture2DView m_colorMapView;
+        Texture2DView m_normalMapView;
+        Texture2DView m_mrMapView;
+
         MaterialInfo m_info;
     };
 
@@ -224,23 +231,23 @@ namespace TestApp {
 
         explicit DefaultTexturePool(vkw::Device& device, uint32_t textureDim = 256);
 
-        vkw::ColorImage2D& colorMap(){
+        Texture2D& colorMap(){
             return m_colorMap;
         }
 
-        vkw::ColorImage2D& normalMap(){
+        Texture2D& normalMap(){
             return m_normalMap;
         }
 
-        vkw::ColorImage2D& metallicRoughnessMap(){
+        Texture2D& metallicRoughnessMap(){
             return m_metallicRoughnessMap;
         }
 
 
     private:
-        vkw::ColorImage2D m_colorMap;
-        vkw::ColorImage2D m_normalMap;
-        vkw::ColorImage2D m_metallicRoughnessMap;
+        Texture2D m_colorMap;
+        Texture2D m_normalMap;
+        Texture2D m_metallicRoughnessMap;
     };
 
     class GLTFModel {
@@ -248,7 +255,7 @@ namespace TestApp {
         ModelGeometryLayout geometryLayout;
         std::vector<ModelMaterial> materials;
 
-        std::vector<vkw::ColorImage2D> textures;
+        std::vector<Texture2D> textures;
         std::vector<std::shared_ptr<MNode>> rootNodes;
         std::vector<std::shared_ptr<MNode>> linearNodes;
         std::reference_wrapper<vkw::Device> renderer_;
@@ -257,7 +264,7 @@ namespace TestApp {
         std::stack<size_t> freeIDs;
         size_t instanceCount = 0;
 
-        vkw::ColorImage2D &getTexture(int index) {
+        Texture2D &getTexture(int index) {
             return textures.at(index);
         }
 

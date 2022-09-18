@@ -62,7 +62,8 @@ namespace TestApp {
             layout),
                                                                                               m_sampler(
                                                                                                       m_create_sampler(
-                                                                                                              device)) {
+                                                                                                              device)),
+                                                                                              m_shadow_map(device, shadowPass.shadowMap(), shadowPass.shadowMap().format(), 0, shadowPass.shadowMap().layers()){
         set().write(0, skyBox.sunBuffer());
         VkComponentMapping mapping;
         mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -71,8 +72,7 @@ namespace TestApp {
         mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
         auto &shadowMap = shadowPass.shadowMap();
-        set().write(1, shadowMap.getView<vkw::DepthImageView>(device, shadowMap.format(), 0, shadowMap.arrayLayers(),
-                                                              mapping), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        set().write(1, m_shadow_map, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     m_sampler);
         set().write(2, shadowPass.ubo());
         set().write(3, skyBox.atmoBuffer());

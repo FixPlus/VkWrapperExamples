@@ -115,15 +115,15 @@ int runModel() {
 
     auto mySwapChain = TestApp::SwapChainImpl{device, surface, true};
 
-    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().get().format(),
-                                                      mySwapChain.depthAttachment().get().format(),
+    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().format(),
+                                                      mySwapChain.depthAttachment().format(),
                                                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     std::vector<vkw::FrameBuffer> framebuffers;
 
+    std::vector<vkw::ImageViewVT<vkw::V2DA> const*> viewRefs = {nullptr, dynamic_cast<vkw::ImageViewVT<vkw::V2DA> const*>(&mySwapChain.depthAttachment())};
     for (auto &attachment: mySwapChain.attachments()) {
-        framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                vkw::Image2DArrayViewConstRefArray{attachment,
-                                                                                   mySwapChain.depthAttachment()}});
+        viewRefs[0] = &attachment;
+        framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,{viewRefs.begin(), viewRefs.end()}});
     }
 
     auto queue = device.getGraphicsQueue();
@@ -283,11 +283,12 @@ int runModel() {
 
                 framebuffers.clear();
 
+                viewRefs = {nullptr, static_cast<vkw::ImageViewVT<vkw::V2DA> const*>(&mySwapChain.depthAttachment())};
                 for (auto &attachment: mySwapChain.attachments()) {
-                    framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                            vkw::Image2DArrayViewConstRefArray{attachment,
-                                                                                               mySwapChain.depthAttachment()}});
+                    viewRefs[0] = &attachment;
+                    framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,{viewRefs.begin(), viewRefs.end()}});
                 }
+
                 firstEncounter = true;
                 continue;
             } else {

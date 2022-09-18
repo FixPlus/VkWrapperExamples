@@ -11,6 +11,7 @@ namespace TestApp{
 
     class ShadowRenderPass {
     public:
+        using ShadowArrayT = vkw::Image<vkw::DEPTH, vkw::I2D, vkw::ARRAY>;
         struct ShadowMapSpace {
             glm::mat4 cascades[TestApp::SHADOW_CASCADES_COUNT];
             float splits[TestApp::SHADOW_CASCADES_COUNT * 4];
@@ -69,8 +70,8 @@ namespace TestApp{
         RenderEngine::Material m_shadow_material;
         RenderEngine::LightingLayout m_shadow_pass_layout;
         RenderEngine::Lighting m_shadow_pass;
-
-        vkw::DepthStencilImage2DArray m_shadowCascades;
+        ShadowArrayT m_shadowCascades;
+        std::vector<vkw::ImageView<vkw::DEPTH, vkw::V2D>> m_per_cascade_views;
         std::vector<vkw::FrameBuffer> m_shadowBufs;
     };
 

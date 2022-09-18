@@ -47,7 +47,7 @@ namespace TestApp {
         if (!atlas)
             atlas = io.Fonts;
 
-        auto textureID = static_cast<TextureView>(atlas->TexID);
+        auto textureID = static_cast<TextureView const*>(atlas->TexID);
 
         if(m_font_textures.contains(textureID)){
             m_font_textures.erase(textureID);
@@ -70,16 +70,12 @@ namespace TestApp {
         mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-        TextureView view = &fontTexture.getView<vkw::ColorImageView>(
-                m_device,
-                fontTexture.format(),
-        mapping);
+        auto* key = m_views_storage.emplace_back(std::make_unique<TextureView>(m_device, fontTexture, fontTexture.format())).get();
 
-        auto &newTexture = m_font_textures.emplace(view, std::move(fontTexture)).first->second;
+        auto &newTexture = m_font_textures.emplace(key, std::move(fontTexture)).first->second;
 
-        m_materials.emplace(view, Material{m_device, m_materialLayout, *view, m_sampler});
-        atlas->TexID = const_cast<vkw::Image2DView*>(view);
-
+        m_materials.emplace(key, Material{m_device, m_materialLayout, *key, m_sampler});
+        atlas->TexID = key;
     }
 
     vkw::Sampler GUIBackend::m_sampler_init(vkw::Device &device) {
@@ -167,7 +163,7 @@ namespace TestApp {
 
         ImGuiIO &io = ImGui::GetIO();
 
-        auto cachedID = static_cast<TextureView>(io.Fonts->TexID);
+        auto cachedID = static_cast<TextureView const*>(io.Fonts->TexID);
 
         recorder.setGeometry(m_geometry);
         recorder.setProjection(m_projection);
@@ -193,7 +189,7 @@ namespace TestApp {
             const ImDrawList *cmd_list = imDrawData->CmdLists[i];
             for (int32_t j = 0; j < cmd_list->CmdBuffer.Size; j++) {
                 const ImDrawCmd *pcmd = &cmd_list->CmdBuffer[j];
-                auto currentTextureID = static_cast<TextureView>(pcmd->TextureId);
+                auto currentTextureID = static_cast<TextureView const*>(pcmd->TextureId);
 
                 if (currentTextureID != cachedID) {
                     recorder.setMaterial(m_materials.at(currentTextureID));
@@ -451,18 +447,9 @@ namespace TestApp {
         io.AddMouseWheelEvent(xOffset, yOffset);
     }
 
-    GUIBackend::Material::Material(vkw::Device &device, RenderEngine::MaterialLayout &layout,
-                                   const vkw::Image2DView &texture, const vkw::Sampler &sampler): RenderEngine::Material(layout) {
-        auto* pTexture = &texture;
-        if(auto colorTexture = dynamic_cast<const vkw::ColorImageView*>(pTexture)){
-            set().write(0, *colorTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
-        } else if(auto depthTexture = dynamic_cast<const vkw::DepthImageView*>(pTexture)){
-            set().write(0, *depthTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
-        } else if(auto stencilTexture = dynamic_cast<const vkw::StencilImageView*>(pTexture)){
-            set().write(0, *stencilTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
-        } else{
-            throw std::runtime_error("GUI: failed to create Combined Image sampler: broken image view");
-        }
+    GUIBackend::Material::Material(vkw::Device &device, RenderEngine::MaterialLayout &layout, TextureView const& texture,
+                                   const vkw::Sampler &sampler): RenderEngine::Material(layout) {
+        set().write(0, texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
     }
 
     GUIWindow::GUIWindow(GUIFrontEnd& parent, WindowSettings settings): m_parent(parent), m_settings(std::move(settings)){

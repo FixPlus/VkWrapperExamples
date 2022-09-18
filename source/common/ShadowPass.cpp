@@ -23,7 +23,7 @@ m_shadow_pass(m_shadow_pass_layout),
 m_shadowCascades{device.getAllocator(),
                  VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                  VK_FORMAT_D32_SFLOAT, 2048,
-                 2048, TestApp::SHADOW_CASCADES_COUNT, 1,
+                 2048, 1, TestApp::SHADOW_CASCADES_COUNT, 1,
                  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT},
 m_ubo(device,
       VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
@@ -37,18 +37,18 @@ m_mapped(m_ubo.map()){
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    std::vector<vkw::DepthImage2DArrayView const *> shadowMapAttachmentViews{};
-    for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
-        shadowMapAttachmentViews.emplace_back(
-                &m_shadowCascades.getView<vkw::DepthImageView>(device, m_shadowCascades.format(), i, 1, mapping));
+    for (unsigned i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+        m_per_cascade_views.emplace_back(vkw::ImageView<vkw::DEPTH, vkw::V2D>{device, m_shadowCascades, m_shadowCascades.format(), i, 1});
     }
+#if 0
     auto &shadowMapSampledView = m_shadowCascades.getView<vkw::DepthImageView>(device, m_shadowCascades.format(), 0,
                                                                                TestApp::SHADOW_CASCADES_COUNT, mapping);
-
+#endif
     for (int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i) {
+        auto* viewIt = dynamic_cast<vkw::ImageViewVT<vkw::V2D> const*>(m_per_cascade_views.data() + i);
         m_shadowBufs.emplace_back(device, m_pass,
                                   VkExtent2D{2048, 2048},
-                                  *shadowMapAttachmentViews.at(i));
+                                  std::span<vkw::ImageViewVT<vkw::V2D> const*>{&viewIt, 1});
     }
 }
 
