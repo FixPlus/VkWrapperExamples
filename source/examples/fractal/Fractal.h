@@ -15,6 +15,8 @@ namespace TestApp{
 
     class Fractal{
     public:
+
+        using ColorImage2D = vkw::Image<vkw::COLOR, vkw::I2D>;
         Fractal(vkw::Device& device, vkw::RenderPass& pass, uint32_t subpass, RenderEngine::TextureLoader& textureLoader, uint32_t texWidth, uint32_t texHeight);
 
         void update(TestApp::CameraPerspective const& camera);
@@ -72,16 +74,24 @@ namespace TestApp{
         public:
             OffscreenBufferImages(vkw::Device& device, uint32_t width, uint32_t height);
 
-            vkw::ColorImage2D& colorTarget() {
+            ColorImage2D& colorTarget() {
                 return m_colorTarget;
             };
 
-            vkw::ColorImage2D& depthTarget() {
+            ColorImage2D& depthTarget() {
                 return m_depthTarget;
             }
+
+            std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2>& targetViews(){
+                return m_targetRefViews;
+            };
         private:
-            vkw::ColorImage2D m_colorTarget;
-            vkw::ColorImage2D m_depthTarget;
+            ColorImage2D m_colorTarget;
+            ColorImage2D m_depthTarget;
+            std::array<vkw::ImageView<vkw::COLOR, vkw::V2DA>, 2> m_targetViews;
+            std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2> m_targetRefViews;
+
+
         };
 
         class OffscreenBuffer: public OffscreenBufferImages, public vkw::FrameBuffer{
@@ -107,7 +117,8 @@ namespace TestApp{
         private:
             vkw::UniformBuffer<UBO> m_buffer;
             UBO* m_mapped;
-            vkw::ColorImage2D m_texture;
+            ColorImage2D m_texture;
+            vkw::ImageView<vkw::COLOR, vkw::V2D> m_texture_view;
             vkw::Sampler m_sampler;
             vkw::Sampler m_sampler_with_mips;
             bool m_sampler_mode = false;
@@ -128,12 +139,17 @@ namespace TestApp{
 
             void update(FilterUBO const& ubo);
 
+            void updateTargetViews(OffscreenBuffer& offscreenBuffer);
+
             void rewriteOffscreenTextures(OffscreenBuffer& offscreenBuffer, vkw::Device& device);
 
         private:
             vkw::UniformBuffer<FilterUBO> m_buffer;
             FilterUBO* m_mapped;
             vkw::Sampler m_sampler;
+            vkw::ImageView<vkw::COLOR, vkw::V2D> m_colorTargetView;
+            vkw::ImageView<vkw::COLOR, vkw::V2D> m_depthTargetView;
+            std::reference_wrapper<vkw::Device> m_device;
         } m_filter_material;
 
         std::reference_wrapper<vkw::Device> m_device;

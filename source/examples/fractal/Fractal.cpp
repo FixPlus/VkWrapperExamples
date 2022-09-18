@@ -92,6 +92,7 @@ void TestApp::Fractal::update(const TestApp::CameraPerspective &camera) {
 
 void TestApp::Fractal::resizeOffscreenBuffer(uint32_t width, uint32_t height) {
     m_offscreenBuffer = std::make_unique<OffscreenBuffer>(m_device.get(), m_offscreenPass, width, height);
+    m_filter_material.updateTargetViews(*m_offscreenBuffer);
     m_filter_material.rewriteOffscreenTextures(*m_offscreenBuffer, m_device.get());
 }
 
@@ -116,7 +117,8 @@ TestApp::Fractal::FractalMaterial::FractalMaterial(RenderEngine::MaterialLayout 
         m_buffer(device,
                  VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
         m_mapped(m_buffer.map()),
-        m_device(device) {
+        m_device(device),
+        m_texture_view(device, m_texture, m_texture.format(), 0u, m_texture.mipLevels()){
 
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -124,10 +126,7 @@ TestApp::Fractal::FractalMaterial::FractalMaterial(RenderEngine::MaterialLayout 
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto &texView = m_texture.getView<vkw::ColorImageView>(device, m_texture.format(), mapping, 0,
-                                                           m_texture.mipLevels());
-
-    set().write(1, texView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+    set().write(1, m_texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
     set().write(0, m_buffer);
 }
 
@@ -146,10 +145,7 @@ void TestApp::Fractal::FractalMaterial::switchSamplerMode() {
 
     m_sampler_mode = !m_sampler_mode;
 
-    auto &texView = m_texture.getView<vkw::ColorImageView>(m_device, m_texture.format(), mapping, 0,
-                                                           m_texture.mipLevels());
-
-    set().write(1, texView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler_mode ? m_sampler_with_mips : m_sampler);
+    set().write(1, m_texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler_mode ? m_sampler_with_mips : m_sampler);
 
 }
 
@@ -215,12 +211,14 @@ vkw::RenderPassCreateInfo TestApp::Fractal::RenderPass::m_compileRenderPassInfo(
 TestApp::Fractal::OffscreenBufferImages::OffscreenBufferImages(vkw::Device &device, uint32_t width, uint32_t height) :
         m_colorTarget(device.getAllocator(),
                       VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-                      VK_FORMAT_R8G8B8A8_UNORM, width, height, 1,
+                      VK_FORMAT_R8G8B8A8_UNORM, width, height, 1, 1, 1,
                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
         m_depthTarget(device.getAllocator(),
                       VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-                      VK_FORMAT_R32_SFLOAT, width, height, 1,
-                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT) {
+                      VK_FORMAT_R32_SFLOAT, width, height, 1, 1, 1,
+                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
+        m_targetViews({vkw::ImageView<vkw::COLOR, vkw::V2DA>{device,  m_colorTarget, m_colorTarget.format()}, {device,  m_depthTarget, m_depthTarget.format()}}),
+        m_targetRefViews({&m_targetViews.at(0), &m_targetViews.at(1)}){
 
     doTransitLayout(m_colorTarget, device, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     doTransitLayout(m_depthTarget, device, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -233,19 +231,7 @@ TestApp::Fractal::OffscreenBuffer::OffscreenBuffer(vkw::Device &device, TestApp:
          vkw::FrameBuffer(device,
                           pass,
                           VkExtent2D{width,height},
-                          vkw::Image2DViewConstRefArray{
-                                colorTarget().getView<vkw::ColorImageView>(device,
-                                                                           colorTarget().format(),
-                                                                           VkComponentMapping{.r=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                                              .g=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                                              .b=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                                              .a=VK_COMPONENT_SWIZZLE_IDENTITY}),
-                                depthTarget().getView<vkw::ColorImageView>(device,
-                                                                           depthTarget().format(),
-                                                                           VkComponentMapping{.r=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                                   .g=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                                   .b=VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                                   .a=VK_COMPONENT_SWIZZLE_IDENTITY})}) {
+                          {targetViews().begin(), targetViews().end()}) {
 }
 
 TestApp::Fractal::FilterMaterial::FilterMaterial(RenderEngine::MaterialLayout &parent, vkw::Device &device,
@@ -255,7 +241,10 @@ TestApp::Fractal::FilterMaterial::FilterMaterial(RenderEngine::MaterialLayout &p
                                                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU,
                                                                                   .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
                                                                                   m_mapped(m_buffer.map()),
-                                                 m_sampler(TestApp::createDefaultSampler(device)){
+                                                 m_sampler(TestApp::createDefaultSampler(device)),
+                                                 m_colorTargetView(device, offscreenBuffer.colorTarget(), offscreenBuffer.colorTarget().format()),
+                                                 m_depthTargetView(device, offscreenBuffer.depthTarget(), offscreenBuffer.depthTarget().format()),
+                                                 m_device(device){
 
     set().write(0, m_buffer);
     rewriteOffscreenTextures(offscreenBuffer, device);
@@ -273,9 +262,11 @@ void TestApp::Fractal::FilterMaterial::rewriteOffscreenTextures(TestApp::Fractal
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto& colorView = offscreenBuffer.colorTarget().getView<vkw::ColorImageView>(device, offscreenBuffer.colorTarget().format(), mapping);
-    auto& depthView = offscreenBuffer.depthTarget().getView<vkw::ColorImageView>(device, offscreenBuffer.depthTarget().format(), mapping);
+    set().write(1, m_colorTargetView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+    set().write(2, m_depthTargetView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+}
 
-    set().write(1, colorView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
-    set().write(2, depthView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
+void TestApp::Fractal::FilterMaterial::updateTargetViews(TestApp::Fractal::OffscreenBuffer &offscreenBuffer) {
+    m_colorTargetView = vkw::ImageView<vkw::COLOR, vkw::V2D>(m_device, offscreenBuffer.colorTarget(), offscreenBuffer.colorTarget().format());
+    m_depthTargetView = vkw::ImageView<vkw::COLOR, vkw::V2D>(m_device, offscreenBuffer.depthTarget(), offscreenBuffer.depthTarget().format());
 }
