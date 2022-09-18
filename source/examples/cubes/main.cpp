@@ -189,16 +189,11 @@ private:
               uint32_t cascades, vkw::Sampler &sampler)
                 : RenderEngine::Lighting(layout), uniform(device,
                                                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
+                  m_shadow_map_view(device, pass.shadowMap(), pass.shadowMap().format(), 0, cascades),
                   mapped(uniform.map()){
-            VkComponentMapping mapping{};
-            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
             auto& shadowCascades = pass.shadowMap();
-            set().write(0, shadowCascades.getView<vkw::DepthImageView>(device, shadowCascades.format(), 0, cascades,
-                                                                         mapping),
+            set().write(0, m_shadow_map_view,
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
             set().write(1, pass.ubo());
             set().write(2, uniform);
@@ -212,6 +207,7 @@ private:
         }
 
         vkw::UniformBuffer<LightUniform> uniform;
+        vkw::ImageView<vkw::DEPTH, vkw::V2DA> m_shadow_map_view;
         LightUniform *mapped;
     } m_light;
 
@@ -241,18 +237,14 @@ private:
     struct M_TexturedSurface : public RenderEngine::Material {
         M_TexturedSurface(vkw::Device &device, RenderEngine::MaterialLayout &layout,
                           RenderEngine::TextureLoader &loader, vkw::Sampler &sampler, std::string const &imageName) :
-                RenderEngine::Material(layout), m_texture(loader.loadTexture(imageName)) {
-            VkComponentMapping mapping{};
-            mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-            set().write(0, m_texture.getView<vkw::ColorImageView>(device, m_texture.format(), mapping),
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+                RenderEngine::Material(layout), m_texture(loader.loadTexture(imageName)),
+                m_texture_view(device, m_texture, m_texture.format()){
+            set().write(0, m_texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
         }
 
     private:
-        vkw::ColorImage2D m_texture;
+        vkw::Image<vkw::COLOR, vkw::I2D> m_texture;
+        vkw::ImageView<vkw::COLOR, vkw::V2D> m_texture_view;
     } m_material;
 };
 
@@ -324,37 +316,31 @@ int runCubes() {
 
     // 8. create swapchain images views for framebuffer
 
-    VkComponentMapping mapping;
-    mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    std::vector<vkw::Image2DArrayViewCRef> swapChainImageViews;
+    std::vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>> swapChainImageViews;
     auto swapChainImages = mySwapChain.retrieveImages();
     for (auto &image: swapChainImages) {
-        swapChainImageViews.emplace_back(image.getView<vkw::ColorImageView>(device, image.format(), 0, 1, mapping));
+        swapChainImageViews.emplace_back(device, image, image.format(), 0, 1);
     }
 
     // 9. create render pass
 
-    auto lightRenderPass = TestApp::LightPass(device, swapChainImageViews.front().get().format(), VK_FORMAT_D32_SFLOAT,
+    auto lightRenderPass = TestApp::LightPass(device, swapChainImageViews.front().format(), VK_FORMAT_D32_SFLOAT,
                                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     // 10. create framebuffer for each swapchain image view
 
     auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
-    std::optional<vkw::DepthStencilImage2D> depthMap = createDepthStencilImage(device, extents.width, extents.height);
-    vkw::DepthImage2DArrayView const *depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping,
-                                                                                                      VK_FORMAT_D32_SFLOAT);
+    auto depthMap = createDepthStencilImage(device, extents.width, extents.height);
+    auto depthImageView = vkw::ImageView<vkw::DEPTH, vkw::V2DA>(device, depthMap, depthMap.format());
     std::vector<vkw::FrameBuffer> framebuffers;
 
     try {
         for (auto &view: swapChainImageViews) {
-            framebuffers.emplace_back(device, lightRenderPass, VkExtent2D{view.get().image()->rawExtents().width,
-                                                                          view.get().image()->rawExtents().height},
-                                      vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
+            std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2> views{&view, &depthImageView};
+            framebuffers.emplace_back(device, lightRenderPass, VkExtent2D{view.image()->rawExtents().width,
+                                                                          view.image()->rawExtents().height},
+                                      std::span<vkw::ImageViewVT<vkw::V2DA> const*>{views.begin(), views.end()});
         }
     } catch (vkw::Error &e) {
         std::cout << e.what() << std::endl;
@@ -372,7 +358,7 @@ int runCubes() {
     RenderEngine::ShaderImporter shaderImporter{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
     RenderEngine::ShaderLoader shaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
     auto cubeTexture = textureLoader.loadTexture("image");
-    auto &cubeTextureView = cubeTexture.getView<vkw::ColorImageView>(device, cubeTexture.format(), mapping);
+    auto cubeTextureView = vkw::ImageView<vkw::COLOR, vkw::V2D>(device, cubeTexture, cubeTexture.format());
 
     // 13. create global layout
 
@@ -496,23 +482,21 @@ int runCubes() {
                 swapChainImageViews.clear();
 
                 for (auto &image: swapChainImages) {
-                    swapChainImageViews.emplace_back(
-                            image.getView<vkw::ColorImageView>(device, image.format(), 0, 1, mapping));
+                    swapChainImageViews.emplace_back(device, image, image.format(), 0, 1);
                 }
 
                 extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
 
-                depthMap.reset();
-                depthMap.emplace(createDepthStencilImage(device, extents.width, extents.height));
-                depthImageView = &depthMap.value().getView<vkw::DepthImageView>(device, mapping,
-                                                                                VK_FORMAT_D32_SFLOAT);
+                depthMap = createDepthStencilImage(device, extents.width, extents.height);
+                depthImageView = vkw::ImageView<vkw::DEPTH, vkw::V2DA>(device, depthMap, depthMap.format());
+
                 framebuffers.clear();
 
                 for (auto &view: swapChainImageViews) {
-                    framebuffers.emplace_back(device, lightRenderPass,
-                                              VkExtent2D{view.get().image()->rawExtents().width,
-                                                         view.get().image()->rawExtents().height},
-                                              vkw::Image2DArrayViewConstRefArray{view, *depthImageView});
+                    std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2> views{&view, &depthImageView};
+                    framebuffers.emplace_back(device, lightRenderPass, VkExtent2D{view.image()->rawExtents().width,
+                                                                                  view.image()->rawExtents().height},
+                                              std::span<vkw::ImageViewVT<vkw::V2DA> const*>{views.begin(), views.end()});
                 }
                 firstEncounter = true;
                 continue;
