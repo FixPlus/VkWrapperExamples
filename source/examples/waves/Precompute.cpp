@@ -16,18 +16,12 @@ TestApp::PrecomputeImageLayout::m_emplace_image_binding(RenderEngine::SubstageDe
 }
 
 TestApp::PrecomputeImage::PrecomputeImage(vkw::Device &device, TestApp::PrecomputeImageLayout &parent,
-                                          vkw::ColorImage2DArrayInterface &image): RenderEngine::Compute(parent),
+                                          vkw::BasicImage<vkw::COLOR, vkw::I2D, vkw::ARRAY> &image): RenderEngine::Compute(parent),
                                                                      m_image(image),
+                                                                                   m_imageView(device, image, image.format(), 0u, image.layers()),
                                                                      m_cached_group_size(image.width() / parent.xGroupSize(), image.height() / parent.yGroupSize()){
-    VkComponentMapping mapping{};
-    mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto& view = image.getView<vkw::ColorImageView>(device, image.format(), 0, image.arrayLayers(),  mapping);
-
-    set().writeStorageImage(0, view, VK_IMAGE_LAYOUT_GENERAL);
+    set().writeStorageImage(0, m_imageView, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void TestApp::PrecomputeImage::acquireOwnership(vkw::CommandBuffer &buffer, uint32_t incomingFamilyIndex,
@@ -44,7 +38,7 @@ void TestApp::PrecomputeImage::acquireOwnership(vkw::CommandBuffer &buffer, uint
     transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     transitLayout1.subresourceRange.baseArrayLayer = 0;
     transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = m_image.get().arrayLayers();
+    transitLayout1.subresourceRange.layerCount = m_image.get().layers();
     transitLayout1.subresourceRange.levelCount = 1;
     transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
     transitLayout1.srcAccessMask = incomingAccessMask;
@@ -67,7 +61,7 @@ void TestApp::PrecomputeImage::releaseOwnershipTo(vkw::CommandBuffer &buffer, ui
     transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     transitLayout1.subresourceRange.baseArrayLayer = 0;
     transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = m_image.get().arrayLayers();
+    transitLayout1.subresourceRange.layerCount = m_image.get().layers();
     transitLayout1.subresourceRange.levelCount = 1;
     transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
     transitLayout1.srcAccessMask = incomingAccessMask;
@@ -89,7 +83,7 @@ void TestApp::PrecomputeImage::releaseOwnership(vkw::CommandBuffer &buffer, uint
     transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     transitLayout1.subresourceRange.baseArrayLayer = 0;
     transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = m_image.get().arrayLayers();
+    transitLayout1.subresourceRange.layerCount = m_image.get().layers();
     transitLayout1.subresourceRange.levelCount = 1;
     transitLayout1.dstAccessMask = acquireAccessMask;
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
@@ -112,7 +106,7 @@ void TestApp::PrecomputeImage::acquireOwnershipFrom(vkw::CommandBuffer &buffer, 
     transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     transitLayout1.subresourceRange.baseArrayLayer = 0;
     transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = m_image.get().arrayLayers();
+    transitLayout1.subresourceRange.layerCount = m_image.get().layers();
     transitLayout1.subresourceRange.levelCount = 1;
     transitLayout1.dstAccessMask = acquireAccessMask;
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;

@@ -23,7 +23,7 @@ void WaterSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer) {
 
 WaterSurface::Geometry::Geometry(vkw::Device &device, WaterSurface &surface, WaveSurfaceTexture &texture)
         : RenderEngine::Geometry(surface),
-          m_sampler(m_sampler_create(device)) {
+          m_sampler(m_sampler_create(device)){
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -35,8 +35,8 @@ WaterSurface::Geometry::Geometry(vkw::Device &device, WaterSurface &surface, Wav
     auto cascadeCount = texture.cascadesCount();
     for(int i = 0; i < cascadeCount; ++i){
         auto &cascade = texture.cascade(i);
-        auto &displacement = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 0, mapping);
-        auto &derivatives = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 1, mapping);
+        auto &displacement = m_displacements_view.emplace_back(device, cascade, cascade.format());
+        //auto &derivatives = cascade.getView<vkw::ColorImageView>(device, cascade.format(), 1, mapping);
         set().write(i + 1, displacement, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
     }
 
@@ -105,8 +105,7 @@ WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMater
     auto cascadeCount = texture.cascadesCount();
     for(int i = 0; i < cascadeCount; ++i) {
         auto &tex = texture.cascade(i);
-        auto &derivatives = tex.getView<vkw::ColorImageView>(device, tex.format(), 1, mapping);
-        auto &turbulence = tex.getView<vkw::ColorImageView>(device, tex.format(), 2, mapping);
+        auto& [derivatives, turbulence] = m_derivTurbViews.emplace_back(vkw::ImageView<vkw::COLOR, vkw::V2D>{device, tex, tex.format(), 1},vkw::ImageView<vkw::COLOR, vkw::V2D>{device, tex, tex.format(), 2});
         set().write(2 + i, derivatives, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
         set().write(2 + cascadeCount + i, turbulence, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_sampler);
     }
@@ -250,51 +249,19 @@ void WaveSurfaceTexture::dispatch(vkw::CommandBuffer &buffer) {
     for (auto &cascade: m_cascades) {
         cascade.computeSpectrum(buffer);
 
-        m_fft.ftt(buffer, cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          0,
-                          mapping),
-                  cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          4,
-                          mapping));
+        m_fft.ftt(buffer, cascade.spectrum().displacementView(0),
+                  cascade.spectrum().displacementView(4));
 
 
-        m_fft.ftt(buffer, cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          1,
-                          mapping),
-                  cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          5,
-                          mapping));
+        m_fft.ftt(buffer, cascade.spectrum().displacementView(1),
+                  cascade.spectrum().displacementView(5));
 
-        m_fft.ftt(buffer, cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          2,
-                          mapping),
-                  cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          6,
-                          mapping));
+        m_fft.ftt(buffer, cascade.spectrum().displacementView(2),
+                  cascade.spectrum().displacementView(6));
 
 
-        m_fft.ftt(buffer, cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          3,
-                          mapping),
-                  cascade.spectrum().getView<vkw::ColorImageView>(
-                          m_device.get(),
-                          cascade.spectrum().format(),
-                          7,
-                          mapping));
+        m_fft.ftt(buffer, cascade.spectrum().displacementView(3),
+                  cascade.spectrum().displacementView(7));
 
         cascade.combineFinalTexture(buffer);
     }
@@ -402,8 +369,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::WaveSurfaceTextureCascade(WaveSur
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto &spectraImageView = m_spectrum_textures.getView<vkw::ColorImageView>(device, m_spectrum_textures.format(), 0,
-                                                                              2, mapping);
+    auto &spectraImageView = m_spectrum_textures.view();
 }
 
 void WaveSurfaceTexture::WaveSurfaceTextureCascade::precomputeStaticSpectrum(vkw::CommandBuffer &buffer) {
@@ -428,7 +394,7 @@ void WaveSurfaceTexture::WaveSurfaceTextureCascade::computeSpectrum(vkw::Command
     transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     transitLayout1.subresourceRange.baseArrayLayer = 0;
     transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = m_dynamic_spectrum.arrayLayers();
+    transitLayout1.subresourceRange.layerCount = m_dynamic_spectrum.layers();
     transitLayout1.subresourceRange.levelCount = 1;
     transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
@@ -452,7 +418,12 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
                          cascadeSize,
                          cascadeSize,
                          1,
-                         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT} {
+                         3,
+                         1,
+                         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT},
+        m_views({vkw::ImageView<vkw::COLOR, vkw::V2D>{device, m_surfaceTexture, m_surfaceTexture.format(), 0u, 1u},
+                 {device, m_surfaceTexture, m_surfaceTexture.format(), 1u, 1u},
+                 {device, m_surfaceTexture, m_surfaceTexture.format(), 2u, 1u}}){
 
     auto queue = device.getComputeQueue();
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
@@ -471,7 +442,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
     transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     transitLayout1.subresourceRange.baseArrayLayer = 0;
     transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = m_surfaceTexture.arrayLayers();
+    transitLayout1.subresourceRange.layerCount = m_surfaceTexture.layers();
     transitLayout1.subresourceRange.levelCount = 1;
     transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     transitLayout1.srcAccessMask = 0;
@@ -498,13 +469,16 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
 
 WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::GaussTexture(vkw::Device &device,
                                                                                             uint32_t size) :
-        vkw::ColorImage2D(device.getAllocator(),
+        vkw::Image<vkw::COLOR, vkw::I2D>(device.getAllocator(),
                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                           VK_FORMAT_R32G32_SFLOAT,
                           size,
                           size,
                           1,
-                          VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
+                          1,
+                          1,
+                          VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
+        m_view(device, *this, format()){
     vkw::Buffer<glm::vec2> stageBuf{device, size * size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}};
 
@@ -578,18 +552,21 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
 WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTextures(
         TestApp::PrecomputeImageLayout &spectrumPrecomputeLayout,
         vkw::UniformBuffer<SpectrumParameters> const &spectrumParams, vkw::Device &device, uint32_t cascadeSize, float cascadeScale)
-        : vkw::ColorImage2DArray<2>{device.getAllocator(),
+        : vkw::Image<vkw::COLOR, vkw::I2D, vkw::ARRAY>{device.getAllocator(),
                                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                                     VK_FORMAT_R32G32B32A32_SFLOAT,
                                     cascadeSize,
                                     cascadeSize,
+                                    1,
+                                    2,
                                     1,
                                     VK_IMAGE_USAGE_STORAGE_BIT},
           TestApp::PrecomputeImage(device, spectrumPrecomputeLayout, *this),
           m_gauss_texture(device, cascadeSize),
           m_global_params(device,
                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-          m_globals_mapped(m_global_params.map()) {
+          m_globals_mapped(m_global_params.map()),
+          m_view(device, *this, format(), 0u, 2u){
     globalParameters.Size = cascadeSize;
     globalParameters.LengthScale = (float)cascadeScale;
     VkImageMemoryBarrier transitLayout1{};
@@ -631,11 +608,9 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTexture
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto &gaussImageView = m_gauss_texture.getView<vkw::ColorImageView>(device, m_gauss_texture.format(), mapping);
-
     *m_globals_mapped = globalParameters;
 
-    set().writeStorageImage(1, gaussImageView, VK_IMAGE_LAYOUT_GENERAL);
+    set().writeStorageImage(1, m_gauss_texture.view(), VK_IMAGE_LAYOUT_GENERAL);
     set().write(2, spectrumParams);
     set().write(3, m_global_params);
 
@@ -776,21 +751,32 @@ FFT::FFTColumn::FFTColumn(RenderEngine::ComputeLayout &layout, const Complex2DTe
 WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicSpectrumTextures(
         RenderEngine::ComputeLayout &layout, SpectrumTextures &spectrum,
         vkw::UniformBuffer<DynamicSpectrumParams> const &params, vkw::Device &device, uint32_t cascadeSize) :
-        vkw::ColorImage2DArray<8>(device.getAllocator(),
+        vkw::Image<vkw::COLOR, vkw::I2D, vkw::ARRAY>(device.getAllocator(),
                                   VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_GPU_ONLY, .requiredFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-                                  VK_FORMAT_R32G32_SFLOAT, cascadeSize, cascadeSize, 1, VK_IMAGE_USAGE_STORAGE_BIT),
-        RenderEngine::Compute(layout) {
+                                  VK_FORMAT_R32G32_SFLOAT, cascadeSize, cascadeSize, 1, 8, 1, VK_IMAGE_USAGE_STORAGE_BIT),
+        RenderEngine::Compute(layout),
+        staticSpectrumView(device, spectrum, spectrum.format(), 0, 2),
+        displacementXY(device, *this, format(), 0),
+        displacementZXdx(device, *this, format(), 1),
+        displacementYdxZdx(device, *this, format(), 2),
+        displacementYdzZdz(device, *this, format(), 3),
+        m_displacementViews{
+                vkw::ImageView<vkw::COLOR, vkw::V2D>{device, *this, format(), 0},
+                {device, *this, format(), 1},
+                {device, *this, format(), 2},
+                {device, *this, format(), 3},
+                {device, *this, format(), 4},
+                {device, *this, format(), 5},
+                {device, *this, format(), 6},
+                {device, *this, format(), 7},
+        }
+{
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto &staticSpectrumView = spectrum.getView<vkw::ColorImageView>(device, spectrum.format(), 0, 2, mapping);
-    auto &displacementXY = getView<vkw::ColorImageView>(device, format(), 0, mapping);
-    auto &displacementZXdx = getView<vkw::ColorImageView>(device, format(), 1, mapping);
-    auto &displacementYdxZdx = getView<vkw::ColorImageView>(device, format(), 2, mapping);
-    auto &displacementYdzZdz = getView<vkw::ColorImageView>(device, format(), 3, mapping);
     set().writeStorageImage(0, staticSpectrumView);
     set().writeStorageImage(1, displacementXY);
     set().writeStorageImage(2, displacementZXdx);
@@ -815,7 +801,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicS
     transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     transitLayout1.subresourceRange.baseArrayLayer = 0;
     transitLayout1.subresourceRange.baseMipLevel = 0;
-    transitLayout1.subresourceRange.layerCount = arrayLayers();
+    transitLayout1.subresourceRange.layerCount = layers();
     transitLayout1.subresourceRange.levelCount = 1;
     transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     transitLayout1.srcAccessMask = 0;
@@ -840,13 +826,14 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::FinalTextureCombiner::FinalTextur
     mappping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     mappping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-    auto &dis1 = specTex.getView<vkw::ColorImageView>(device, specTex.format(), 4, mappping);
-    auto &dis2 = specTex.getView<vkw::ColorImageView>(device, specTex.format(), 5, mappping);
-    auto &dis3 = specTex.getView<vkw::ColorImageView>(device, specTex.format(), 6, mappping);
-    auto &dis4 = specTex.getView<vkw::ColorImageView>(device, specTex.format(), 7, mappping);
-    auto &disp = final.texture().getView<vkw::ColorImageView>(device, final.texture().format(), 0, mappping);
-    auto &deriv = final.texture().getView<vkw::ColorImageView>(device, final.texture().format(), 1, mappping);
-    auto &turbulence = final.texture().getView<vkw::ColorImageView>(device, final.texture().format(), 2, mappping);
+    auto &dis1 = specTex.displacementView(4);
+    auto &dis2 = specTex.displacementView(5);
+    auto &dis3 = specTex.displacementView(6);
+    auto &dis4 = specTex.displacementView(7);
+
+    auto &disp = final.view(0);
+    auto &deriv = final.view(1);
+    auto &turbulence = final.view(2);
 
     set().writeStorageImage(0, dis1);
     set().writeStorageImage(1, dis2);

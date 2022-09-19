@@ -108,17 +108,17 @@ int runWaves() {
 
     auto mySwapChain = TestApp::SwapChainImpl{device, surface, true};
 
-    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().get().format(),
-                                                      mySwapChain.depthAttachment().get().format(),
+    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().format(),
+                                                      mySwapChain.depthAttachment().format(),
                                                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     auto shadowPass = TestApp::ShadowRenderPass{device};
     std::vector<vkw::FrameBuffer> framebuffers;
 
     for (auto &attachment: mySwapChain.attachments()) {
+        std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2 > views = {&attachment, &mySwapChain.depthAttachment()};
         framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                vkw::Image2DArrayViewConstRefArray{attachment,
-                                                                                   mySwapChain.depthAttachment()}});
+                                                {views.begin(), views.end()}});
     }
 
     auto queue = device.getGraphicsQueue();
@@ -268,9 +268,9 @@ int runWaves() {
                 framebuffers.clear();
 
                 for (auto &attachment: mySwapChain.attachments()) {
+                    std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2 > views = {&attachment, &mySwapChain.depthAttachment()};
                     framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                            vkw::Image2DArrayViewConstRefArray{attachment,
-                                                                                               mySwapChain.depthAttachment()}});
+                                                            {views.begin(), views.end()}});
                 }
                 firstEncounter = true;
                 continue;

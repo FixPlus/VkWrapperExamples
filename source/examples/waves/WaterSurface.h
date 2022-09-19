@@ -15,7 +15,7 @@
 #include "Grid.h"
 #include "Precompute.h"
 
-using Complex2DTexture = vkw::ColorImage2DView;
+using Complex2DTexture = vkw::ImageView<vkw::COLOR, vkw::V2D>;
 
 class FFT {
 public:
@@ -58,7 +58,7 @@ public:
     WaveSurfaceTexture(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, uint32_t baseCascadeSize,
                        uint32_t cascades = 1);
 
-    vkw::ColorImage2DArrayInterface &cascade(uint32_t cascadeIndex) {
+    vkw::BasicImage<vkw::COLOR, vkw::I2D, vkw::ARRAY> &cascade(uint32_t cascadeIndex) {
         return m_cascades.at(cascadeIndex).texture();
     }
 
@@ -108,7 +108,7 @@ public:
             transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             transitLayout1.subresourceRange.baseArrayLayer = 0;
             transitLayout1.subresourceRange.baseMipLevel = 0;
-            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.layerCount = texture.layers();
             transitLayout1.subresourceRange.levelCount = 1;
             transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
             transitLayout1.srcAccessMask = incomingAccessMask;
@@ -136,7 +136,7 @@ public:
             transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             transitLayout1.subresourceRange.baseArrayLayer = 0;
             transitLayout1.subresourceRange.baseMipLevel = 0;
-            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.layerCount = texture.layers();
             transitLayout1.subresourceRange.levelCount = 1;
             transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
             transitLayout1.srcAccessMask = incomingAccessMask;
@@ -165,7 +165,7 @@ public:
             transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             transitLayout1.subresourceRange.baseArrayLayer = 0;
             transitLayout1.subresourceRange.baseMipLevel = 0;
-            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.layerCount = texture.layers();
             transitLayout1.subresourceRange.levelCount = 1;
             transitLayout1.dstAccessMask = acquireAccessMask;
             transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
@@ -193,7 +193,7 @@ public:
             transitLayout1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             transitLayout1.subresourceRange.baseArrayLayer = 0;
             transitLayout1.subresourceRange.baseMipLevel = 0;
-            transitLayout1.subresourceRange.layerCount = texture.arrayLayers();
+            transitLayout1.subresourceRange.layerCount = texture.layers();
             transitLayout1.subresourceRange.levelCount = 1;
             transitLayout1.dstAccessMask = acquireAccessMask;
             transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
@@ -236,16 +236,22 @@ private:
     public:
         WaveSurfaceTextureCascadeImageHandler(vkw::Device &device, uint32_t cascadeSize);
 
-        vkw::ColorImage2DArrayInterface &texture() {
+        vkw::BasicImage<vkw::COLOR, vkw::I2D, vkw::ARRAY> &texture() {
             return m_surfaceTexture;
         }
 
-        vkw::ColorImage2DArrayInterface const &texture() const {
+        vkw::BasicImage<vkw::COLOR, vkw::I2D, vkw::ARRAY> const &texture() const {
             return m_surfaceTexture;
+        }
+
+
+        vkw::ImageView<vkw::COLOR, vkw::V2D> const& view(unsigned i) const{
+            return m_views.at(i);
         }
 
     private:
-        vkw::ColorImage2DArray<3> m_surfaceTexture;
+        vkw::Image<vkw::COLOR, vkw::I2D, vkw::ARRAY> m_surfaceTexture;
+        std::array<vkw::ImageView<vkw::COLOR, vkw::V2D>, 3> m_views;
     };
 
     class WaveSurfaceTextureCascade : public WaveSurfaceTextureCascadeImageHandler {
@@ -261,9 +267,7 @@ private:
 
         void computeSpectrum(vkw::CommandBuffer &commandBuffer);
 
-        vkw::ColorImage2DArrayInterface &spectrum() {
-            return m_dynamic_spectrum;
-        }
+
 
         void combineFinalTexture(vkw::CommandBuffer &buffer);
 
@@ -273,32 +277,53 @@ private:
 
     private:
 
-        class SpectrumTextures : public vkw::ColorImage2DArray<2>, public TestApp::PrecomputeImage {
+        class SpectrumTextures : public vkw::Image<vkw::COLOR, vkw::I2D, vkw::ARRAY>, public TestApp::PrecomputeImage {
         public:
             SpectrumTextures(TestApp::PrecomputeImageLayout &spectrumPrecomputeLayout,
                              vkw::UniformBuffer<SpectrumParameters> const &spectrumParams, vkw::Device &device,
                              uint32_t cascadeSize, float cascadeScale);
 
+            vkw::ImageView<vkw::COLOR, vkw::V2DA> const& view() const{
+                return m_view;
+            }
             GlobalParams globalParameters{};
 
             void update();
 
         private:
 
-            class GaussTexture : public vkw::ColorImage2D {
+            class GaussTexture : public vkw::Image<vkw::COLOR, vkw::I2D> {
             public:
                 GaussTexture(vkw::Device &device, uint32_t size);
+                vkw::ImageView<vkw::COLOR, vkw::V2D> const& view() const{
+                    return m_view;
+                }
+            private:
+                vkw::ImageView<vkw::COLOR, vkw::V2D> m_view;
             } m_gauss_texture;
 
             vkw::UniformBuffer<GlobalParams> m_global_params;
             GlobalParams *m_globals_mapped;
+            vkw::ImageView<vkw::COLOR, vkw::V2DA> m_view;
         } m_spectrum_textures;
 
-        class DynamicSpectrumTextures : public vkw::ColorImage2DArray<8>, public RenderEngine::Compute {
+        class DynamicSpectrumTextures : public vkw::Image<vkw::COLOR, vkw::I2D, vkw::ARRAY>, public RenderEngine::Compute {
         public:
             DynamicSpectrumTextures(RenderEngine::ComputeLayout &layout, SpectrumTextures &spectrum,
                                     vkw::UniformBuffer<DynamicSpectrumParams> const &params,
                                     vkw::Device &device, uint32_t cascadeSize);
+
+            vkw::ImageView<vkw::COLOR, vkw::V2D> const& displacementView(unsigned i) const{
+                return m_displacementViews.at(i);
+            }
+        private:
+            vkw::ImageView<vkw::COLOR, vkw::V2DA> staticSpectrumView;
+            vkw::ImageView<vkw::COLOR, vkw::V2D> displacementXY;
+            vkw::ImageView<vkw::COLOR, vkw::V2D> displacementZXdx;
+            vkw::ImageView<vkw::COLOR, vkw::V2D> displacementYdxZdx;
+            vkw::ImageView<vkw::COLOR, vkw::V2D> displacementYdzZdz;
+
+            std::array<vkw::ImageView<vkw::COLOR, vkw::V2D>, 8> m_displacementViews;
         } m_dynamic_spectrum;
 
         class FinalTextureCombiner : public RenderEngine::Compute {
@@ -310,6 +335,10 @@ private:
         size_t cascade_size;
         std::reference_wrapper<vkw::Device> m_device;
         std::reference_wrapper<TestApp::PrecomputeImageLayout> m_layout;
+    public:
+        DynamicSpectrumTextures &spectrum() {
+            return m_dynamic_spectrum;
+        }
     };
 
     TestApp::PrecomputeImageLayout m_spectrum_precompute_layout;
@@ -345,12 +374,15 @@ public:
 
 private:
 
-    struct Geometry : public RenderEngine::Geometry {
+    class Geometry : public RenderEngine::Geometry {
+    public:
         vkw::Sampler m_sampler;
 
         Geometry(vkw::Device &device, WaterSurface &surface, WaveSurfaceTexture &texture);
 
         static vkw::Sampler m_sampler_create(vkw::Device &device);
+    private:
+        std::vector<vkw::ImageView<vkw::COLOR, vkw::V2D>> m_displacements_view;
     } m_geometry;
 
 protected:
@@ -380,7 +412,8 @@ public:
     }
 
 private:
-    struct Material : public RenderEngine::Material {
+    class Material : public RenderEngine::Material {
+    public:
         vkw::UniformBuffer<WaterDescription> m_buffer;
         WaterDescription *m_mapped;
 
@@ -389,6 +422,9 @@ private:
         static vkw::Sampler m_sampler_create(vkw::Device &device);
 
         vkw::Sampler m_sampler;
+    private:
+        std::vector<std::pair<vkw::ImageView<vkw::COLOR, vkw::V2D>, vkw::ImageView<vkw::COLOR, vkw::V2D>>> m_derivTurbViews;
+
     } m_material;
 
 };
