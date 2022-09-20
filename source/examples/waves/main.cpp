@@ -17,6 +17,7 @@
 #include "SkyBox.h"
 #include "ShadowPass.h"
 #include "RenderEngine/Window/Boxer.h"
+#include "ErrorCallbackWrapper.h"
 
 using namespace TestApp;
 
@@ -96,10 +97,15 @@ int runWaves() {
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
     // to support wireframe display
-    deviceDesc.enableFeature(vkw::feature::fillModeNonSolid{});
+    deviceDesc.enableFeature(vkw::device::feature::fillModeNonSolid);
+
     // to support anisotropy filtering (if possible) in ocean
-    if(deviceDesc.isFeatureSupported(vkw::feature::samplerAnisotropy{}))
-        deviceDesc.enableFeature(vkw::feature::samplerAnisotropy{});
+    if(deviceDesc.isFeatureSupported(vkw::device::feature::samplerAnisotropy)) {
+        std::cout << "Sampler anisotropy enabled" << std::endl;
+        deviceDesc.enableFeature(vkw::device::feature::samplerAnisotropy);
+    } else{
+        std::cout << "Sampler anisotropy disabled" << std::endl;
+    }
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 
@@ -370,16 +376,5 @@ int runWaves() {
 
 
 int main(){
-    try{
-        runWaves();
-    }
-    catch(vkw::VulkanError& e){
-        RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
-    }
-    catch(vkw::Error& e){
-        RenderEngine::Boxer::show(e.what(), "vkw::Error", RenderEngine::Boxer::Style::Error);
-    }
-    catch(std::runtime_error& e){
-        RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
-    }
+    return ErrorCallbackWrapper<runWaves>::run();
 }

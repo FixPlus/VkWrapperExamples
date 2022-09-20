@@ -45,6 +45,7 @@
 #include "Utils.h"
 #include "ShadowPass.h"
 #include "RenderEngine/Window/Boxer.h"
+#include "ErrorCallbackWrapper.h"
 
 using namespace TestApp;
 
@@ -287,7 +288,7 @@ int runCubes() {
 
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
-    deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
+    std::cout << deviceDesc.isFeatureSupported(vkw::device::feature::multiViewport) << std::endl;
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 
@@ -298,6 +299,7 @@ int runCubes() {
     // 6. Create swapchain, present queue and fence for sync
 
     auto mySwapChain = TestApp::SwapChainImpl{device, surface};
+
 
     auto queue = device.getGraphicsQueue();
 
@@ -587,16 +589,5 @@ int runCubes() {
 
 
 int main(){
-    try{
-        runCubes();
-    }
-    catch(vkw::VulkanError& e){
-        RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
-    }
-    catch(vkw::Error& e){
-        RenderEngine::Boxer::show(e.what(), "vkw::Error", RenderEngine::Boxer::Style::Error);
-    }
-    catch(std::runtime_error& e){
-        RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
-    }
+    return ErrorCallbackWrapper<runCubes>::run();
 }

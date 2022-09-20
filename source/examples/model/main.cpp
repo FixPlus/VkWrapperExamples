@@ -13,6 +13,7 @@
 #include "GlobalLayout.h"
 #include "SkyBox.h"
 #include "RenderEngine/Window/Boxer.h"
+#include "ErrorCallbackWrapper.h"
 
 using namespace TestApp;
 
@@ -105,8 +106,6 @@ int runModel() {
     }
 
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
-
-    deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 
@@ -356,19 +355,7 @@ int runModel() {
     return 0;
 }
 
-
 int main(){
-    try{
-        runModel();
-    }
-    catch(vkw::VulkanError& e){
-        RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
-    }
-    catch(vkw::Error& e){
-        RenderEngine::Boxer::show(e.what(), "vkw::Error", RenderEngine::Boxer::Style::Error);
-    }
-    catch(std::runtime_error& e){
-        RenderEngine::Boxer::show(e.what(), "Fatal error", RenderEngine::Boxer::Style::Error);
-    }
+    return ErrorCallbackWrapper<runModel>::run();
 }
 

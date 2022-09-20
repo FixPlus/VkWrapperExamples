@@ -43,7 +43,7 @@ namespace RenderEngine {
         auto ext = glfwGetRequiredInstanceExtensions(&count);
 
         for (int i = 0; i < count; ++i)
-            extensions.emplace_back(vulkanLib.getExtensionId(ext[i]));
+            extensions.emplace_back(vkw::Library::ExtensionId(ext[i]));
 
 #ifdef __linux__
         extensions.emplace_back(vulkanLib.getExtensionId(VK_KHR_XLIB_SURFACE_EXTENSION_NAME));
