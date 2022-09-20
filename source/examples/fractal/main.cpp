@@ -88,7 +88,7 @@ int runFractal(){
 
     vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
 
-    deviceDesc.enableExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 

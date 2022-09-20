@@ -37,16 +37,16 @@ namespace RenderEngine {
         return surface;
     }
 
-    vkw::Instance Window::vulkanInstance(vkw::Library &vulkanLib, std::vector<std::string> extensions, bool enableValidation) {
+    vkw::Instance Window::vulkanInstance(vkw::Library &vulkanLib, std::vector<vkw::ext> extensions, bool enableValidation) {
         initImpl();
         uint32_t count = 0;
         auto ext = glfwGetRequiredInstanceExtensions(&count);
 
         for (int i = 0; i < count; ++i)
-            extensions.emplace_back(ext[i]);
+            extensions.emplace_back(vulkanLib.getExtensionId(ext[i]));
 
 #ifdef __linux__
-        extensions.emplace_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+        extensions.emplace_back(vulkanLib.getExtensionId(VK_KHR_XLIB_SURFACE_EXTENSION_NAME));
 #endif
         return {vulkanLib, extensions, enableValidation};
     }

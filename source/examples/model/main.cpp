@@ -104,7 +104,7 @@ int runModel() {
         return 1;
     }
 
-    deviceDesc.enableExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
     deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
 

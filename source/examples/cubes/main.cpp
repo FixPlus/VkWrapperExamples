@@ -260,11 +260,6 @@ int runCubes() {
 
     vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, vulkanLib.hasLayer("VK_LAYER_KHRONOS_validation"));
 
-    std::for_each(renderInstance.extensions_begin(), renderInstance.extensions_end(),
-                  [](vkw::Instance::extension_const_iterator::value_type const &ext) {
-                      std::cout << ext.first << std::endl;
-                  });
-
     // 2. Enumerate available devices
 
     auto devs = renderInstance.enumerateAvailableDevices();
@@ -290,7 +285,7 @@ int runCubes() {
 
     // 4. enable needed device extensions and create logical device
 
-    deviceDesc.enableExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
     deviceDesc.isFeatureSupported(vkw::feature::multiViewport());
 

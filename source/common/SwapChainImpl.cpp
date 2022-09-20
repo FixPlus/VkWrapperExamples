@@ -74,7 +74,7 @@ namespace TestApp{
         auto &physicalDevice = device.physicalDevice();
         auto availablePresentQueues = surface.getQueueFamilyIndicesThatSupportPresenting(physicalDevice);
 
-        if (!device.supportsPresenting() || availablePresentQueues.empty())
+        if (!device.physicalDevice().extensionSupported(vkw::ext::KHR_swapchain) || availablePresentQueues.empty())
             throw vkw::Error("Cannot create SwapChain on device that does not support presenting");
 
         auto surfCaps = surface.getSurfaceCapabilities(physicalDevice);
