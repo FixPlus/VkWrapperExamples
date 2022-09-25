@@ -3,7 +3,7 @@
 //
 
 #include "RenderPassesImpl.h"
-
+#include <span>
 vkw::RenderPassCreateInfo TestApp::LightPass::m_compile_info(VkFormat colorFormat, VkFormat depthFormat, VkImageLayout colorLayout) {
     auto attachmentDescription = vkw::AttachmentDescription{colorFormat,
                                                             VK_SAMPLE_COUNT_1_BIT,
@@ -43,9 +43,9 @@ vkw::RenderPassCreateInfo TestApp::LightPass::m_compile_info(VkFormat colorForma
     outputDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 
-    return vkw::RenderPassCreateInfo{{m_attachments.at(0), m_attachments.at(1)},
-                                                               {subpassDescription},
-                                                               {inputDependency,       outputDependency}};
+    return vkw::RenderPassCreateInfo{std::span<vkw::AttachmentDescription, 2>{m_attachments.begin(), m_attachments.begin() + 1},
+                                     {subpassDescription},
+                                                              {inputDependency,       outputDependency}};
 }
 
 vkw::RenderPassCreateInfo TestApp::ShadowPass::m_compile_info(VkFormat attachmentFormat) {

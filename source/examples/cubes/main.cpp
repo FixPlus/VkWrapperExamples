@@ -288,7 +288,7 @@ int runCubes() {
 
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
-    std::cout << deviceDesc.isFeatureSupported(vkw::device::feature::multiViewport) << std::endl;
+    std::cout << deviceDesc.isFeatureSupported(vkw::PhysicalDevice::feature::multiViewport) << std::endl;
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 
@@ -568,7 +568,7 @@ int runCubes() {
         commandBuffer.endRenderPass();
         commandBuffer.end();
 
-        queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
+        queue->submit(commandBuffer, presentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                       renderComplete, &fence);
 
 

@@ -97,12 +97,12 @@ int runWaves() {
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
     // to support wireframe display
-    deviceDesc.enableFeature(vkw::device::feature::fillModeNonSolid);
+    deviceDesc.enableFeature(vkw::PhysicalDevice::feature::fillModeNonSolid);
 
     // to support anisotropy filtering (if possible) in ocean
-    if(deviceDesc.isFeatureSupported(vkw::device::feature::samplerAnisotropy)) {
+    if(deviceDesc.isFeatureSupported(vkw::PhysicalDevice::feature::samplerAnisotropy)) {
         std::cout << "Sampler anisotropy enabled" << std::endl;
-        deviceDesc.enableFeature(vkw::device::feature::samplerAnisotropy);
+        deviceDesc.enableFeature(vkw::PhysicalDevice::feature::samplerAnisotropy);
     } else{
         std::cout << "Sampler anisotropy disabled" << std::endl;
     }
@@ -168,7 +168,7 @@ int runWaves() {
     auto computeCommandBuffer = vkw::PrimaryCommandBuffer(computeCommandPool);
 
     auto computeImageReady = vkw::Semaphore(device);
-    computeQueue->submit({}, {}, {computeImageReady});
+    computeQueue->submit(std::span<vkw::Semaphore const>{&computeImageReady, 0}, {}, std::span<vkw::Semaphore const>{&computeImageReady, 1});
     auto computeImageRelease = vkw::Semaphore(device);
 
     // 3D queue and buffer
@@ -355,11 +355,11 @@ int runWaves() {
         commandBuffer.end();
 
 
-        queue->submit(commandBuffer, {computeImageReady, presentComplete},
+        queue->submit(commandBuffer, std::array<vkw::SemaphoreCRef, 2>{computeImageReady, presentComplete},
                       {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                      {computeImageRelease, renderComplete});
+                      std::array<vkw::SemaphoreCRef, 2>{computeImageRelease, renderComplete});
 
-        computeQueue->submit(computeCommandBuffer, computeImageRelease, {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
+        computeQueue->submit(computeCommandBuffer, computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                              computeImageReady, &fence);
 
         queue->present(mySwapChain, renderComplete);

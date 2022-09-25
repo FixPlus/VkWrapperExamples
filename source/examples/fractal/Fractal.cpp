@@ -203,7 +203,7 @@ vkw::RenderPassCreateInfo TestApp::Fractal::RenderPass::m_compileRenderPassInfo(
     outputDependency.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     outputDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-    return vkw::RenderPassCreateInfo({{colorAttachment(), depthAttachment()},
+    return vkw::RenderPassCreateInfo({std::array<vkw::AttachmentDescriptionCRef, 2>{colorAttachment(), depthAttachment()},
                                       {subpassDescription},
                                       {inputDependency,   outputDependency}});
 }

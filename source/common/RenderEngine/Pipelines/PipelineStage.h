@@ -21,7 +21,7 @@ namespace RenderEngine{
     class PipelineStageLayout{
     public:
         PipelineStageLayout(vkw::Device& device, SubstageDescription desc, uint32_t maxSets): m_layout(device,
-                                                                                                       vkw::DescriptorSetLayoutBindingConstRefArray{desc.setBindings}, 0),
+                                                                                                       desc.setBindings, 0),
                                                                                               m_description(std::move(desc)){
             if(!m_description.setBindings.empty())
                 m_pool.emplace(m_initPool(device, m_description, maxSets));
