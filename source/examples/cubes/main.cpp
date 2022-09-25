@@ -403,6 +403,9 @@ int runCubes() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
+    auto submitInfo = vkw::SubmitInfo{commandBuffer, presentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                      renderComplete};
+
     // 16. Create pipeline pool and recorder state abstraction
 
     auto pipelinePool = RenderEngine::GraphicsPipelinePool{device, shaderLoader};
@@ -568,11 +571,10 @@ int runCubes() {
         commandBuffer.endRenderPass();
         commandBuffer.end();
 
-        queue->submit(commandBuffer, presentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                      renderComplete, &fence);
+        queue->submit(submitInfo, fence);
 
-
-        queue->present(mySwapChain, renderComplete);
+        auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
+        queue->present(presentInfo);
     }
 
 

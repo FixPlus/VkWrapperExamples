@@ -48,7 +48,9 @@ namespace TestApp{
 
             auto fence = vkw::Fence{device};
 
-            queue->submit(commandBuffer, {}, {}, {}, &fence);
+            auto submitInfo = vkw::SubmitInfo(commandBuffer);
+
+            queue->submit(submitInfo, fence);
             fence.wait();
 
             VkComponentMapping mapping;

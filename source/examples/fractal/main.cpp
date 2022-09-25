@@ -129,6 +129,9 @@ int runFractal(){
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
+    auto submitInfo = vkw::SubmitInfo{commandBuffer, presentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                      renderComplete};
+
     auto fractal = Fractal{device, lightPass, 0, textureLoader, framebuffers.front().extents().width, framebuffers.front().extents().height};
     auto fractalSettings = FractalSettings{gui, fractal};
 
@@ -219,9 +222,9 @@ int runFractal(){
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
-        queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                      renderComplete, &fence);
-        queue->present(mySwapChain, renderComplete);
+        queue->submit(submitInfo, fence);
+        auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
+        queue->present(presentInfo);
 
     }
 

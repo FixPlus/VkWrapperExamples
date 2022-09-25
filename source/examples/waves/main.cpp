@@ -168,8 +168,10 @@ int runWaves() {
     auto computeCommandBuffer = vkw::PrimaryCommandBuffer(computeCommandPool);
 
     auto computeImageReady = vkw::Semaphore(device);
-    computeQueue->submit(std::span<vkw::Semaphore const>{&computeImageReady, 0}, {}, std::span<vkw::Semaphore const>{&computeImageReady, 1});
+    auto syncCSubmitInfo = vkw::SubmitInfo{std::span<vkw::Semaphore const>{&computeImageReady, 0}, {}, std::span<vkw::Semaphore const>{&computeImageReady, 1}};
+    computeQueue->submit(syncCSubmitInfo);
     auto computeImageRelease = vkw::Semaphore(device);
+
 
     // 3D queue and buffer
 
@@ -179,6 +181,12 @@ int runWaves() {
 
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
+
+    auto computeSubmitInfo = vkw::SubmitInfo{computeCommandBuffer, computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeImageReady};
+
+    auto submitInfo = vkw::SubmitInfo{commandBuffer, std::array<vkw::SemaphoreCRef, 2>{computeImageReady, presentComplete},
+                                             {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
+                                             std::array<vkw::SemaphoreCRef, 2>{computeImageRelease, renderComplete}};
 
     auto waveSettings = WaveSettings{gui, waves, waveSurfaceTexture,
                                      {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
@@ -355,14 +363,12 @@ int runWaves() {
         commandBuffer.end();
 
 
-        queue->submit(commandBuffer, std::array<vkw::SemaphoreCRef, 2>{computeImageReady, presentComplete},
-                      {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                      std::array<vkw::SemaphoreCRef, 2>{computeImageRelease, renderComplete});
+        queue->submit(submitInfo);
 
-        computeQueue->submit(computeCommandBuffer, computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                             computeImageReady, &fence);
+        computeQueue->submit(computeSubmitInfo, fence);
 
-        queue->present(mySwapChain, renderComplete);
+        auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
+        queue->present(presentInfo);
     }
 
 

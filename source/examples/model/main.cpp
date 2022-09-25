@@ -234,6 +234,9 @@ int runModel() {
     auto presentComplete = vkw::Semaphore{device};
     auto renderComplete = vkw::Semaphore{device};
 
+    auto submitInfo = vkw::SubmitInfo{commandBuffer, presentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                      renderComplete};
+
     shadowPass.onPass = [&instance, &instances](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
         instance.drawGeometryOnly(state);
 
@@ -342,9 +345,10 @@ int runModel() {
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
-        queue->submit(commandBuffer, presentComplete, {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                      renderComplete, &fence);
-        queue->present(mySwapChain, renderComplete);
+        queue->submit(submitInfo, fence);
+
+        auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
+        queue->present(presentInfo);
     }
 
     fence.wait();
