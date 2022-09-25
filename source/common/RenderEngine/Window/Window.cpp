@@ -37,7 +37,7 @@ namespace RenderEngine {
         return surface;
     }
 
-    vkw::Instance Window::vulkanInstance(vkw::Library &vulkanLib, std::vector<vkw::ext> extensions, bool enableValidation) {
+    vkw::Instance Window::vulkanInstance(vkw::Library &vulkanLib, std::vector<vkw::ext> extensions, std::vector<vkw::layer> layers) {
         initImpl();
         uint32_t count = 0;
         auto ext = glfwGetRequiredInstanceExtensions(&count);
@@ -48,7 +48,7 @@ namespace RenderEngine {
 #ifdef __linux__
         extensions.emplace_back(vulkanLib.getExtensionId(VK_KHR_XLIB_SURFACE_EXTENSION_NAME));
 #endif
-        return {vulkanLib, extensions, enableValidation};
+        return {vulkanLib, extensions, layers};
     }
 
     class GlfwLibKeeper{

@@ -14,6 +14,7 @@
 #include "SkyBox.h"
 #include "RenderEngine/Window/Boxer.h"
 #include "ErrorCallbackWrapper.h"
+#include "Validation.hpp"
 
 using namespace TestApp;
 
@@ -93,8 +94,27 @@ int runModel() {
 
     vkw::Library vulkanLib{};
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, {}, vulkanLib.hasLayer("VK_LAYER_KHRONOS_validation"));
+    auto validationPossible = vulkanLib.hasLayer(vkw::layer::KHRONOS_validation);
 
+    if(!validationPossible)
+        std::cout << "Validation unavailable" << std::endl;
+    else
+        std::cout << "Validation enabled" << std::endl;
+
+    std::vector<vkw::layer> requiredLayers;
+    std::vector<vkw::ext> requiredExtensions;
+
+    if(validationPossible) {
+        requiredLayers.emplace_back(vkw::layer::KHRONOS_validation);
+        requiredExtensions.emplace_back(vkw::ext::EXT_debug_utils);
+    }
+
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, requiredExtensions, requiredLayers);
+
+    std::optional<vkw::debug::Validation> validation;
+
+    if(validationPossible)
+        validation.emplace(renderInstance);
     auto devs = renderInstance.enumerateAvailableDevices();
 
     vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
