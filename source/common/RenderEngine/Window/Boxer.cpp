@@ -3,7 +3,7 @@
 using namespace RenderEngine;
 
 #ifdef __linux__
-
+#if 0
 #include <gtk/gtk.h>
 
 namespace {
@@ -52,6 +52,7 @@ Boxer::Selection getSelection(gint response) {
 }
 
 } // namespace
+#endif
 #elif defined _WIN32
 
 #include <windows.h>
@@ -111,6 +112,7 @@ RenderEngine::Boxer::Selection
 RenderEngine::Boxer::show(std::string_view const& message, std::string_view const& title, RenderEngine::Boxer::Style style,
                           RenderEngine::Boxer::Buttons buttons) {
 #ifdef __linux__
+#if 0
     if (!gtk_init_check(0, NULL)) {
       return Boxer::Selection::None;
    }
@@ -128,6 +130,7 @@ RenderEngine::Boxer::show(std::string_view const& message, std::string_view cons
    while (g_main_context_iteration(NULL, false));
 
    return selection;
+#endif
 #elif defined _WIN32
     UINT flags = MB_TASKMODAL;
 
@@ -136,4 +139,5 @@ RenderEngine::Boxer::show(std::string_view const& message, std::string_view cons
 
     return getSelection(MessageBox(NULL, message.data(), title.data(), flags));
 #endif
+    return Selection::NONE;
 }

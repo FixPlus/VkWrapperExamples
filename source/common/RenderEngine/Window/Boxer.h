@@ -25,7 +25,7 @@ namespace RenderEngine{
             Cancel,
             Yes,
             No,
-            None
+            NONE
         };
 
 
