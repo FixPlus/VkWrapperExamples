@@ -171,8 +171,8 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
     transitLayout2.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
     transitLayout2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 
-    auto transferQueue = m_device.get().getTransferQueue();
-    auto commandPool = vkw::CommandPool{m_device, 0, transferQueue->familyIndex()};
+    auto const& transferQueue = m_device.get().anyTransferQueue();
+    auto commandPool = vkw::CommandPool{m_device, 0, transferQueue.family().index()};
     auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -193,8 +193,8 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
                                        {transitLayout2});
     transferCommand.end();
 
-    transferQueue->submit(transferCommand);
-    transferQueue->waitIdle();
+    transferQueue.submit(transferCommand);
+    transferQueue.waitIdle();
 
     return ret;
 }

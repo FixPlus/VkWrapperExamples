@@ -90,15 +90,14 @@ int runWaves() {
     else
         std::cout << "Validation enabled" << std::endl;
 
-    std::vector<vkw::layer> requiredLayers;
-    std::vector<vkw::ext> requiredExtensions;
+    vkw::InstanceCreateInfo createInfo{};
 
     if(validationPossible) {
-        requiredLayers.emplace_back(vkw::layer::KHRONOS_validation);
-        requiredExtensions.emplace_back(vkw::ext::EXT_debug_utils);
+        createInfo.requestLayer(vkw::layer::KHRONOS_validation);
+        createInfo.requestExtension(vkw::ext::EXT_debug_utils);
     }
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, requiredExtensions, requiredLayers);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, createInfo);
 
     std::optional<vkw::debug::Validation> validation;
 
@@ -106,13 +105,15 @@ int runWaves() {
         validation.emplace(renderInstance);
     auto devs = renderInstance.enumerateAvailableDevices();
 
-    vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
-
     if (devs.empty()) {
         std::cout << "No available devices supporting vulkan on this machine." << std::endl <<
                   " Make sure your graphics drivers are installed and updated." << std::endl;
         return 1;
     }
+
+    vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
+
+    TestApp::requestQueues(deviceDesc, true, true);
 
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
 
@@ -147,7 +148,7 @@ int runWaves() {
                                                 {views.begin(), views.end()}});
     }
 
-    auto queue = device.getGraphicsQueue();
+    auto queue = device.anyGraphicsQueue();
     auto fence = vkw::Fence{device};
 
     auto shaderLoader = RenderEngine::ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
@@ -182,20 +183,20 @@ int runWaves() {
 
     // Compute queue and buffer
 
-    auto computeQueue = device.getComputeQueue();
+    auto computeQueue = device.getSpecificQueue(TestApp::dedicatedCompute());
     auto computeCommandPool = vkw::CommandPool(device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                               computeQueue->familyIndex());
+                                               computeQueue.family().index());
     auto computeCommandBuffer = vkw::PrimaryCommandBuffer(computeCommandPool);
 
     auto computeImageReady = vkw::Semaphore(device);
     auto syncCSubmitInfo = vkw::SubmitInfo{std::span<vkw::Semaphore const>{&computeImageReady, 0}, {}, std::span<vkw::Semaphore const>{&computeImageReady, 1}};
-    computeQueue->submit(syncCSubmitInfo);
+    computeQueue.submit(syncCSubmitInfo);
     auto computeImageRelease = vkw::Semaphore(device);
 
 
     // 3D queue and buffer
 
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
     auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
     auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
 
@@ -383,12 +384,12 @@ int runWaves() {
         commandBuffer.end();
 
 
-        queue->submit(submitInfo);
+        queue.submit(submitInfo);
 
-        computeQueue->submit(computeSubmitInfo, fence);
+        computeQueue.submit(computeSubmitInfo, fence);
 
         auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
-        queue->present(presentInfo);
+        queue.present(presentInfo);
     }
 
 

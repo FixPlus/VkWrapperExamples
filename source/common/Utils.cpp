@@ -24,8 +24,8 @@ namespace TestApp{
         transitLayout.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
         transitLayout.srcAccessMask = 0;
 
-        auto queue = device.getTransferQueue();
-        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+        auto const& queue = device.anyTransferQueue();
+        auto commandPool = vkw::CommandPool{device, 0, queue.family().index()};
         auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
 
         transferCommand.begin(0);
@@ -33,8 +33,8 @@ namespace TestApp{
                                            {transitLayout});
         transferCommand.end();
 
-        queue->submit(transferCommand);
-        queue->waitIdle();
+        queue.submit(transferCommand);
+        queue.waitIdle();
 
         return depthMap;
     }
@@ -70,8 +70,8 @@ namespace TestApp{
         transitLayout.dstAccessMask = 0;
         transitLayout.srcAccessMask = 0;
 
-        auto queue = device.getTransferQueue();
-        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+        auto const& queue = device.anyTransferQueue();
+        auto commandPool = vkw::CommandPool{device, 0, queue.family().index()};
         auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
 
         transferCommand.begin(0);
@@ -79,7 +79,56 @@ namespace TestApp{
                                            {transitLayout});
         transferCommand.end();
 
-        queue->submit(transferCommand);
-        queue->waitIdle();
+        queue.submit(transferCommand);
+        queue.waitIdle();
+    }
+
+    void requestQueues(vkw::PhysicalDevice& physicalDevice, bool wantTransfer, bool wantCompute){
+
+        auto& families = physicalDevice.queueFamilies();
+
+        // Find any graphics queue family
+
+        auto graphicsFamily = std::find_if(families.begin(), families.end(), [](vkw::QueueFamily const&family){ return family.graphics();});
+
+        if(graphicsFamily == families.end()){
+            throw vkw::Error{"Device has no supported graphics queues"};
+        }
+
+        graphicsFamily->requestQueue();
+
+        // find DEDICATED transfer queue family if needed
+
+        if(wantTransfer){
+            auto transferFamily = std::find_if(families.begin(), families.end(), [](vkw::QueueFamily const&family){ return family.transfer();});
+
+            if(transferFamily->index() == graphicsFamily->index()){
+                transferFamily++;
+                transferFamily = std::find_if(transferFamily, families.end(), [](vkw::QueueFamily const&family){ return family.transfer();});
+            }
+
+            if(transferFamily == families.end()){
+                throw vkw::Error{"Device has no supported dedicated transfer queues"};
+            }
+
+            transferFamily->requestQueue();
+        }
+
+        // find DEDICATED compute queue family if needed
+
+        if(wantCompute){
+            auto computeFamily = std::find_if(families.begin(), families.end(), [](vkw::QueueFamily const&family){ return family.compute();});
+
+            if(computeFamily->index() == graphicsFamily->index()){
+                computeFamily++;
+                computeFamily = std::find_if(computeFamily, families.end(), [](vkw::QueueFamily const&family){ return family.compute();});
+            }
+
+            if(computeFamily == families.end()){
+                throw vkw::Error{"Device has no supported dedicated compute queues"};
+            }
+
+            computeFamily->requestQueue();
+        }
     }
 }

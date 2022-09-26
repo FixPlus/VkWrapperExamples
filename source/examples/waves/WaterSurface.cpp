@@ -332,8 +332,8 @@ void WaveSurfaceTexture::computeSpectrum() {
     m_spectrum_params.flush();
 
     auto &device = m_device.get();
-    auto queue = device.getComputeQueue();
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto queue = device.getSpecificQueue(TestApp::dedicatedCompute());
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
     auto buffer = vkw::PrimaryCommandBuffer{commandPool};
     buffer.begin(0);
 
@@ -344,8 +344,8 @@ void WaveSurfaceTexture::computeSpectrum() {
 
     buffer.end();
 
-    queue->submit(buffer);
-    queue->waitIdle();
+    queue.submit(buffer);
+    queue.waitIdle();
 }
 
 WaveSurfaceTexture::WaveSurfaceTextureCascade::WaveSurfaceTextureCascade(WaveSurfaceTexture &parent,
@@ -425,8 +425,8 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
                  {device, m_surfaceTexture, m_surfaceTexture.format(), 1u, 1u},
                  {device, m_surfaceTexture, m_surfaceTexture.format(), 2u, 1u}}){
 
-    auto queue = device.getComputeQueue();
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto queue = device.getSpecificQueue(TestApp::dedicatedCompute());
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
     auto transferBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
     transferBuffer.begin(0);
@@ -452,8 +452,8 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
 
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     transitLayout1.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    transitLayout1.srcQueueFamilyIndex = queue->familyIndex();
-    transitLayout1.dstQueueFamilyIndex = device.getGraphicsQueue()->familyIndex();
+    transitLayout1.srcQueueFamilyIndex = queue.family().index();
+    transitLayout1.dstQueueFamilyIndex = device.anyGraphicsQueue().family().index();
     transitLayout1.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
@@ -461,9 +461,9 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
                                       {transitLayout1});
     transferBuffer.end();
 
-    queue->submit(transferBuffer);
+    queue.submit(transferBuffer);
 
-    queue->waitIdle();
+    queue.waitIdle();
 
 }
 
@@ -499,10 +499,10 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
 
     stageBuf.flush();
 
-    auto transferQueue = device.getTransferQueue();
+    auto transferQueue = device.getSpecificQueue(TestApp::dedicatedTransfer());
 
     auto commandPool = vkw::CommandPool(device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                        transferQueue->familyIndex());
+                                        transferQueue.family().index());
     auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
 
     VkImageMemoryBarrier transitLayout1{};
@@ -544,9 +544,9 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
 
     transferCommand.end();
 
-    transferQueue->submit(transferCommand);
+    transferQueue.submit(transferCommand);
 
-    transferQueue->waitIdle();
+    transferQueue.waitIdle();
 }
 
 WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTextures(
@@ -585,10 +585,10 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTexture
     transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     transitLayout1.srcAccessMask = 0;
 
-    auto transferQueue = device.getTransferQueue();
+    auto transferQueue = device.getSpecificQueue(TestApp::dedicatedTransfer());
 
     auto commandPool = vkw::CommandPool(device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                        transferQueue->familyIndex());
+                                        transferQueue.family().index());
     auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
 
     transferCommand.begin(0);
@@ -598,9 +598,9 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTexture
 
     transferCommand.end();
 
-    transferQueue->submit(transferCommand);
+    transferQueue.submit(transferCommand);
 
-    transferQueue->waitIdle();
+    transferQueue.waitIdle();
 
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -784,8 +784,8 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicS
     set().writeStorageImage(4, displacementYdzZdz);
     set().write(5, params);
 
-    auto queue = device.getComputeQueue();
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto queue = device.getSpecificQueue(TestApp::dedicatedCompute());
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
     auto transferBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
     transferBuffer.begin(0);
@@ -811,9 +811,9 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicS
 
     transferBuffer.end();
 
-    queue->submit(transferBuffer);
+    queue.submit(transferBuffer);
 
-    queue->waitIdle();
+    queue.waitIdle();
 }
 
 WaveSurfaceTexture::WaveSurfaceTextureCascade::FinalTextureCombiner::FinalTextureCombiner(

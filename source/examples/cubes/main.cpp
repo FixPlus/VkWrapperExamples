@@ -267,15 +267,14 @@ int runCubes() {
     else
         std::cout << "Validation enabled" << std::endl;
 
-    std::vector<vkw::layer> requiredLayers;
-    std::vector<vkw::ext> requiredExtensions;
+    vkw::InstanceCreateInfo createInfo{};
 
     if(validationPossible) {
-        requiredLayers.emplace_back(vkw::layer::KHRONOS_validation);
-        requiredExtensions.emplace_back(vkw::ext::EXT_debug_utils);
+        createInfo.requestLayer(vkw::layer::KHRONOS_validation);
+        createInfo.requestExtension(vkw::ext::EXT_debug_utils);
     }
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, requiredExtensions, requiredLayers);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, createInfo);
 
     std::optional<vkw::debug::Validation> validation;
 
@@ -305,6 +304,8 @@ int runCubes() {
 
     vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
 
+    TestApp::requestQueues(deviceDesc);
+
     // 4. enable needed device extensions and create logical device
 
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
@@ -322,7 +323,7 @@ int runCubes() {
     auto mySwapChain = TestApp::SwapChainImpl{device, surface};
 
 
-    auto queue = device.getGraphicsQueue();
+    auto queue = device.anyGraphicsQueue();
 
     auto fence = vkw::Fence(device);
 
@@ -330,7 +331,7 @@ int runCubes() {
 
     auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
                                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                        device.getGraphicsQueue()->familyIndex()};
+                                        queue.family().index()};
 
     // 8. create swapchain images views for framebuffer
 
@@ -592,10 +593,10 @@ int runCubes() {
         commandBuffer.endRenderPass();
         commandBuffer.end();
 
-        queue->submit(submitInfo, fence);
+        queue.submit(submitInfo, fence);
 
         auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
-        queue->present(presentInfo);
+        queue.present(presentInfo);
     }
 
 

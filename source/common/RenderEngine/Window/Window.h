@@ -154,7 +154,7 @@ namespace RenderEngine {
         }
 
         static vkw::Instance
-        vulkanInstance(vkw::Library &vulkanLib, std::vector<vkw::ext> extensions = {}, std::vector<vkw::layer> layers = {});
+        vulkanInstance(vkw::Library &vulkanLib, vkw::InstanceCreateInfo& createInfo);
 
     protected:
         virtual void keyInput(int key, int scancode, int action, int mods) {};

@@ -34,9 +34,9 @@ namespace TestApp{
         Buffer ret{device, static_cast<uint64_t>(size), createInfo, VK_BUFFER_USAGE_TRANSFER_DST_BIT};
 
 
-        auto queue = device.getTransferQueue();
+        auto const& queue = device.anyTransferQueue();
 
-        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+        auto commandPool = vkw::CommandPool{device, 0, queue.family().index()};
 
         auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
         VkBufferCopy region{};
@@ -50,8 +50,8 @@ namespace TestApp{
 
         commandBuffer.end();
 
-        queue->submit(commandBuffer);
-        queue->waitIdle();
+        queue.submit(commandBuffer);
+        queue.waitIdle();
 
         return ret;
     }
@@ -61,6 +61,12 @@ namespace TestApp{
     vkw::Sampler createDefaultSampler(vkw::Device& device, int mipLevels = 1);
 
     void doTransitLayout(vkw::ImageInterface& image, vkw::Device& device, VkImageLayout from, VkImageLayout to);
+
+    inline vkw::QueueFamily::Type dedicatedTransfer() { return vkw::QueueFamily::TRANSFER;}
+
+    inline vkw::QueueFamily::Type dedicatedCompute() { return vkw::QueueFamily::TRANSFER | vkw::QueueFamily::COMPUTE;}
+
+    void requestQueues(vkw::PhysicalDevice& physicalDevice, bool wantTransfer = true, bool wantCompute = false);
 
 }
 #endif //TESTAPP_UTILS_H

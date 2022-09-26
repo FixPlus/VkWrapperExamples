@@ -65,8 +65,8 @@ namespace TestApp {
         stageBuf.flush();
         stageBuf.unmap();
 
-        auto queue = device.getTransferQueue();
-        auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+        auto queue = device.anyTransferQueue();
+        auto commandPool = vkw::CommandPool{device, 0, queue.family().index()};
         auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
         transferCommand.begin(0);
         VkBufferCopy region{};
@@ -77,8 +77,8 @@ namespace TestApp {
         transferCommand.copyBufferToBuffer(stageBuf, m_vertices, {region});
 
         transferCommand.end();
-        queue->submit(transferCommand);
-        queue->waitIdle();
+        queue.submit(transferCommand);
+        queue.waitIdle();
 
     }
 

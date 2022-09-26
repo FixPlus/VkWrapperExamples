@@ -12,6 +12,7 @@
 #include "RenderEngine/Window/Boxer.h"
 #include "ErrorCallbackWrapper.h"
 #include "Validation.hpp"
+#include "Utils.h"
 
 using namespace TestApp;
 
@@ -85,15 +86,14 @@ int runFractal(){
     else
         std::cout << "Validation enabled" << std::endl;
 
-    std::vector<vkw::layer> requiredLayers;
-    std::vector<vkw::ext> requiredExtensions;
+    vkw::InstanceCreateInfo createInfo{};
 
     if(validationPossible) {
-        requiredLayers.emplace_back(vkw::layer::KHRONOS_validation);
-        requiredExtensions.emplace_back(vkw::ext::EXT_debug_utils);
+        createInfo.requestLayer(vkw::layer::KHRONOS_validation);
+        createInfo.requestExtension(vkw::ext::EXT_debug_utils);
     }
 
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, requiredExtensions, requiredLayers);
+    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, createInfo);
 
     std::optional<vkw::debug::Validation> validation;
 
@@ -110,6 +110,8 @@ int runFractal(){
     vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
 
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
+
+    TestApp::requestQueues(deviceDesc);
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 
@@ -130,7 +132,7 @@ int runFractal(){
                                                 {views.begin(), views.end()}});
     }
 
-    auto queue = device.getGraphicsQueue();
+    auto queue = device.anyGraphicsQueue();
     auto fence = vkw::Fence{device};
 
     auto shaderLoader = RenderEngine::ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
@@ -141,7 +143,7 @@ int runFractal(){
     window.setContext(gui);
 
     auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
     auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
     auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
@@ -242,9 +244,9 @@ int runFractal(){
 
         commandBuffer.endRenderPass();
         commandBuffer.end();
-        queue->submit(submitInfo, fence);
+        queue.submit(submitInfo, fence);
         auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
-        queue->present(presentInfo);
+        queue.present(presentInfo);
 
     }
 

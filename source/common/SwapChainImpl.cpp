@@ -35,8 +35,8 @@ namespace TestApp{
                 transitLayouts.push_back(transitLayout);
             }
 
-            auto queue = device.getGraphicsQueue();
-            auto commandPool = vkw::CommandPool{device, 0, queue->familyIndex()};
+            auto queue = device.anyGraphicsQueue();
+            auto commandPool = vkw::CommandPool{device, 0, queue.family().index()};
             auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
             commandBuffer.begin(0);
@@ -50,7 +50,7 @@ namespace TestApp{
 
             auto submitInfo = vkw::SubmitInfo(commandBuffer);
 
-            queue->submit(submitInfo, fence);
+            queue.submit(submitInfo, fence);
             fence.wait();
 
             VkComponentMapping mapping;

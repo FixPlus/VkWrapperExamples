@@ -37,18 +37,18 @@ namespace RenderEngine {
         return surface;
     }
 
-    vkw::Instance Window::vulkanInstance(vkw::Library &vulkanLib, std::vector<vkw::ext> extensions, std::vector<vkw::layer> layers) {
+    vkw::Instance Window::vulkanInstance(vkw::Library &vulkanLib, vkw::InstanceCreateInfo& createInfo) {
         initImpl();
         uint32_t count = 0;
         auto ext = glfwGetRequiredInstanceExtensions(&count);
 
         for (int i = 0; i < count; ++i)
-            extensions.emplace_back(vkw::Library::ExtensionId(ext[i]));
+            createInfo.requestExtension(vkw::Library::ExtensionId(ext[i]));
 
 #ifdef __linux__
-        extensions.emplace_back(vulkanLib.getExtensionId(VK_KHR_XLIB_SURFACE_EXTENSION_NAME));
+        createInfo.requestExtension(vkw::Library::ExtensionId(VK_KHR_XLIB_SURFACE_EXTENSION_NAME));
 #endif
-        return {vulkanLib, extensions, layers};
+        return {vulkanLib, createInfo};
     }
 
     class GlfwLibKeeper{

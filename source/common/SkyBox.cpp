@@ -79,8 +79,8 @@ SkyBox::OutScatterTexture::OutScatterTexture(vkw::Device &device, RenderEngine::
     set().write(0, atmo);
     set().writeStorageImage(1, scatterView);
 
-    auto queue = device.getComputeQueue();
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto queue = device.anyComputeQueue();
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
     auto transferBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
     transferBuffer.begin(0);
@@ -106,15 +106,15 @@ SkyBox::OutScatterTexture::OutScatterTexture(vkw::Device &device, RenderEngine::
 
     transferBuffer.end();
 
-    queue->submit(transferBuffer);
+    queue.submit(transferBuffer);
 
-    queue->waitIdle();
+    queue.waitIdle();
 
 }
 
 void SkyBox::OutScatterTexture::recompute(vkw::Device& device) {
-    auto queue = device.getComputeQueue();
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue->familyIndex()};
+    auto queue = device.anyComputeQueue();
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
     auto transferBuffer = vkw::PrimaryCommandBuffer{commandPool};
 
     transferBuffer.begin(0);
@@ -152,8 +152,8 @@ void SkyBox::OutScatterTexture::recompute(vkw::Device& device) {
                                       {transitLayout1});
     transferBuffer.end();
 
-    queue->submit(transferBuffer);
+    queue.submit(transferBuffer);
 
-    queue->waitIdle();
+    queue.waitIdle();
 
 }

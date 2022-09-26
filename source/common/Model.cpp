@@ -764,8 +764,8 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
     transitLayout2.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
     transitLayout2.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 
-    auto transferQueue = device.getTransferQueue();
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, transferQueue->familyIndex()};
+    auto transferQueue = device.anyTransferQueue();
+    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, transferQueue.family().index()};
     auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -783,8 +783,8 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
                                        {transitLayout2});
     transferCommand.end();
 
-    transferQueue->submit(transferCommand);
-    transferQueue->waitIdle();
+    transferQueue.submit(transferCommand);
+    transferQueue.waitIdle();
 
     for(int i = 0; i < textureDim; ++i)
         for(int j = 0; j < textureDim; ++j)
@@ -803,8 +803,8 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
                                        {transitLayout2});
     transferCommand.end();
 
-    transferQueue->submit(transferCommand);
-    transferQueue->waitIdle();
+    transferQueue.submit(transferCommand);
+    transferQueue.waitIdle();
 
 
     for(int i = 0; i < textureDim; ++i)
@@ -825,7 +825,7 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
                                        {transitLayout2});
     transferCommand.end();
 
-    transferQueue->submit(transferCommand);
-    transferQueue->waitIdle();
+    transferQueue.submit(transferCommand);
+    transferQueue.waitIdle();
 
 }
