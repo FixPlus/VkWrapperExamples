@@ -309,8 +309,8 @@ int runCubes() {
     // 4. enable needed device extensions and create logical device
 
     deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
-
-    std::cout << deviceDesc.isFeatureSupported(vkw::PhysicalDevice::feature::multiViewport) << std::endl;
+    if(deviceDesc.isFeatureSupported(vkw::PhysicalDevice::feature::samplerAnisotropy))
+        deviceDesc.enableFeature(vkw::PhysicalDevice::feature::samplerAnisotropy);
 
     auto device = vkw::Device{renderInstance, deviceDesc};
 
@@ -392,7 +392,10 @@ int runCubes() {
     samplerCI.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerCI.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerCI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    samplerCI.anisotropyEnable = false;
+    if(device.physicalDevice().enabledFeatures().samplerAnisotropy) {
+        samplerCI.anisotropyEnable = true;
+        samplerCI.maxAnisotropy = device.physicalDevice().properties().limits.maxSamplerAnisotropy;
+    }
 
     auto textureSampler = vkw::Sampler{device, samplerCI};
 
