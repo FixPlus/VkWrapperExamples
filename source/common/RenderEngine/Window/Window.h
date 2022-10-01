@@ -62,19 +62,11 @@ namespace RenderEngine {
 
         Window(Window const &another) = delete;
 
-        Window(Window &&another) noexcept: m_window(another.m_window) {
-            m_windowMap[m_window] = this;
-            another.m_window = nullptr;
-        }
+        Window(Window &&another) noexcept;
 
         Window &operator=(Window const &another) = delete;
 
-        Window &operator=(Window &&another) noexcept {
-            m_window = another.m_window;
-            m_windowMap[m_window] = this;
-            another.m_window = nullptr;
-            return *this;
-        };
+        Window &operator=(Window &&another) noexcept;
 
         virtual ~Window();
 
@@ -144,14 +136,7 @@ namespace RenderEngine {
 
         vkw::Surface surface(vkw::Instance &instance) const;
 
-        static void pollEvents() {
-            initImpl();
-            glfwPollEvents();
-            for (auto &window: m_windowMap) {
-                window.second->onPollEvents();
-                window.second->m_clock.frame();
-            }
-        }
+        static void pollEvents();
 
         static vkw::Instance
         vulkanInstance(vkw::Library &vulkanLib, vkw::InstanceCreateInfo& createInfo);
@@ -170,13 +155,37 @@ namespace RenderEngine {
         virtual void onPollEvents() {};
 
     private:
+        static void initImpl();
+
+        double m_cursor_x = 0.0;
+        double m_cursor_y = 0.0;
+        bool m_cursorDisabled = false;
+        FrameClock m_clock;
+        GLFWwindow *m_window = nullptr;
+
+        friend class WindowCallbackHandler;
+    };
+
+    class WindowCallbackHandler{
+    public:
+
+        void pollEvents();
+
+        void connectWindow(Window& window);
+
+        void disconnectWindow(Window& window);
+
+        static WindowCallbackHandler& get();
+    private:
+
+        WindowCallbackHandler() = default;
 
         static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-            m_windowMap.at(window)->keyInput(key, scancode, action, mods);
+            get().m_windowMap.at(window)->keyInput(key, scancode, action, mods);
         }
 
         static void cursor_position_callback(GLFWwindow *window, double xpos, double ypos) {
-            auto *window_handle = m_windowMap.at(window);
+            auto *window_handle = get().m_windowMap.at(window);
             double xdelta = xpos - window_handle->m_cursor_x;
             double ydelta = ypos - window_handle->m_cursor_y;
             window_handle->m_cursor_x = xpos;
@@ -185,27 +194,35 @@ namespace RenderEngine {
         }
 
         static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
-            m_windowMap.at(window)->mouseInput(button, action, mods);
+            get().m_windowMap.at(window)->mouseInput(button, action, mods);
         }
 
         static void character_callback(GLFWwindow* window, unsigned int codepoint)
         {
-            m_windowMap.at(window)->charInput(codepoint);
+            get().m_windowMap.at(window)->charInput(codepoint);
         }
 
         static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-            m_windowMap.at(window)->mouseScroll(xoffset, yoffset);
+            get().m_windowMap.at(window)->mouseScroll(xoffset, yoffset);
         }
+        std::map<GLFWwindow *, Window *> m_windowMap;
+    };
 
-        static void initImpl();
 
-        static std::map<GLFWwindow *, Window *> m_windowMap;
+    inline Window::Window(Window &&another) noexcept: m_window(another.m_window), m_clock(another.m_clock), m_cursorDisabled(
+            another.m_cursorDisabled), m_cursor_x(another.m_cursor_x), m_cursor_y(another.m_cursor_y) {
+        WindowCallbackHandler::get().disconnectWindow(another);
+        WindowCallbackHandler::get().connectWindow(*this);
+        another.m_window = nullptr;
+    }
 
-        double m_cursor_x = 0.0;
-        double m_cursor_y = 0.0;
-        bool m_cursorDisabled = false;
-        FrameClock m_clock;
-        GLFWwindow *m_window = nullptr;
+    inline Window &Window::operator=(Window &&another) noexcept {
+        std::swap(m_window, another.m_window);
+        m_clock = another.m_clock;
+        m_cursorDisabled = another.m_cursorDisabled;
+        m_cursor_x = another.m_cursor_x;
+        m_cursor_y = another.m_cursor_y;
+        return *this;
     };
 }
 #endif //TESTAPP_WINDOW_H

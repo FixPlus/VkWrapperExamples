@@ -2,27 +2,18 @@
 
 namespace RenderEngine {
 
-    std::map<GLFWwindow*, Window*> Window::m_windowMap{};
-
     Window::Window(uint32_t width, uint32_t height, const std::string &title) {
         initImpl();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
-        m_windowMap.emplace(m_window, this);
-
-        glfwSetKeyCallback(m_window, key_callback);
-        glfwSetCursorPosCallback(m_window, cursor_position_callback);
-        glfwSetMouseButtonCallback(m_window, mouse_button_callback);
-        glfwSetCharCallback(m_window, character_callback);
-        glfwSetScrollCallback(m_window, scroll_callback);
-
+        WindowCallbackHandler::get().connectWindow(*this);
     }
 
     Window::~Window() {
         if (!m_window)
             return;
         glfwDestroyWindow(m_window);
-        m_windowMap.erase(m_window);
+        WindowCallbackHandler::get().disconnectWindow(*this);
     }
 
     vkw::Surface Window::surface(vkw::Instance &instance) const {
@@ -65,5 +56,38 @@ namespace RenderEngine {
     };
     void Window::initImpl() {
         static GlfwLibKeeper glfwKeeper{};
+    }
+
+    void Window::pollEvents() {
+        initImpl();
+        WindowCallbackHandler::get().pollEvents();
+    }
+
+    WindowCallbackHandler &WindowCallbackHandler::get() {
+        static WindowCallbackHandler handler;
+        return handler;
+    }
+
+    void WindowCallbackHandler::connectWindow(Window &window) {
+        auto* rawHandle = window.m_window;
+        m_windowMap.emplace(rawHandle, &window);
+
+        glfwSetKeyCallback(rawHandle, key_callback);
+        glfwSetCursorPosCallback(rawHandle, cursor_position_callback);
+        glfwSetMouseButtonCallback(rawHandle, mouse_button_callback);
+        glfwSetCharCallback(rawHandle, character_callback);
+        glfwSetScrollCallback(rawHandle, scroll_callback);
+    }
+
+    void WindowCallbackHandler::pollEvents() {
+        glfwPollEvents();
+        for(auto& window: m_windowMap){
+            window.second->onPollEvents();
+            window.second->m_clock.frame();
+        }
+    }
+
+    void WindowCallbackHandler::disconnectWindow(Window &window) {
+        m_windowMap.erase(window.m_window);
     }
 }
