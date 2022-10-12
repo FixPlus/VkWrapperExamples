@@ -10,7 +10,7 @@ namespace TestApp{
     public:
         SwapChainImpl(vkw::Device &device, vkw::Surface &surface, bool createDepthBuffer = false, bool vsync = false);
 
-        std::vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>> const&attachments() const{
+        boost::container::small_vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>, 3> const&attachments() const{
             return m_image_views;
         };
 
@@ -42,8 +42,8 @@ namespace TestApp{
         }
     private:
 
-        std::vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>> m_image_views;
-        std::vector<vkw::SwapChainImage> m_images;
+        boost::container::small_vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>, 3> m_image_views;
+        boost::container::small_vector<vkw::SwapChainImage, 3> m_images;
         std::optional<vkw::Image<vkw::DEPTH, vkw::I2D, vkw::SINGLE>> m_depth{};
         std::unique_ptr<vkw::ImageView<vkw::DEPTH, vkw::V2DA>> m_depth_view{};
         static VkSwapchainCreateInfoKHR compileInfo(vkw::Device &device, vkw::Surface &surface, bool vsync);

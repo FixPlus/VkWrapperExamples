@@ -56,8 +56,8 @@ void TestApp::Fractal::drawOffscreen(vkw::PrimaryCommandBuffer& buffer, RenderEn
 
     buffer.beginRenderPass(m_offscreenPass, *m_offscreenBuffer, renderArea, false, values.size(), values.data());
 
-    buffer.setScissors({scissor});
-    buffer.setViewports({viewport});
+    buffer.setScissors({&scissor, 1});
+    buffer.setViewports({&viewport, 1});
 
     auto recorder = RenderEngine::GraphicsRecordingState{buffer, pool};
 

@@ -5,7 +5,7 @@ namespace RenderEngine {
 
     vkw::DescriptorPool
     PipelineStageLayout::m_initPool(vkw::Device &device, const SubstageDescription &createInfo, uint32_t maxSets) {
-        std::vector<VkDescriptorPoolSize> sizes{};
+        boost::container::small_vector<VkDescriptorPoolSize, 3> sizes{};
 
 
         for (auto &binding: createInfo.setBindings) {

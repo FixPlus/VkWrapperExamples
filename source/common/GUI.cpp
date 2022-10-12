@@ -201,7 +201,7 @@ namespace TestApp {
                 scissorRect.offset.y = std::max((int32_t) (pcmd->ClipRect.y), 0);
                 scissorRect.extent.width = (uint32_t) (pcmd->ClipRect.z - pcmd->ClipRect.x);
                 scissorRect.extent.height = (uint32_t) (pcmd->ClipRect.w - pcmd->ClipRect.y);
-                recorder.commands().setScissors({scissorRect}, 0);
+                recorder.commands().setScissors({&scissorRect, 1}, 0);
                 recorder.commands().drawIndexed(pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
                 indexOffset += pcmd->ElemCount;
             }

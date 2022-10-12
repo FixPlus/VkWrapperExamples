@@ -769,7 +769,7 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
     auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout1});
+                                       {&transitLayout1, 1});
     VkBufferImageCopy bufferCopy{};
     bufferCopy.imageExtent = {static_cast<uint32_t>(textureDim), static_cast<uint32_t>(textureDim), 1};
     bufferCopy.imageSubresource.mipLevel = 0;
@@ -777,10 +777,10 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
     bufferCopy.imageSubresource.baseArrayLayer = 0;
     bufferCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    transferCommand.copyBufferToImage(stageBuffer, m_colorMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
+    transferCommand.copyBufferToImage(stageBuffer, m_colorMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {&bufferCopy, 1});
 
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout2});
+                                       {&transitLayout2, 1});
     transferCommand.end();
 
     transferQueue.submit(transferCommand);
@@ -795,12 +795,12 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
 
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout1});
+                                       {&transitLayout1, 1});
 
-    transferCommand.copyBufferToImage(stageBuffer, m_normalMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
+    transferCommand.copyBufferToImage(stageBuffer, m_normalMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {&bufferCopy, 1});
 
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout2});
+                                       {&transitLayout2, 1});
     transferCommand.end();
 
     transferQueue.submit(transferCommand);
@@ -817,12 +817,12 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
 
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout1});
+                                       {&transitLayout1, 1});
 
-    transferCommand.copyBufferToImage(stageBuffer, m_metallicRoughnessMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
+    transferCommand.copyBufferToImage(stageBuffer, m_metallicRoughnessMap, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {&bufferCopy, 1});
 
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout2});
+                                       {&transitLayout2, 1});
     transferCommand.end();
 
     transferQueue.submit(transferCommand);

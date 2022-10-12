@@ -73,7 +73,7 @@ static void generateMipMaps(vkw::CommandBuffer& buffer, vkw::Image<vkw::COLOR, v
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-        buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, {barrier});
+        buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, {&barrier, 1});
 
         VkImageBlit blit{};
         blit.srcOffsets[0] = { 0, 0, 0 };
@@ -96,7 +96,7 @@ static void generateMipMaps(vkw::CommandBuffer& buffer, vkw::Image<vkw::COLOR, v
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, {barrier});
+        buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, {&barrier, 1});
 
         if (mipWidth > 1) mipWidth /= 2;
         if (mipHeight > 1) mipHeight /= 2;
@@ -108,7 +108,7 @@ static void generateMipMaps(vkw::CommandBuffer& buffer, vkw::Image<vkw::COLOR, v
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, {barrier});
+    buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, {&barrier, 1});
 
 }
 
@@ -176,7 +176,7 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
     auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout1});
+                                       {&transitLayout1, 1});
     VkBufferImageCopy bufferCopy{};
     bufferCopy.imageExtent = {static_cast<uint32_t>(textureWidth), static_cast<uint32_t>(textureHeight), 1};
     bufferCopy.imageSubresource.mipLevel = 0;
@@ -184,13 +184,13 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
     bufferCopy.imageSubresource.baseArrayLayer = 0;
     bufferCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    transferCommand.copyBufferToImage(stageBuffer, ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {bufferCopy});
+    transferCommand.copyBufferToImage(stageBuffer, ret, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {&bufferCopy, 1});
 
     if(mipLevels > 1) {
         generateMipMaps(transferCommand, ret, mipLevels);
     } else
         transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                       {transitLayout2});
+                                       {&transitLayout2, 1});
     transferCommand.end();
 
     transferQueue.submit(transferCommand);

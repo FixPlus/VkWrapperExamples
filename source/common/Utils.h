@@ -46,7 +46,7 @@ namespace TestApp{
 
         commandBuffer.begin(0);
 
-        commandBuffer.copyBufferToBuffer(stagingBuffer, ret, {region});
+        commandBuffer.copyBufferToBuffer(stagingBuffer, ret, {&region, 1});
 
         commandBuffer.end();
 

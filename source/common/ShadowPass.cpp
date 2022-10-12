@@ -77,8 +77,8 @@ m_mapped(m_ubo.map()){
                                    m_shadowBufs.at(i).getFullRenderArea(), false,
                                    1, &value);
 
-            buffer.setViewports({viewport}, 0);
-            buffer.setScissors({scissor}, 0);
+            buffer.setViewports({&viewport, 1}, 0);
+            buffer.setScissors({&scissor, 1}, 0);
 
             state.setMaterial(m_shadow_material);
             state.setLighting(m_shadow_pass);

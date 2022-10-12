@@ -30,7 +30,7 @@ namespace TestApp{
 
         transferCommand.begin(0);
         transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                           {transitLayout});
+                                           {&transitLayout, 1});
         transferCommand.end();
 
         queue.submit(transferCommand);
@@ -76,7 +76,7 @@ namespace TestApp{
 
         transferCommand.begin(0);
         transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                           {transitLayout});
+                                           {&transitLayout, 1});
         transferCommand.end();
 
         queue.submit(transferCommand);

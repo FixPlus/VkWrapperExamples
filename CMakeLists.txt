@@ -83,6 +83,9 @@ find_package(SPIRV-Tools REQUIRED)
 find_package(SPIRV-Tools-opt REQUIRED)
 find_package(SPIRV-Tools-link REQUIRED)
 
+find_package(Boost 1.62 REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS})
+
 include_directories(source)
 include_directories(source/common)
 add_subdirectory(external)

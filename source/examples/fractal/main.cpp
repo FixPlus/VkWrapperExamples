@@ -236,8 +236,8 @@ int runFractal(){
 
         commandBuffer.beginRenderPass(lightPass, fb, renderArea, false, values.size(), values.data());
 
-        commandBuffer.setViewports({viewport}, 0);
-        commandBuffer.setScissors({scissor}, 0);
+        commandBuffer.setViewports({&viewport, 1}, 0);
+        commandBuffer.setScissors({&scissor, 1}, 0);
 
         fractal.draw(recorder);
         gui.draw(recorder);

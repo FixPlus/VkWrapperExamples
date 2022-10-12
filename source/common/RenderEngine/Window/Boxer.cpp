@@ -98,7 +98,7 @@ namespace {
             case IDNO:
                 return Boxer::Selection::No;
             default:
-                return Boxer::Selection::None;
+                return Boxer::Selection::NONE;
         }
     }
 

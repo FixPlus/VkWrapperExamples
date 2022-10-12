@@ -582,8 +582,8 @@ int runCubes() {
         scissor.extent.width = currentFrameBuffer.getFullRenderArea().extent.width;
         scissor.extent.height = currentFrameBuffer.getFullRenderArea().extent.height;
 
-        commandBuffer.setViewports({viewport}, 0);
-        commandBuffer.setScissors({scissor}, 0);
+        commandBuffer.setViewports({&viewport, 1}, 0);
+        commandBuffer.setScissors({&scissor, 1}, 0);
 
         globals.bind(recorder);
         recorder.setMaterial(texturedSurface.get());

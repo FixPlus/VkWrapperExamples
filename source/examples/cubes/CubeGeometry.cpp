@@ -74,7 +74,7 @@ namespace TestApp {
         region.dstOffset = 0;
         region.srcOffset = 0;
 
-        transferCommand.copyBufferToBuffer(stageBuf, m_vertices, {region});
+        transferCommand.copyBufferToBuffer(stageBuf, m_vertices, {&region, 1});
 
         transferCommand.end();
         queue.submit(transferCommand);

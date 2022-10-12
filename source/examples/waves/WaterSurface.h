@@ -113,7 +113,7 @@ public:
             transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
             transitLayout1.srcAccessMask = incomingAccessMask;
 
-            buffer.imageMemoryBarrier(incomingStageMask, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, {transitLayout1});
+            buffer.imageMemoryBarrier(incomingStageMask, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, {&transitLayout1, 1});
         }
     }
 
@@ -141,7 +141,7 @@ public:
             transitLayout1.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
             transitLayout1.srcAccessMask = incomingAccessMask;
 
-            buffer.imageMemoryBarrier(incomingStageMask, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, {transitLayout1});
+            buffer.imageMemoryBarrier(incomingStageMask, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, {&transitLayout1, 1});
         }
     }
 
@@ -170,7 +170,7 @@ public:
             transitLayout1.dstAccessMask = acquireAccessMask;
             transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
-            buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, acquireStageMask, {transitLayout1});
+            buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, acquireStageMask, {&transitLayout1, 1});
         }
     }
 
@@ -198,7 +198,7 @@ public:
             transitLayout1.dstAccessMask = acquireAccessMask;
             transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
-            buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, acquireStageMask, {transitLayout1});
+            buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, acquireStageMask, {&transitLayout1, 1});
         }
     }
 

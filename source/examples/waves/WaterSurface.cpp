@@ -400,7 +400,7 @@ void WaveSurfaceTexture::WaveSurfaceTextureCascade::computeSpectrum(vkw::Command
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
     buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              {transitLayout1});
+                              {&transitLayout1, 1});
 
 }
 
@@ -448,7 +448,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
     transitLayout1.srcAccessMask = 0;
 
     transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                      {transitLayout1});
+                                      {&transitLayout1, 1});
 
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     transitLayout1.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -458,7 +458,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
     transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-                                      {transitLayout1});
+                                      {&transitLayout1, 1});
     transferBuffer.end();
 
     queue.submit(transferBuffer);
@@ -523,7 +523,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
 
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                       {transitLayout1});
+                                       {&transitLayout1, 1});
 
     VkBufferImageCopy copyRegion{};
     copyRegion.imageExtent = VkExtent3D{size, size, 1};
@@ -532,7 +532,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
     copyRegion.imageSubresource.baseArrayLayer = 0;
     copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    transferCommand.copyBufferToImage(stageBuf, *this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {copyRegion});
+    transferCommand.copyBufferToImage(stageBuf, *this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, {&copyRegion, 1});
 
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     transitLayout1.newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -540,7 +540,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                       {transitLayout1});
+                                       {&transitLayout1, 1});
 
     transferCommand.end();
 
@@ -594,7 +594,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTexture
     transferCommand.begin(0);
 
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                       {transitLayout1});
+                                       {&transitLayout1, 1});
 
     transferCommand.end();
 
@@ -692,7 +692,7 @@ void FFT::ftt(vkw::CommandBuffer &buffer, const Complex2DTexture &input, const C
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
     buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                              {transitLayout1});
+                              {&transitLayout1, 1});
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     uint32_t size = 1;
 
@@ -702,14 +702,14 @@ void FFT::ftt(vkw::CommandBuffer &buffer, const Complex2DTexture &input, const C
         buffer.pushConstants(fft_row.layout().pipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, size);
         fft_row.dispatch(buffer, x / 32, y / 16, 1);
         buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                  {transitLayout1});
+                                  {&transitLayout1, 1});
         size *= 2u;
     }
 
     get<2>(comp).dispatch(buffer, x / 16, y / 16, 1);
 
     buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                              {transitLayout1});
+                              {&transitLayout1, 1});
 
     auto &fft_column = get<3>(comp);
 
@@ -719,12 +719,12 @@ void FFT::ftt(vkw::CommandBuffer &buffer, const Complex2DTexture &input, const C
         buffer.pushConstants(fft_column.layout().pipelineLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, size);
         fft_column.dispatch(buffer, x / 32, y / 16, 1);
         buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                  {transitLayout1});
+                                  {&transitLayout1, 1});
         size *= 2u;
     }
 
     buffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                              {transitLayout1});
+                              {&transitLayout1, 1});
 }
 
 FFT::PermuteRow::PermuteRow(RenderEngine::ComputeLayout &layout, const Complex2DTexture &input,
@@ -807,7 +807,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicS
     transitLayout1.srcAccessMask = 0;
 
     transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                      {transitLayout1});
+                                      {&transitLayout1, 1});
 
     transferBuffer.end();
 

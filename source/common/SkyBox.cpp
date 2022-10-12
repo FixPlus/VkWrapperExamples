@@ -102,7 +102,7 @@ SkyBox::OutScatterTexture::OutScatterTexture(vkw::Device &device, RenderEngine::
     transitLayout1.srcAccessMask = 0;
 
     transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                      {transitLayout1});
+                                      {&transitLayout1, 1});
 
     transferBuffer.end();
 
@@ -136,7 +136,7 @@ void SkyBox::OutScatterTexture::recompute(vkw::Device& device) {
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 
     transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                      {transitLayout1});
+                                      {&transitLayout1, 1});
 
     dispatch(transferBuffer, width() / 16, height() / 16, 1);
 
@@ -149,7 +149,7 @@ void SkyBox::OutScatterTexture::recompute(vkw::Device& device) {
     transitLayout1.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
     transferBuffer.imageMemoryBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                      {transitLayout1});
+                                      {&transitLayout1, 1});
     transferBuffer.end();
 
     queue.submit(transferBuffer);

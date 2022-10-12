@@ -12,8 +12,8 @@ namespace RenderEngine{
 
     struct SubstageDescription{
         std::string shaderSubstageName;
-        std::vector<vkw::DescriptorSetLayoutBinding> setBindings;
-        std::vector<VkPushConstantRange> pushConstants;
+        boost::container::small_vector<vkw::DescriptorSetLayoutBinding, 3> setBindings;
+        boost::container::small_vector<VkPushConstantRange, 3> pushConstants;
     };
 
     class PipelineStageBase;
