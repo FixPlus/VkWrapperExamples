@@ -160,7 +160,7 @@ namespace TestApp {
         friend class CubePool;
 
         CubePool::PerInstance model;
-
+#undef max
         static constexpr const uint32_t M_MOVED_OUT = std::numeric_limits<uint32_t>::max();
 
         uint32_t m_id;

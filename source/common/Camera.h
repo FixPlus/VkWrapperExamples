@@ -5,6 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 #include <cstdint>
+#include <array>
 
 namespace TestApp {
 
@@ -299,6 +300,7 @@ namespace TestApp {
 
                 float frustumCircumscribedRadius = 0.0f;
 
+#undef max
                 for (auto &corner: innerFrustumCorners) {
                     frustumCircumscribedRadius = glm::max(frustumCircumscribedRadius,
                                                           glm::length(corner - innerFrustumCenter));

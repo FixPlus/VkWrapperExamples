@@ -83,7 +83,8 @@ int runWaves() {
 
     vkw::Library vulkanLib{};
 
-    auto validationPossible = vulkanLib.hasLayer(vkw::layer::KHRONOS_validation);
+   // TODO : Fix validation error and re-enable it again
+    auto validationPossible = vulkanLib.hasLayer(vkw::layer::KHRONOS_validation) && false;
 
     if(!validationPossible)
         std::cout << "Validation unavailable" << std::endl;

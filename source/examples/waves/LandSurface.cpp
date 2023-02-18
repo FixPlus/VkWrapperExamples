@@ -20,14 +20,16 @@ void TestApp::LandSurface::preDraw(RenderEngine::GraphicsRecordingState &buffer)
 }
 
 TestApp::LandSurface::Geometry::Geometry(vkw::Device &device, TestApp::LandSurface &surface): RenderEngine::Geometry(surface),
-                                                                                              m_ubo(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                                              m_ubo_mapped(m_ubo.map()){
+                                                                                              m_ubo(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}){
+    m_ubo.map();
+    m_ubo_mapped = m_ubo.mapped().data();
     set().write(0, m_ubo);
 }
 
 TestApp::LandMaterial::Material::Material(vkw::Device &device, TestApp::LandMaterial &landMaterial): RenderEngine::Material(landMaterial),
-                                                                                                     m_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                                                     m_mapped(m_buffer.map()){
+                                                                                                     m_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}){
+    m_buffer.map();
+    m_mapped = m_buffer.mapped().data();
     set().write(0, m_buffer);
 }
 

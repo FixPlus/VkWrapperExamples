@@ -1,6 +1,6 @@
 #include "Compute.h"
 #include "vkw/CommandBuffer.hpp"
-
+#include <array>
 
 
 RenderEngine::ComputeLayout::ComputeLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,

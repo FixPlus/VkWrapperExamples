@@ -110,11 +110,13 @@ private:
         Material(vkw::Device &device, RenderEngine::MaterialLayout &layout, vkw::UniformBuffer<Atmosphere> const& atmoBuf, vkw::ImageView<vkw::COLOR, vkw::V2D> const& outScatterTexture) : RenderEngine::Material(layout),
                                                                               m_buffer(device,
                                                                                        VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                              m_mapped(m_buffer.map()),
                                                                               m_material_buffer(device,
                                                                                        VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                              m_material_mapped(m_material_buffer.map()),
                                                                               m_sampler(TestApp::createDefaultSampler(device)){
+            m_buffer.map();
+            m_material_buffer.map();
+            m_mapped = m_buffer.mapped().data();
+            m_material_mapped = m_material_buffer.mapped().data();
             set().write(0, m_buffer);
             set().write(1, m_material_buffer);
             set().write(2, atmoBuf);

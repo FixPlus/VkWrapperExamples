@@ -37,17 +37,17 @@ namespace TestApp{
     class LandMaterial : public RenderEngine::MaterialLayout {
     public:
         LandMaterial(vkw::Device &device, bool wireframe = false) : RenderEngine::MaterialLayout(device,
-                                                                                                  RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="land", .setBindings={
+                                                                                                  RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"land", {
                                                                                                           vkw::DescriptorSetLayoutBinding{
                                                                                                                   0,
-                                                                                                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .rasterizationState={
+                                                                                                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, {
                                                                                                           VK_FALSE,
                                                                                                           VK_FALSE,
                                                                                                           wireframe
                                                                                                           ? VK_POLYGON_MODE_LINE
-                                                                                                          : VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, .depthTestState=vkw::DepthTestStateCreateInfo{
+                                                                                                          : VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, vkw::DepthTestStateCreateInfo{
                                                                                                           VK_COMPARE_OP_LESS,
-                                                                                                          true}, .maxMaterials=1}),
+                                                                                                          true}, 1}),
                                                                      m_material(device, *this) {
         };
 

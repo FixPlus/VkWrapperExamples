@@ -6,36 +6,34 @@ namespace TestApp {
                                const SkyBox &skyBox) :
             m_camera_projection_layout(device,
                                        RenderEngine::SubstageDescription{
-                                               .shaderSubstageName="perspective",
-                                               .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                               "perspective",
+                                               {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
                                        1),
             m_light_layout(device,
                            RenderEngine::LightingLayout::CreateInfo{
-                                   .substageDescription=RenderEngine::SubstageDescription{
-                                           .shaderSubstageName="sunlightShadow",
-                                           .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+                                   RenderEngine::SubstageDescription{
+                                           "sunlightShadow",
+                                           {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                                          {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                                                          {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                                          {3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                                          {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
-                                   .pass=pass,
-                                   .subpass=subpass
-#if 1
-                                   ,
-                                   .blendStates={{m_getBlendState(), 0}}
-#endif
+                                   pass,
+                                   subpass,
+                                   {{m_getBlendState(), 0}}
+
                            },
                            1),
             m_camera(camera),
             m_light(device, m_light_layout, shadowPass, skyBox),
             m_camera_projection(device, m_camera_projection_layout),
             m_simple_light_layout(device, RenderEngine::LightingLayout::CreateInfo{
-                .substageDescription=RenderEngine::SubstageDescription{
-                    .shaderSubstageName="sunlightSimple",
-                    .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}
+                RenderEngine::SubstageDescription{
+                    "sunlightSimple",
+                    {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}
                 },
-                .pass=pass,
-                .subpass=subpass
+                pass,
+                subpass
             }, 1),
             m_simple_light(device, m_simple_light_layout, skyBox){}
 
@@ -95,8 +93,9 @@ namespace TestApp {
 
     GlobalLayout::CameraProjection::CameraProjection(vkw::Device &device, RenderEngine::ProjectionLayout &layout) : RenderEngine::Projection(
     layout), uniform(device,
-                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-    mapped(uniform.map()) {
+                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}) {
+        uniform.map();
+        mapped = uniform.mapped().data();
         set().write(0, uniform);
         *mapped = ubo;
         uniform.flush();

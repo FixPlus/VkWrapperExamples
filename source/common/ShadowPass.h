@@ -48,8 +48,9 @@ namespace TestApp{
             ShadowProjection(RenderEngine::ProjectionLayout &layout, vkw::Device &device, vkw::UniformBuffer<ShadowMapSpace> const &ubo, int id) :
                     RenderEngine::Projection(layout),
                     m_ubo(device,
-                          VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                    m_mapped(m_ubo.map()) {
+                          VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}) {
+                m_ubo.map();
+                m_mapped = m_ubo.mapped().data();
                 *m_mapped = id;
                 set().write(0, ubo);
                 set().write(1, m_ubo);

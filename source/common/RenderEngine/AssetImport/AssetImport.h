@@ -7,7 +7,6 @@
 #include <vkw/Image.hpp>
 #include <vkw/Shader.hpp>
 #include <fstream>
-#include "spirv-tools/linker.hpp"
 
 namespace RenderEngine {
 
@@ -83,12 +82,9 @@ namespace RenderEngine {
         vkw::ComputeShader loadComputeShader(std::string const& name) const;
 
     private:
-        std::vector<uint32_t> m_link(std::vector<std::vector<uint32_t> const*> const& binaries) const;
         std::reference_wrapper<vkw::Device> m_device;
-        spvtools::MessageConsumer m_message_consumer;
-        spvtools::Context m_context;
-        std::vector<uint32_t> m_general_vert{};
-        std::vector<uint32_t> m_general_frag{};
+        vkw::SPIRVModule m_general_vert;
+        vkw::SPIRVModule m_general_frag;
 
     };
 

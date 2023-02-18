@@ -6,8 +6,10 @@
 #include <vkw/Queue.hpp>
 #include <vkw/CommandPool.hpp>
 #include <vkw/CommandBuffer.hpp>
+#include <vkw/SPIRVModule.hpp>
 #include <cstring>
 #include <iostream>
+#include <array>
 
 bool RenderEngine::AssetImporterBase::try_open(const std::string &filename) const {
     std::ifstream is(m_root + filename, std::ios::binary | std::ios::in | std::ios::ate);
@@ -55,7 +57,7 @@ RenderEngine::TextureLoader::loadTexture(const std::string &name, int mipLevels,
 static void generateMipMaps(vkw::CommandBuffer& buffer, vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>& image, int mipLevels){
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = image;
+    barrier.image = image.vkw::AllocatedImage::operator VkImage_T *();
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -123,8 +125,10 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
     vkw::Buffer<unsigned char> stageBuffer{m_device, textureWidth * textureHeight * 4u,
                                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, allocInfo};
 
-    auto mappedBuffer = stageBuffer.map();
-    memcpy(mappedBuffer, texture, textureWidth * textureHeight * 4u);
+    stageBuffer.map();
+
+    auto mappedBuffer = stageBuffer.mapped();
+    std::copy(texture, texture + textureWidth * textureHeight * 4u, mappedBuffer.data());
     stageBuffer.flush();
 
     allocInfo.usage = memUsage;
@@ -140,7 +144,7 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
                                  transferUsage | imageUsage};
 
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = ret;
+    transitLayout1.image = ret.vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -156,7 +160,7 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
     transitLayout1.srcAccessMask = 0;
 
     VkImageMemoryBarrier transitLayout2{};
-    transitLayout2.image = ret;
+    transitLayout2.image = ret.vkw::AllocatedImage::operator VkImage_T *();
     transitLayout2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout2.pNext = nullptr;
     transitLayout2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -202,49 +206,26 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture, size_t te
 vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(const std::string &name) const {
     std::string filename = name + ".vert.spv";
     auto code = read_binary<uint32_t>(filename);
-    std::vector<std::vector<uint32_t> const*> binRefs;
-    binRefs.push_back(&code);
-    try {
-        auto linked = m_link(binRefs);
-        return {m_device, linked.size() * 4u, linked.data()};
-    } catch (std::runtime_error& e){
-        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + filename);
-    }
+    auto PreLinkModule = vkw::SPIRVModule{code};
+    return {m_device, vkw::SPIRVModule{std::array{PreLinkModule}}};
 }
 
 vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(const std::string &name) const {
     std::string filename = name + ".frag.spv";
     auto code = read_binary<uint32_t>(filename);
-    std::vector<std::vector<uint32_t> const*> binRefs;
-    binRefs.push_back(&code);
-    try {
-        auto linked = m_link(binRefs);
-        return {m_device, linked.size() * 4u, linked.data()};
-    } catch (std::runtime_error& e){
-        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + filename);
-    }
+    auto PreLinkModule = vkw::SPIRVModule{code};
+    return {m_device, vkw::SPIRVModule{std::array{PreLinkModule}}};
 }
 
 vkw::VertexShader
 RenderEngine::ShaderImporter::loadVertexShader(const std::string &geometry, const std::string &projection) const {
+
+
     std::string geom_filename = geometry + ".gm.vert.spv";
     std::string proj_filename = projection + ".pr.vert.spv";
-    std::vector<uint32_t> geometry_code = read_binary<uint32_t>(geom_filename);
-    std::vector<uint32_t> projection_code = read_binary<uint32_t>(proj_filename);
-    std::vector<std::vector<uint32_t> const*> binRefs;
-
-    binRefs.push_back(&geometry_code);
-    binRefs.push_back(&projection_code);
-    binRefs.push_back(&m_general_vert);
-
-    try{
-        auto linked = m_link(binRefs);
-
-        return {m_device, linked.size() * 4u, linked.data()};
-
-    } catch (std::runtime_error& e){
-        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + geom_filename + " and " + proj_filename);
-    }
+    auto GeometryModule = vkw::SPIRVModule{read_binary<uint32_t>(geom_filename)};
+    auto ProjectionModule = vkw::SPIRVModule{read_binary<uint32_t>(proj_filename)};
+    return vkw::VertexShader{m_device.get(), vkw::SPIRVModule{std::array{GeometryModule, ProjectionModule, m_general_vert}}};
 }
 
 
@@ -252,63 +233,22 @@ vkw::FragmentShader
 RenderEngine::ShaderImporter::loadFragmentShader(const std::string &material, const std::string &lighting) const {
     std::string material_filename = material + ".mt.frag.spv";
     std::string lighting_filename = lighting + ".lt.frag.spv";
-    std::vector<uint32_t> material_code = read_binary<uint32_t>(material_filename);
-    std::vector<uint32_t> lighting_code = read_binary<uint32_t>(lighting_filename);
-    std::vector<std::vector<uint32_t> const*> binRefs;
-
-    binRefs.push_back(&material_code);
-    binRefs.push_back(&lighting_code);
-    binRefs.push_back(&m_general_frag);
-
-    try{
-        auto linked = m_link(binRefs);
-
-        return {m_device, linked.size() * 4u, linked.data()};
-
-    } catch (std::runtime_error& e){
-        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + material_filename + " and " + lighting_filename);
-    }
+    auto MaterialModule = vkw::SPIRVModule{read_binary<uint32_t>(material_filename)};
+    auto LightingModule = vkw::SPIRVModule{read_binary<uint32_t>(lighting_filename)};
+    return vkw::FragmentShader{m_device.get(), vkw::SPIRVModule{std::array{MaterialModule, LightingModule, m_general_frag}}};
 }
 
 
 RenderEngine::ShaderImporter::ShaderImporter(vkw::Device &device, std::string const &rootDirectory) :
-        AssetImporterBase(rootDirectory), m_device(device), m_context(SPV_ENV_VULKAN_1_0),
-        m_message_consumer([](spv_message_level_t messageLevel, const char* message, const spv_position_t position, const char*){
-            if(messageLevel == SPV_MSG_ERROR){
-                std::cerr <<"SPIRV-Link failed. Error message: " + std::string(message) << std::endl;
-            }
-        }),
+        AssetImporterBase(rootDirectory), m_device(device),
         m_general_vert(read_binary<uint32_t>("general.vert.spv")),
         m_general_frag(read_binary<uint32_t>("general.frag.spv")){
-    m_context.SetMessageConsumer(m_message_consumer);
 }
 
-std::vector<uint32_t> RenderEngine::ShaderImporter::m_link(std::vector<std::vector<uint32_t> const*> const& binaries) const{
-    std::vector<uint32_t const*> bin_refs{};
-    std::vector<size_t> bin_sizes{};
-
-    for(auto binary : binaries){
-        bin_refs.push_back(binary->data());
-        bin_sizes.push_back(binary->size());
-    }
-    std::vector<uint32_t> ret{};
-    auto result = spvtools::Link(m_context, bin_refs.data(), bin_sizes.data(), binaries.size(), &ret);
-
-    if(result != SPV_SUCCESS)
-        throw std::runtime_error("SPIRV-Link failed");
-
-    return ret;
-}
 
 vkw::ComputeShader RenderEngine::ShaderImporter::loadComputeShader(const std::string &name) const {
     std::string filename = name + ".comp.spv";
     auto code = read_binary<uint32_t>(filename);
-    std::vector<std::vector<uint32_t> const*> binRefs;
-    binRefs.push_back(&code);
-    try {
-        auto linked = m_link(binRefs);
-        return {m_device, linked.size() * 4u, linked.data()};
-    } catch (std::runtime_error& e){
-        throw std::runtime_error(e.what() + std::string(". Linked modules were: ") + filename);
-    }
+    auto PreLinkModule = vkw::SPIRVModule{code};
+    return vkw::ComputeShader{m_device, vkw::SPIRVModule{std::array{PreLinkModule}}};
 }

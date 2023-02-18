@@ -67,7 +67,7 @@ vkw::Sampler WaterSurface::Geometry::m_sampler_create(vkw::Device &device) {
 }
 WaterMaterial::WaterMaterial(vkw::Device &device, WaveSurfaceTexture &texture, bool wireframe)
 : RenderEngine::MaterialLayout(device,
-        RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="water", .setBindings={
+        RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"water", {
         {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
         {1,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
         {2,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
@@ -76,14 +76,14 @@ WaterMaterial::WaterMaterial(vkw::Device &device, WaveSurfaceTexture &texture, b
         {5,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
         {6,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
         {7,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
-                                                 .rasterizationState={
+                                                 {
         VK_FALSE,
         VK_FALSE,
         wireframe
         ? VK_POLYGON_MODE_LINE
-        : VK_POLYGON_MODE_FILL,VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, .depthTestState=vkw::DepthTestStateCreateInfo{
+        : VK_POLYGON_MODE_FILL,VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE}, vkw::DepthTestStateCreateInfo{
         VK_COMPARE_OP_LESS,
-        true}, .maxMaterials=1}),
+        true}, 1}),
 m_material(device, *this, texture) {
 
 };
@@ -91,8 +91,9 @@ m_material(device, *this, texture) {
 WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMaterial, WaveSurfaceTexture &texture)
         : RenderEngine::Material(
         waterMaterial), m_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU}),
-          m_mapped(m_buffer.map()),
           m_sampler(m_sampler_create(device)) {
+    m_buffer.map();
+    m_mapped = m_buffer.mapped().data();
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -280,7 +281,6 @@ WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::Shader
                                      16),
         m_spectrum_params(device,
                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        m_params_mapped(m_spectrum_params.map()),
         m_device(device),
         m_fft(device, shaderLoader),
         m_dyn_spectrum_gen_layout(device, shaderLoader, RenderEngine::SubstageDescription{
@@ -302,10 +302,14 @@ WaveSurfaceTexture::WaveSurfaceTexture(vkw::Device &device, RenderEngine::Shader
                               {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, cascades),
         m_dyn_params(device,
                      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        m_dyn_params_mapped(m_dyn_params.map()),
-        m_scales_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        m_scales_buffer_mapped{m_scales_buffer.map()}{
+        m_scales_buffer(device, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}){
 
+    m_dyn_params.map();
+    m_dyn_params_mapped = m_dyn_params.mapped().data();
+    m_scales_buffer.map();
+    m_scales_buffer_mapped = m_scales_buffer.mapped().data();
+    m_spectrum_params.map();
+    m_params_mapped = m_spectrum_params.mapped().data();
     m_cascades.reserve(cascades);
 
     float cascadeSizes[3] = {491.0f, 41.0f, 11.0f};
@@ -384,7 +388,7 @@ void WaveSurfaceTexture::WaveSurfaceTextureCascade::computeSpectrum(vkw::Command
 
     VkImageMemoryBarrier transitLayout1{};
 
-    transitLayout1.image = m_dynamic_spectrum;
+    transitLayout1.image = m_dynamic_spectrum.vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -432,7 +436,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascadeImageHandler::WaveSurfaceTextureCas
     transferBuffer.begin(0);
 
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = m_surfaceTexture;
+    transitLayout1.image = m_surfaceTexture.vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -482,7 +486,8 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
     vkw::Buffer<glm::vec2> stageBuf{device, size * size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                     VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}};
 
-    auto *mapped = stageBuf.map();
+    stageBuf.map();
+    auto *mapped = stageBuf.mapped().data();
 
     // Create gaussian noise (normal distribution)
 
@@ -506,7 +511,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::GaussTexture::G
     auto transferCommand = vkw::PrimaryCommandBuffer{commandPool};
 
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = *this;
+    transitLayout1.image = vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -565,12 +570,13 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::SpectrumTexture
           m_gauss_texture(device, cascadeSize),
           m_global_params(device,
                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-          m_globals_mapped(m_global_params.map()),
           m_view(device, *this, format(), 0u, 2u){
+    m_global_params.map();
+    m_globals_mapped = m_global_params.mapped().data();
     globalParameters.Size = cascadeSize;
     globalParameters.LengthScale = (float)cascadeScale;
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = *this;
+    transitLayout1.image = vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -791,7 +797,7 @@ WaveSurfaceTexture::WaveSurfaceTextureCascade::DynamicSpectrumTextures::DynamicS
     transferBuffer.begin(0);
 
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = *this;
+    transitLayout1.image = vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;

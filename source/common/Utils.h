@@ -20,10 +20,12 @@ namespace TestApp{
 
         Buffer stagingBuffer{device, static_cast<uint64_t>(size), createInfo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT};
 
-        auto* mapped = stagingBuffer.map();
+        stagingBuffer.map();
+        auto mapped = stagingBuffer.mapped();
+        auto mapIt = mapped.begin();
 
-        for(auto it = begin; it < end; ++it, ++mapped){
-            *mapped = *it;
+        for(auto it = begin; it < end; ++it, ++mapIt){
+            *mapIt = *it;
         }
 
         stagingBuffer.flush();

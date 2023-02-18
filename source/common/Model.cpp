@@ -660,16 +660,16 @@ void TestApp::GLTFModel::setRootMatrix(glm::mat4 transform, size_t id) {
 
 TestApp::ModelMaterialLayout::ModelMaterialLayout(vkw::Device &device) :
         RenderEngine::MaterialLayout(device,
-                                     RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="pbr", .setBindings={
+                                     RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"pbr", {
                                              vkw::DescriptorSetLayoutBinding{0,
                                                                              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                                              vkw::DescriptorSetLayoutBinding{1,
                                                                              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                                              vkw::DescriptorSetLayoutBinding{2,
-                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .rasterizationState=vkw::RasterizationStateCreateInfo(
+                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, vkw::RasterizationStateCreateInfo(
                                              VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL,
-                                             VK_CULL_MODE_BACK_BIT), .depthTestState=vkw::DepthTestStateCreateInfo(
-                                             VK_COMPARE_OP_LESS, VK_TRUE), .maxMaterials=50}) {
+                                             VK_CULL_MODE_BACK_BIT), vkw::DepthTestStateCreateInfo(
+                                             VK_COMPARE_OP_LESS, VK_TRUE), 50}) {
 
 }
 
@@ -698,16 +698,17 @@ TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, DefaultTexturePool& p
 
 TestApp::ModelGeometryLayout::ModelGeometryLayout(vkw::Device &device) :
         RenderEngine::GeometryLayout(device,
-                                     RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&ModelVertexInputState, .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="model", .setBindings={
+                                     RenderEngine::GeometryLayout::CreateInfo{&ModelVertexInputState, vkw::InputAssemblyStateCreateInfo{}, RenderEngine::SubstageDescription{"model", {
                                              vkw::DescriptorSetLayoutBinding{0,
-                                                                             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .maxGeometries=1000}) {
+                                                                             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1000}) {
 
 }
 
 TestApp::ModelGeometry::ModelGeometry(vkw::Device &device, TestApp::ModelGeometryLayout &layout)
         : RenderEngine::Geometry(layout), m_ubo(device,
-                                                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-          m_mapped(m_ubo.map()) {
+                                                VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}) {
+    m_ubo.map();
+    m_mapped = m_ubo.mapped().data();
     set().write(0, m_ubo);
 }
 
@@ -724,7 +725,8 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
 {
     vkw::Buffer<uint32_t> stageBuffer{device, textureDim * textureDim, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU,.requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}};
 
-    auto* textureData = stageBuffer.map();
+    stageBuffer.map();
+    auto textureData = stageBuffer.mapped();
 
     for(int i = 0; i < textureDim; ++i)
         for(int j = 0; j < textureDim; ++j)
@@ -733,7 +735,7 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
     stageBuffer.flush();
 
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = m_colorMap;
+    transitLayout1.image = m_colorMap.vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -749,7 +751,7 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
     transitLayout1.srcAccessMask = 0;
 
     VkImageMemoryBarrier transitLayout2{};
-    transitLayout2.image = m_colorMap;
+    transitLayout2.image = m_colorMap.vkw::AllocatedImage::operator VkImage_T *();
     transitLayout2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout2.pNext = nullptr;
     transitLayout2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -790,8 +792,8 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
         for(int j = 0; j < textureDim; ++j)
             textureData[i * textureDim + j] = 0x0;
     stageBuffer.flush();
-    transitLayout1.image = m_normalMap;
-    transitLayout2.image = m_normalMap;
+    transitLayout1.image = m_normalMap.vkw::AllocatedImage::operator VkImage_T *();
+    transitLayout2.image = m_normalMap.vkw::AllocatedImage::operator VkImage_T *();
 
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -812,8 +814,8 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
             textureData[i * textureDim + j] = 0xFFFFFFFF;
 
     stageBuffer.flush();
-    transitLayout1.image = m_metallicRoughnessMap;
-    transitLayout2.image = m_metallicRoughnessMap;
+    transitLayout1.image = m_metallicRoughnessMap.vkw::AllocatedImage::operator VkImage_T *();
+    transitLayout2.image = m_metallicRoughnessMap.vkw::AllocatedImage::operator VkImage_T *();
 
     transferCommand.begin(0);
     transferCommand.imageMemoryBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,

@@ -58,30 +58,12 @@ include_directories(${RENDERER_INCLUDE_DIR}/vkw)
 include_directories(external)
 include_directories(external/glm)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-find_library(RENDERER_LIB NAMES VkWrapper.a libVkWrapper libVkWrapper.so PATHS ${RENDERER_LIB_DIR} REQUIRED)
+find_library(RENDERER_LIB NAMES VkWrapper libVkWrapper libVkWrapper.so PATHS ${RENDERER_LIB_DIR} REQUIRED)
 message(STATUS ${RENDERER_LIB})
 
 
 find_package(glfw3 3.3 REQUIRED)
 set(GLFW_LIBRARY glfw)
-
-if(NOT SPIRV_TOOLS_INSTALL_DIR)
-    message(FATAL_ERROR "Please, specify SPIRV_TOOLS_INSTALL_DIR")
-endif()
-
-if(WIN32)
-    set(SPIRV-Tools_DIR ${SPIRV_TOOLS_INSTALL_DIR}/SPIRV-Tools/cmake)
-    set(SPIRV-Tools-opt_DIR ${SPIRV_TOOLS_INSTALL_DIR}/SPIRV-Tools-opt/cmake)
-    set(SPIRV-Tools-link_DIR ${SPIRV_TOOLS_INSTALL_DIR}/SPIRV-Tools-link/cmake)
-elseif(UNIX)
-    set(SPIRV-Tools_DIR ${SPIRV_TOOLS_INSTALL_DIR}/lib/cmake/SPIRV-Tools)
-    set(SPIRV-Tools-opt_DIR ${SPIRV_TOOLS_INSTALL_DIR}/lib/cmake/SPIRV-Tools-opt)
-    set(SPIRV-Tools-link_DIR ${SPIRV_TOOLS_INSTALL_DIR}/lib/cmake/SPIRV-Tools-link)
-endif()
-
-find_package(SPIRV-Tools REQUIRED)
-find_package(SPIRV-Tools-opt REQUIRED)
-find_package(SPIRV-Tools-link REQUIRED)
 
 find_package(Boost 1.62 REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})

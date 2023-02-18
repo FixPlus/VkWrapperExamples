@@ -37,18 +37,18 @@ vec4(0.0f, -1.0f, 0.0f, 0.0f), vec4(-1.0f, -1.0f, 0.0f, 0.0f), vec4(1.0f, -1.0f,
 vec4(-1.0f, 0.0f, 0.0f, 0.0f)};
 
 #define SPOUNGE_UNIT 1.0f
-#define RANK 11.0f
+#define RANK 9.0f
 
 
-#define SHAPE_BALL 1
+#define SHAPE_CUBE_BALL_TORUS 1
 
-
-vec4 ShapeOffset(vec4 pos){ //x y z for vector, a for length
-    #ifdef SHAPE_BALL
-    float new_len = length(pos.xyz) - 0.5f;
+vec4 BallOffset(vec4 pos) {
+    float new_len = length(pos.xyz) - 0.6f;
     vec3 dir = normalize(pos.xyz);
-    return vec4(dir, max(0.0f, new_len));
-    #elif SHAPE_CUBE
+    return vec4(dir, new_len);
+}
+
+vec4 CubeOffset(vec4 pos) {
     vec3 dir;
     if(abs(pos.x) >= abs(pos.y) && abs(pos.x) >= abs(pos.z))
     dir =  vec3(pos.x > 0.0f ? 1.0f: -1.0f, 0.0f, 0.0f);
@@ -56,14 +56,20 @@ vec4 ShapeOffset(vec4 pos){ //x y z for vector, a for length
     dir =  vec3(0.0f, pos.y > 0.0f ? 1.0f: -1.0f, 0.0f);
     else
     dir =  vec3(0.0f, 0.0f, pos.z > 0.0f ? 1.0f: -1.0f);
-    float divX = pos.x > 0.5f ? (pos.x - 0.5f) : (pos.x < -0.5f ? pos.x + 0.5f : 0.0f);
-    float divY = pos.y > 0.5f ? (pos.y - 0.5f) : (pos.y < -0.5f ? pos.y + 0.5f : 0.0f);
-    float divZ = pos.z > 0.5f ? (pos.z - 0.5f) : (pos.z < -0.5f ? pos.z + 0.5f : 0.0f);
-    return vec4(dir, sqrt(divX * divX + divY * divY + divZ * divZ));
-    #elif SHAPE_TORUS
+    float divX = abs(pos.x) - 0.5f;
+    float divY = abs(pos.y) - 0.5f;
+    float divZ = abs(pos.z) - 0.5f;
+    float dist = 0.0f;
+    if(divX >= 0.0f || divY >= 0.0f || divZ >= 0.0f)
+        dist = sqrt(max(divX, 0.0f) * max(divX, 0.0f) + max(divY, 0.0f) * max(divY, 0.0f) + max(divZ, 0.0f) * max(divZ, 0.0f));
+    else
+        dist = max(divX, max(divY, divZ));
+    return vec4(dir, dist);
+}
+
+vec4 TorusOffset(vec4 pos) {
     pos.w = 0.0f;
     vec4 ret;
-
     vec4 torusFaceNormal = vec4(1.0f, 0.0f, 0.0f, 0.0f);
     vec4 torusCenterDisposal = pos;
     vec4 torusRefVec = torusCenterDisposal - torusFaceNormal * dot(torusCenterDisposal, torusFaceNormal);
@@ -74,11 +80,35 @@ vec4 ShapeOffset(vec4 pos){ //x y z for vector, a for length
         ret = torusCenterDisposal - 0.375f * torusRefVec;
         return vec4(normalize(ret).xyz, max(0.0f, length(ret) - 0.125f));
     }
-        #elif
-    return pos;
-    #endif
 }
 
+vec4 diff(vec4 Shape1, vec4 Shape2) {
+  if(Shape1.w > -Shape2.w)
+    return Shape1;
+  else
+    return -Shape2;
+}
+
+vec4 concat(vec4 Shape1, vec4 Shape2) {
+    if(Shape1.w < Shape2.w){
+        return Shape1;
+    }
+    else {
+        return Shape2;
+    }
+}
+
+vec4 ShapeOffset(vec4 pos){ //x y z for vector, a for length
+    #ifdef SHAPE_BALL
+    return BallOffset(pos);
+    #elif SHAPE_CUBE
+    return CubeOffset(pos);
+    #elif SHAPE_CUBE_BALL
+    return diff(CubeOffset(pos), BallOffset(pos));
+    #elif SHAPE_CUBE_BALL_TORUS
+    return concat(TorusOffset(pos), diff(CubeOffset(pos), BallOffset(pos)));
+    #endif
+}
 
 float roundUp(float f){
     float ret = round(f);
@@ -270,20 +300,16 @@ vec4 getMarchDirection(){
     return dir;
 }
 
-vec4 fractal(){
+struct Hit{
+    vec4 albedo;
+    vec4 normal;
+    vec4 hitPoint;
+    float distance;
+    int steps;
+    bool hasHit;
+};
 
-    vec4 outFragColor;
-    // color and mix used for the background. Now it just uses single color, but could be altered by texture
-
-    vec4 color = vec4(0.2f, 0.8f, 0.9f,1.0f); //texture(samplerColor1, vec2(inUVW.x, inUVW.y), 1.0f);
-    vec4 mix = vec4(1.0f, 1.0f, 1.0f, 1.0f) - color; //texture(samplerColor1, vec2(inUVW.x, inUVW.y), 1.0f);
-    vec4 glowCol = vec4(1.0f, 0.0f, 1.0f, 0.0f);
-
-
-    vec4 dir = getMarchDirection(); //direction od ray shooting out of camera
-    vec4 curPos = ubo.cameraPos; // contains the posirion of ray's front point
-
-
+Hit march(vec3 origin, vec3 direction){
     int n = 0; //count of steps
     float totalRayLength = 0.0f; // counter for ray length
     float depth = 0.0f; // accum for depth
@@ -291,7 +317,9 @@ vec4 fractal(){
 
     float temp; // used to temproary contaion ED for each step
     float lastL; // used to contain the prev value of temp var
-    vec4 prevPos = curPos; // used to contain the prev value of curPos
+    vec4 prevPos = vec4(origin, 0.0f); // used to contain the prev value of curPos
+    vec4 curPos = prevPos;
+    vec4 dir = vec4(direction, 0.0f);
 
     /*
         Next cycle is representation of ray marching technic
@@ -308,15 +336,50 @@ vec4 fractal(){
 
     while((temp = closestDist(curPos)) > (totalRayLength < SPOUNGE_UNIT ? SPOUNGE_UNIT * epsilon : epsilon * totalRayLength)  && totalRayLength < maxLength && n < maxSteps){
         prevPos = curPos;
-        if(log(length(curPos)) - log(temp) > 13.0f)
-        temp = pow(2.715, log(length(curPos)) - 13.0f) ;
+        //if(log(length(curPos)) - log(temp) > 13.0f)
+        //temp = pow(2.715, log(length(curPos)) - 13.0f) ;
         curPos += dir * temp * 0.995f;
         n++;
         totalRayLength += temp * 0.995f;
         lastL = temp* 0.99f;
     }
 
-    if(totalRayLength >= maxLength){ //should draw background case
+    Hit ret;
+    ret.hasHit = totalRayLength < maxLength;
+    if(ret.hasHit){
+        vec2 texCoords = closestTextureCoord(curPos);
+        vec4 posColor = closestColor(curPos);
+        float foggy = pow(totalRayLength, 3.0) / pow(maxLength, 3.0);
+        float mip = foggy * 8.0f;
+        ret.albedo = texture(samplerColor1, texCoords, mip);
+        ret.distance = totalRayLength;
+        ret.steps = n;
+        ret.normal = closestNormal(curPos);
+        ret.hitPoint = curPos;
+    } else {
+        ret.albedo = vec4(0.2f, 0.8f, 0.9f,1.0f);
+    }
+
+    return ret;
+}
+vec4 fractal(){
+
+    vec4 outFragColor;
+    // color and mix used for the background. Now it just uses single color, but could be altered by texture
+
+    vec4 color = vec4(0.2f, 0.8f, 0.9f,1.0f); //texture(samplerColor1, vec2(inUVW.x, inUVW.y), 1.0f);
+    vec4 mix = vec4(1.0f, 1.0f, 1.0f, 1.0f) - color; //texture(samplerColor1, vec2(inUVW.x, inUVW.y), 1.0f);
+    vec4 glowCol = vec4(1.0f, 0.0f, 1.0f, 0.0f);
+
+
+    vec4 dir = getMarchDirection(); //direction od ray shooting out of camera
+    vec4 curPos = ubo.cameraPos; // contains the posirion of ray's front point
+    float depth;
+
+
+    Hit hit = march(vec3(curPos), vec3(dir));
+
+    if(!hit.hasHit){ //should draw background case
 
         //sun function is to draw the light source
         float sun = pow(100,  10.0f * (-1.0f + max(0.0f, dot(dir, -normalize(ubo.lightPos)))));
@@ -328,19 +391,16 @@ vec4 fractal(){
         depth = maxLength;
     }
     else{
-        depth = totalRayLength;
+        depth = hit.distance;
         vec4 fog = color;
-        float foggy = pow(totalRayLength, 3.0) / pow(maxLength, 3.0);
+        float foggy = pow(depth, 3.0) / pow(maxLength, 3.0);
         float mip = foggy * 8.0f;
         //ambient occlusion calculated from number of steps
-        float occlusion = 1.0f - pow(2.715, -35.0f/float(n));
+        float occlusion = 1.0f - pow(2.715, -35.0f/float(hit.steps));
         //float occlusion = 1.0f - 0.8f * float(n) / float(maxSteps);
 
-        //getting texture coordinates of the object point
-        vec2 texCoords = closestTextureCoord(curPos);
-        vec4 posColor = closestColor(curPos);//= vec4(0.5f + 0.5f * sin((curPos.x + curPos.y) / 10.0f), 0.0f, 0.0f, 1.0f)  + vec4(0.0f, 0.5f + 0.5f * sin((curPos.x + curPos.z) / 100.0f), 0.0f, 1.0f)  + vec4(1.0f, 1.0f, 0.5f + 0.5f * sin((curPos.z + curPos.y) / 1000.0f), 1.0f);
         //enlighted calculated by the angle between surface normal and lightSource beam
-        vec4 normalVec = closestNormal(curPos);
+        vec4 normalVec = hit.normal;
         float normDot = dot(normalVec, -normalize(ubo.lightPos));
         float enlighted = normDot > 0.0f ? 0.5f + 0.3f * normDot : 0.5f + 0.1f * normDot;
         vec4 refVec = reflect(dir, normalVec);
@@ -352,70 +412,44 @@ vec4 fractal(){
 
         // here we use prevPos variable to start our marching from the point where we still
         // didnt hit epsilon treshhold
-        if(/*ubo.shadowOption >= 0.0f &&*/ normDot > 0.0f && n < maxSteps / 2.0f && false){
-            // we only calculate it if it is on, there are no self-shadowing and object is normally lit
+        Hit droppedShadow = march(vec3(hit.hitPoint - hit.distance * 0.001f * dir - normalize(ubo.lightPos) * hit.distance * 0.001f) , vec3(-normalize(ubo.lightPos)));
 
-            curPos = prevPos;
-
-            // but to be sure this point is not far away from real object point we use lastL variable
-            // to check how much did last step took
-            // if it too much (more than 1.5 * epsilon) we do an additional step to our point
-            // that is less by 1.2 * epsilon than in previous marhing was. That unsures ud that
-            // we not hit epsilon treshhold again and be as close to real object point as we could
-
-            if(lastL > epsilon * 1.5f)
-            lastL -= epsilon * 1.2f;
-            else
-            lastL = 0.0f;
-
-            curPos += dir * lastL;
-
-            // then the technic is applied again
-
-            totalRayLength = 0.0f;
-            n = 0;
-            vec4 normLightPos = normalize(ubo.lightPos);
-
-            while(temp != 0.0f && (temp = closestDist(curPos)) > epsilon  && totalRayLength < maxLength && n < 100){
-                curPos -= normLightPos * temp * 0.995f;
-                n++;
-                totalRayLength += temp * 0.995f;
-            }
+        vec3 reflectDir = normalize(reflect(vec3(dir), vec3(hit.normal)));
+        Hit reflected = march(vec3(hit.hitPoint - hit.distance * 0.001f * dir + vec4(reflectDir, 0.0f) * hit.distance * 0.001f) , vec3(reflectDir));
+        vec4 reflectionColor;
+        if(reflected.hasHit){
+            float refOcclusion = 1.0f - pow(2.715, -35.0f/float(reflected.steps));
+            normalVec = reflected.normal;
+            normDot = dot(normalVec, -normalize(ubo.lightPos));
+            float refEnlighted = normDot > 0.0f ? 0.5f + 0.3f * normDot : 0.5f + 0.1f * normDot;
+            float refFoggy = pow(reflected.distance, 3.0) / pow(maxLength, 3.0);
+            float light = refOcclusion * refEnlighted;
+            reflectionColor = reflected.albedo * light * (1 - refFoggy) + fog * refFoggy;
+        } else{
+            reflectionColor = color;
         }
-        else{
-            totalRayLength = maxLength * 1.1f;
-        }
-
-        // if we hit object on the way(rayLength < maxLength) - we apply a shadow
-        // if not - normal enlighted var will be applied
-
-        float shadow = pow(totalRayLength / maxLength, 0.125f) / 1.25f + 0.2f;
-        if(totalRayLength < maxLength)
-        specular = 0.0f;
-
         // and finnaly the totalLight is calculated based on ambient occlusion and shadowing
 
-        float totalLight = occlusion;
+        float alpha = 0.8f; //hit.albedo.r;
+        color = hit.albedo * (1.0f - alpha) + reflectionColor * alpha;
 
-        if(shadow >= 1.0f)
-        totalLight *= enlighted;
-        else
-        totalLight *= shadow;
+        float totalLight = occlusion;
+        if(droppedShadow.hasHit){
+            //color = color * 0.8f + droppedShadow.albedo * 0.2f;
+            specular = 0.0f;
+            totalLight *= 0.2f;
+        } else {
+            totalLight *= enlighted;
+        }
 
         //object also has a color that could be replaced by texture if needed
         //Now it is using previously calculated texture coordintes
 
-        //color = vec4(0.5f, 0.3f, 0.6f, 0.0f);
 
-        color = texture(samplerColor1, texCoords, mip);
+
         specular *= occlusion;
-        /*
-    color.x *= posColor.x;
-    color.y *= posColor.y;
-    color.z *= posColor.z;
-    */
+
         outFragColor = (color * (1 - specular) + vec4(1.5f, 1.5f, 1.5f, 1.0f) * specular) * totalLight * (1 - foggy) + fog * foggy;
-        //outFragColor = texture(samplerColor1, vec2(inUVW.x, inUVW.y), 0.0f);
     }
 
     outFragColor.w = depth;

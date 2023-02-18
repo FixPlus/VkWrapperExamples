@@ -1,5 +1,5 @@
 function(compileShader SHADER_NAME SHADER_DIR OUTPUT_DIR)
-    add_custom_command(OUTPUT ${OUTPUT_DIR}/${SHADER_NAME}.spv COMMAND ${GLSL} -V --allow-partial-linkage -I${SHADER_DIR} -o ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_DIR}/${SHADER_NAME}.spv ${SHADER_DIR}/${SHADER_NAME}
+    add_custom_command(OUTPUT ${OUTPUT_DIR}/${SHADER_NAME}.spv COMMAND ${GLSL} -V --keep-uncalled --allow-partial-linkage -I${SHADER_DIR} -o ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_DIR}/${SHADER_NAME}.spv ${SHADER_DIR}/${SHADER_NAME}
             MAIN_DEPENDENCY ${SHADER_DIR}/${SHADER_NAME} DEPENDS ${SHADER_DIR}/GeomProjInterface.h.glsl ${SHADER_DIR}/MaterialLightingInterface.h.glsl)
 
 endfunction(compileShader)

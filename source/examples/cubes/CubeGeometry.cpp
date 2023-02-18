@@ -48,20 +48,21 @@ namespace TestApp {
                                                        {.usage=VMA_MEMORY_USAGE_GPU_ONLY},
                                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT),
             m_instances(device, maxCubes,
-                        {.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-            m_instance_mapped(m_instances.map()) {
+                        {.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}) {
+        m_instances.map();
+        m_instance_mapped = m_instances.mapped().data();
         VmaAllocationCreateInfo createInfo{};
         createInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         createInfo.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
         vkw::Buffer<PerVertex> stageBuf{device, m_vertices.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, createInfo};
 
-
-        auto *mapped = stageBuf.map();
+        stageBuf.map();
+        auto mapped = stageBuf.mapped();
 
         auto vertices = m_makeCube();
 
-        memcpy(mapped, vertices.data(), m_vertices.size() * sizeof(PerVertex));
+        std::copy(vertices.begin(), vertices.end(), mapped.begin());
         stageBuf.flush();
         stageBuf.unmap();
 

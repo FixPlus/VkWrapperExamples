@@ -30,13 +30,15 @@ namespace TestApp {
             m_geometry(m_geometryLayout),
             m_projectionLayout(device, RenderEngine::SubstageDescription{.shaderSubstageName="flat"}, 1),
             m_projection(m_projectionLayout),
-            m_materialLayout(device, RenderEngine::MaterialLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="ui", .setBindings={vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, .maxMaterials=1000}),
-            m_lightingLayout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="flat"},.pass=pass,.subpass=subpass, .blendStates={{getUIBlendState(), 0}}}, 1),
+            m_materialLayout(device, RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"ui", {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, vkw::RasterizationStateCreateInfo{}, std::optional<vkw::DepthTestStateCreateInfo>{}, 1000}),
+            m_lightingLayout(device, RenderEngine::LightingLayout::CreateInfo{RenderEngine::SubstageDescription{"flat"},pass,subpass, {{getUIBlendState(), 0}}}, 1),
             m_lighting(m_lightingLayout),
     m_vertices(m_create_vertex_buffer(device, 1000)),
     m_indices(m_create_index_buffer(device, 1000)) {
-        m_vertices_mapped = m_vertices.map();
-        m_indices_mapped = m_indices.map();
+        m_vertices.map();
+        m_indices.map();
+        m_vertices_mapped = m_vertices.mapped().data();
+        m_indices_mapped = m_indices.mapped().data();
     }
 
     void GUIBackend::m_updateFontTexture(ImFontAtlas *atlas) {
@@ -111,12 +113,14 @@ namespace TestApp {
 
         if (vertices > m_vertices.size()) {
             m_vertices = m_create_vertex_buffer(m_device, vertices);
-            m_vertices_mapped = m_vertices.map();
+            m_vertices.map();
+            m_vertices_mapped = m_vertices.mapped().data();
         }
 
         if (indices > m_indices.size()) {
             m_indices = m_create_index_buffer(m_device, indices);
-            m_indices_mapped = m_indices.map();
+            m_indices.map();
+            m_indices_mapped = m_indices.mapped().data();
         }
 
         // Upload data

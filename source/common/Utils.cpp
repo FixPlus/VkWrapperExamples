@@ -9,7 +9,7 @@ namespace TestApp{
                                                  height, 1, 1, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT};
 
         VkImageMemoryBarrier transitLayout{};
-        transitLayout.image = depthMap;
+        transitLayout.image = depthMap.vkw::AllocatedImage::operator VkImage_T *();
         transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         transitLayout.pNext = nullptr;
         transitLayout.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;

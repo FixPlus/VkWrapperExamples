@@ -17,7 +17,7 @@ namespace TestApp{
 
             for (auto &image: m_images) {
                 VkImageMemoryBarrier transitLayout{};
-                transitLayout.image = image;
+                transitLayout.image = image.vkw::NonOwingImage::operator VkImage_T *();
                 transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
                 transitLayout.pNext = nullptr;
                 transitLayout.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;

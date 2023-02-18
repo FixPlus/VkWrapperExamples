@@ -10,7 +10,7 @@ m_shadow_proj_layout(device, RenderEngine::SubstageDescription{.shaderSubstageNa
         vkw::DescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
         TestApp::SHADOW_CASCADES_COUNT),
 m_shadow_material_layout(device,
-        RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="flat"}, .rasterizationState=vkw::RasterizationStateCreateInfo{
+        RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="null"}, .rasterizationState=vkw::RasterizationStateCreateInfo{
         VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE,
         VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 3.0f, 0.0f,
         1.2f}, .depthTestState=vkw::DepthTestStateCreateInfo(VK_COMPARE_OP_LESS,
@@ -26,8 +26,9 @@ m_shadowCascades{device.getAllocator(),
                  2048, 1, TestApp::SHADOW_CASCADES_COUNT, 1,
                  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT},
 m_ubo(device,
-      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-m_mapped(m_ubo.map()){
+      VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}){
+        m_ubo.map();
+        m_mapped = m_ubo.mapped().data();
     for(int i = 0; i < TestApp::SHADOW_CASCADES_COUNT; ++i){
         m_shadow_projs.emplace_back(m_shadow_proj_layout, device, m_ubo, i);
     }

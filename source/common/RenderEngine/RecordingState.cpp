@@ -1,5 +1,6 @@
 #include "RecordingState.h"
 #include <cassert>
+#include <stdexcept>
 
 namespace RenderEngine {
     void GraphicsRecordingState::setGeometry(Geometry const &geometry) {

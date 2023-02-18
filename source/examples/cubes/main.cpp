@@ -118,17 +118,17 @@ public:
     GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera,
                  ShadowRenderPass &shadowPass, vkw::Sampler &sampler) :
             m_camera_projection_layout(device,
-                                       RenderEngine::SubstageDescription{.shaderSubstageName="perspective", .setBindings={
+                                       RenderEngine::SubstageDescription{"perspective", {
                                                vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
                                        1),
             m_light_layout(device,
-                           RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="sunlightShadowed", .setBindings={
+                           RenderEngine::LightingLayout::CreateInfo{RenderEngine::SubstageDescription{"sunlightShadowed", {
                                    vkw::DescriptorSetLayoutBinding{0,
                                                                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                                    vkw::DescriptorSetLayoutBinding{1,
                                                                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                    vkw::DescriptorSetLayoutBinding{2,
-                                                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, .pass=pass, .subpass=subpass},
+                                                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, pass, subpass},
                            1),
             m_camera(camera),
             m_light(device, m_light_layout, light, shadowPass, 4, sampler),
@@ -164,8 +164,9 @@ private:
 
         CameraProjection(vkw::Device &device, RenderEngine::ProjectionLayout &layout) : RenderEngine::Projection(
                 layout), uniform(device,
-                                 VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                                        mapped(uniform.map()) {
+                                 VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}) {
+            uniform.map();
+            mapped = uniform.mapped().data();
             set().write(0, uniform);
             *mapped = ubo;
             uniform.flush();
@@ -191,9 +192,10 @@ private:
               uint32_t cascades, vkw::Sampler &sampler)
                 : RenderEngine::Lighting(layout), uniform(device,
                                                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                  m_shadow_map_view(device, pass.shadowMap(), pass.shadowMap().format(), 0, cascades),
-                  mapped(uniform.map()){
+                  m_shadow_map_view(device, pass.shadowMap(), pass.shadowMap().format(), 0, cascades){
 
+            uniform.map();
+            mapped = uniform.mapped().data();
             auto& shadowCascades = pass.shadowMap();
             set().write(0, m_shadow_map_view,
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);

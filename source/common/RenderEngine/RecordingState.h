@@ -44,7 +44,7 @@ namespace RenderEngine{
 
         template<typename T>
         void pushConstants(T constant, VkShaderStageFlagBits shaderStage, uint32_t offset){
-            m_commandBuffer.get().template pushConstants(m_current_layout(), shaderStage, offset, constant);
+            m_commandBuffer.get().pushConstants(m_current_layout(), shaderStage, offset, constant);
         }
 
     private:

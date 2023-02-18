@@ -111,15 +111,16 @@ void TestApp::Fractal::draw(RenderEngine::GraphicsRecordingState& recorder) {
 TestApp::Fractal::FractalMaterial::FractalMaterial(RenderEngine::MaterialLayout &parent, vkw::Device &device,
                                                    RenderEngine::TextureLoader &textureLoader) :
         RenderEngine::Material(parent),
-        m_texture(textureLoader.loadTexture("image", 10)),
-        m_sampler_with_mips(TestApp::createDefaultSampler(device, 10)),
+        m_texture(textureLoader.loadTexture("image", 7)),
+        m_sampler_with_mips(TestApp::createDefaultSampler(device, 7)),
         m_sampler(TestApp::createDefaultSampler(device)),
         m_buffer(device,
                  VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        m_mapped(m_buffer.map()),
         m_device(device),
         m_texture_view(device, m_texture, m_texture.format(), 0u, m_texture.mipLevels()){
 
+    m_buffer.map();
+    m_mapped = m_buffer.mapped().data();
     VkComponentMapping mapping{};
     mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -154,6 +155,8 @@ TestApp::FractalSettings::FractalSettings(TestApp::GUIFrontEnd &gui, TestApp::Fr
 
 void TestApp::FractalSettings::onGui() {
     ImGui::SliderFloat("Mutate", &m_fractal.get().ubo.params.x, 0.0f, 2.0f);
+    ImGui::SliderFloat3("Light Pos", &m_fractal.get().ubo.lightPos.x, -1.0f, 1.0f);
+    m_fractal.get().ubo.lightPos = glm::normalize(m_fractal.get().ubo.lightPos);
     if (ImGui::Checkbox("Use mipmaps", &m_sampler_mode)) {
         m_fractal.get().switchSamplerMode();
     }
@@ -240,12 +243,13 @@ TestApp::Fractal::FilterMaterial::FilterMaterial(RenderEngine::MaterialLayout &p
                                                  m_buffer(device,
                                                           VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU,
                                                                                   .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-                                                                                  m_mapped(m_buffer.map()),
                                                  m_sampler(TestApp::createDefaultSampler(device)),
                                                  m_colorTargetView(device, offscreenBuffer.colorTarget(), offscreenBuffer.colorTarget().format()),
                                                  m_depthTargetView(device, offscreenBuffer.depthTarget(), offscreenBuffer.depthTarget().format()),
                                                  m_device(device){
 
+    m_buffer.map();
+    m_mapped = m_buffer.mapped().data();
     set().write(0, m_buffer);
     rewriteOffscreenTextures(offscreenBuffer, device);
 }

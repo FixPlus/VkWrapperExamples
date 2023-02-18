@@ -7,23 +7,24 @@ static vkw::NullVertexInputState skybox_state{};
 
 SkyBox::SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpass, RenderEngine::ShaderLoaderInterface& shaderLoader) :
         m_device(device),
-        m_geometry_layout(device, RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&skybox_state,.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, .maxGeometries=1}),
+        m_geometry_layout(device, RenderEngine::GeometryLayout::CreateInfo{&skybox_state,vkw::InputAssemblyStateCreateInfo{},RenderEngine::SubstageDescription{"skybox"}, 1}),
         m_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, 1),
         m_material_layout(device, RenderEngine::MaterialLayout::CreateInfo{
-            .substageDescription=RenderEngine::SubstageDescription{
-                .shaderSubstageName="skybox",
-                .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
-                .maxMaterials=1}),
-        m_lighting_layout(device, RenderEngine::LightingLayout::CreateInfo{.substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="flat"}, .pass=pass, .subpass=subpass}, 1),
+            RenderEngine::SubstageDescription{
+                "skybox",
+                {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
+            vkw::RasterizationStateCreateInfo{}, std::optional<vkw::DepthTestStateCreateInfo>{}, 1}),
+        m_lighting_layout(device, RenderEngine::LightingLayout::CreateInfo{RenderEngine::SubstageDescription{"flat"}, pass, subpass}, 1),
         m_geometry(m_geometry_layout),
         m_projection(m_projection_layout),
         m_lighting(m_lighting_layout),
         m_atmo_buffer(device,
                       VmaAllocationCreateInfo{.usage=VMA_MEMORY_USAGE_CPU_TO_GPU, .requiredFlags=VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-        m_atmo_mapped(m_atmo_buffer.map()),
         m_material(device, m_material_layout, m_atmo_buffer, outScatterTexture()),
         m_out_scatter_texture(device, shaderLoader, m_atmo_buffer, 2048, 2048)
 {
+    m_atmo_buffer.map();
+    m_atmo_mapped = m_atmo_buffer.mapped().data();
 }
 
 void SkyBox::draw(RenderEngine::GraphicsRecordingState &buffer) {
@@ -86,7 +87,7 @@ SkyBox::OutScatterTexture::OutScatterTexture(vkw::Device &device, RenderEngine::
     transferBuffer.begin(0);
 
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = *this;
+    transitLayout1.image = vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -120,7 +121,7 @@ void SkyBox::OutScatterTexture::recompute(vkw::Device& device) {
     transferBuffer.begin(0);
 
     VkImageMemoryBarrier transitLayout1{};
-    transitLayout1.image = *this;
+    transitLayout1.image = vkw::AllocatedImage::operator VkImage_T *();
     transitLayout1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     transitLayout1.pNext = nullptr;
     transitLayout1.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
