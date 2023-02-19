@@ -167,8 +167,6 @@ int runFractal(){
         else
             firstEncounter = false;
 
-        extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-
 
         window.update();
         gui.frame();
@@ -176,7 +174,8 @@ int runFractal(){
         recorder.reset();
         fractal.update(window.camera());
 
-        if (window.minimized()){
+        if (extents.width == 0 || extents.height == 0){
+            extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
             firstEncounter = true;
             continue;
         }
@@ -192,6 +191,8 @@ int runFractal(){
 
                 framebuffers.clear();
 
+                extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
+
                 for (auto &attachment: mySwapChain.attachments()) {
                     std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2> views = {&attachment, &mySwapChain.depthAttachment()};
                     framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
@@ -199,6 +200,7 @@ int runFractal(){
                 }
                 fractal.resizeOffscreenBuffer(extents.width, extents.height);
                 firstEncounter = true;
+
                 continue;
             } else {
                 throw;

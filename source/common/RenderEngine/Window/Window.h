@@ -125,9 +125,7 @@ namespace RenderEngine {
         }
 
         std::pair<int, int> framebufferExtents() const {
-            std::pair<int, int> ret{};
-            glfwGetFramebufferSize(m_window, &ret.first, &ret.second);
-            return ret;
+            return {m_fb_width, m_fb_height};
         }
 
         FrameClock const &clock() const {
@@ -154,6 +152,11 @@ namespace RenderEngine {
 
         virtual void onPollEvents() {};
 
+        virtual void onWindowResize(int width, int height) {
+            m_width = width;
+            m_height = height;
+            glfwGetFramebufferSize(m_window, &m_fb_width, &m_fb_height);
+        };
     private:
         static void initImpl();
 
@@ -162,6 +165,10 @@ namespace RenderEngine {
         bool m_cursorDisabled = false;
         FrameClock m_clock;
         GLFWwindow *m_window = nullptr;
+        int m_width;
+        int m_height;
+        int m_fb_width;
+        int m_fb_height;
 
         friend class WindowCallbackHandler;
     };
@@ -205,6 +212,11 @@ namespace RenderEngine {
         static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
             get().m_windowMap.at(window)->mouseScroll(xoffset, yoffset);
         }
+        static void window_size_callback(GLFWwindow* window, int width, int height)
+        {
+            get().m_windowMap.at(window)->onWindowResize(width, height);
+        }
+
         std::map<GLFWwindow *, Window *> m_windowMap;
     };
 

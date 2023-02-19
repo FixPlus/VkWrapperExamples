@@ -52,7 +52,10 @@ Boxer::Selection getSelection(gint response) {
 }
 
 } // namespace
+#else
+#include <iostream>
 #endif
+
 #elif defined _WIN32
 
 #include <windows.h>
@@ -111,6 +114,7 @@ namespace {
 RenderEngine::Boxer::Selection
 RenderEngine::Boxer::show(std::string_view const& message, std::string_view const& title, RenderEngine::Boxer::Style style,
                           RenderEngine::Boxer::Buttons buttons) {
+
 #ifdef __linux__
 #if 0
     if (!gtk_init_check(0, NULL)) {
@@ -130,6 +134,8 @@ RenderEngine::Boxer::show(std::string_view const& message, std::string_view cons
    while (g_main_context_iteration(NULL, false));
 
    return selection;
+#else
+   std::cout << title << ": " << std::endl << message << std::endl;
 #endif
 #elif defined _WIN32
     UINT flags = MB_TASKMODAL;

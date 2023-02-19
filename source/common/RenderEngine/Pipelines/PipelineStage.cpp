@@ -19,7 +19,7 @@ namespace RenderEngine {
             }
         }
 
-        return {device, maxSets, sizes};
+        return {device, maxSets, std::span<VkDescriptorPoolSize>{sizes.data(), sizes.size()}};
     }
 
     PipelineStageLayout::PipelineStageLayout(PipelineStageLayout &&another) noexcept: m_layout(

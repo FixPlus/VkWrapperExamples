@@ -7,6 +7,8 @@ namespace RenderEngine {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
         WindowCallbackHandler::get().connectWindow(*this);
+        glfwGetFramebufferSize(m_window, &m_fb_width, &m_fb_height);
+        glfwGetWindowSize(m_window, &m_width, &m_height);
     }
 
     Window::~Window() {
@@ -77,10 +79,12 @@ namespace RenderEngine {
         glfwSetMouseButtonCallback(rawHandle, mouse_button_callback);
         glfwSetCharCallback(rawHandle, character_callback);
         glfwSetScrollCallback(rawHandle, scroll_callback);
+        glfwSetWindowSizeCallback(rawHandle, window_size_callback);
     }
 
     void WindowCallbackHandler::pollEvents() {
         glfwPollEvents();
+
         for(auto& window: m_windowMap){
             window.second->onPollEvents();
             window.second->m_clock.frame();
