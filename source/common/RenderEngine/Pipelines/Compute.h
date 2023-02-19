@@ -1,7 +1,7 @@
 #ifndef TESTAPP_COMPUTE_H
 #define TESTAPP_COMPUTE_H
 
-#include <Pipeline.hpp>
+#include <vkw/Pipeline.hpp>
 #include "RenderEngine/Pipelines/PipelineStage.h"
 #include "RenderEngine/Pipelines/ShaderLoaderInterface.h"
 

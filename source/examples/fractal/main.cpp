@@ -2,16 +2,16 @@
 #include <thread>
 #include <SwapChainImpl.h>
 #include <RenderPassesImpl.h>
-#include <Fence.hpp>
+#include <vkw/Fence.hpp>
 #include <RenderEngine/Shaders/ShaderLoader.h>
-#include <Semaphore.hpp>
-#include <CommandPool.hpp>
+#include <vkw/Semaphore.hpp>
+#include <vkw/CommandPool.hpp>
 #include "AssetPath.inc"
-#include <Queue.hpp>
+#include <vkw/Queue.hpp>
 #include "Fractal.h"
 #include "RenderEngine/Window/Boxer.h"
 #include "ErrorCallbackWrapper.h"
-#include "Validation.hpp"
+#include <vkw/Validation.hpp>
 #include "Utils.h"
 
 using namespace TestApp;

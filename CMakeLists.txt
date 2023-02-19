@@ -3,10 +3,6 @@ project(TestApp)
 
 set(CMAKE_CXX_STANDARD 20)
 
-if(NOT DEFINED RENDERER_INSTALL_DIR)
-    message(FATAL_ERROR "'RENDERER_INSTALL_DIR' is not set. Add -DRENDERER_INSTALL_DIR=path/to/VkRenderer/install")
-endif()
-
 IF(WIN32)
     IF (NOT Vulkan_FOUND)
         if(DEFINED ENV{VK_SDK_PATH})
@@ -51,18 +47,12 @@ ELSE()
 ENDIF()
 
 
-set(RENDERER_LIB_DIR ${RENDERER_INSTALL_DIR}/lib)
-set(RENDERER_INCLUDE_DIR ${RENDERER_INSTALL_DIR}/include)
-include_directories(${RENDERER_INCLUDE_DIR})
-include_directories(${RENDERER_INCLUDE_DIR}/vkw)
 include_directories(external)
 include_directories(external/glm)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-find_library(RENDERER_LIB NAMES VkWrapper libVkWrapper libVkWrapper.so PATHS ${RENDERER_LIB_DIR} REQUIRED)
-message(STATUS ${RENDERER_LIB})
-
 
 find_package(glfw3 3.3 REQUIRED)
+find_package(VkWrapper 1.0 REQUIRED)
 set(GLFW_LIBRARY glfw)
 
 find_package(Boost 1.62 REQUIRED)

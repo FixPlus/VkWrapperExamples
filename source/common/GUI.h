@@ -6,10 +6,10 @@
 #include <vkw/RenderPass.hpp>
 #include <vkw/Pipeline.hpp>
 #include <glm/glm.hpp>
-#include <DescriptorSet.hpp>
-#include <DescriptorPool.hpp>
+#include <vkw/DescriptorSet.hpp>
+#include <vkw/DescriptorPool.hpp>
 #include <map>
-#include <Image.hpp>
+#include <vkw/Image.hpp>
 #include <RenderEngine/AssetImport/AssetImport.h>
 #include <vkw/Sampler.hpp>
 #include <set>

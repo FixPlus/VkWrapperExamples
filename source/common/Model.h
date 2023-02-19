@@ -10,13 +10,13 @@
 #include <stdexcept>
 #include <tiny_gltf/tiny_gltf.h>
 #include <vkw/VertexBuffer.hpp>
-#include <CommandBuffer.hpp>
-#include <Shader.hpp>
+#include <vkw/CommandBuffer.hpp>
+#include <vkw/Shader.hpp>
 #include <RenderEngine/AssetImport/AssetImport.h>
-#include <Pipeline.hpp>
-#include <DescriptorSet.hpp>
-#include <DescriptorPool.hpp>
-#include <Sampler.hpp>
+#include <vkw/Pipeline.hpp>
+#include <vkw/DescriptorSet.hpp>
+#include <vkw/DescriptorPool.hpp>
+#include <vkw/Sampler.hpp>
 #include <iostream>
 #include <RenderEngine/Pipelines/PipelinePool.h>
 

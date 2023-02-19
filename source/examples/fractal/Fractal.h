@@ -1,7 +1,7 @@
 #ifndef TESTAPP_FRACTAL_H
 #define TESTAPP_FRACTAL_H
 
-#include <Sampler.hpp>
+#include <vkw/Sampler.hpp>
 #include "RenderEngine/Pipelines/PipelinePool.h"
 #include "RenderEngine/RecordingState.h"
 #include "RenderEngine/AssetImport/AssetImport.h"

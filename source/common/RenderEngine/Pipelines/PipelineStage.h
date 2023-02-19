@@ -3,8 +3,8 @@
 
 #include "vkw/Common.hpp"
 #include <string>
-#include <DescriptorSet.hpp>
-#include <DescriptorPool.hpp>
+#include <vkw/DescriptorSet.hpp>
+#include <vkw/DescriptorPool.hpp>
 #include <set>
 #include <optional>
 

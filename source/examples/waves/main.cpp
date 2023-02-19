@@ -6,7 +6,7 @@
 #include <vkw/Fence.hpp>
 #include "Utils.h"
 #include <RenderPassesImpl.h>
-#include <Semaphore.hpp>
+#include <vkw/Semaphore.hpp>
 #include <RenderEngine/Shaders/ShaderLoader.h>
 #include "GUI.h"
 #include "AssetPath.inc"
@@ -18,7 +18,7 @@
 #include "ShadowPass.h"
 #include "RenderEngine/Window/Boxer.h"
 #include "ErrorCallbackWrapper.h"
-#include "Validation.hpp"
+#include <vkw/Validation.hpp>
 
 using namespace TestApp;
 

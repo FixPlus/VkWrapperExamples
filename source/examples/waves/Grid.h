@@ -2,7 +2,7 @@
 #define TESTAPP_GRID_H
 
 #include <glm/glm.hpp>
-#include <VertexBuffer.hpp>
+#include <vkw/VertexBuffer.hpp>
 #include <vector>
 #include <map>
 #include "RenderEngine/Pipelines/PipelinePool.h"

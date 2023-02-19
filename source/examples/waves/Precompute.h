@@ -2,7 +2,7 @@
 #define TESTAPP_PRECOMPUTE_H
 
 #include <vkw/CommandBuffer.hpp>
-#include <Image.hpp>
+#include <vkw/Image.hpp>
 #include "RenderEngine/Pipelines/Compute.h"
 
 namespace TestApp {
