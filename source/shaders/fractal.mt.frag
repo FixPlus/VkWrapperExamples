@@ -24,7 +24,7 @@ layout (location = 4) in vec3 inViewPos;
 
 float FOV = 0.5f; //in radian
 float epsilon = 0.0001f; // distance epsilon vincinity
-float maxLength = 100000.0f;
+float maxLength = 1000.0f;
 int maxSteps = 250;
 
 #define NUM_OF_MIRRORS 7
@@ -37,7 +37,7 @@ vec4(0.0f, -1.0f, 0.0f, 0.0f), vec4(-1.0f, -1.0f, 0.0f, 0.0f), vec4(1.0f, -1.0f,
 vec4(-1.0f, 0.0f, 0.0f, 0.0f)};
 
 #define SPOUNGE_UNIT 1.0f
-#define RANK 9.0f
+#define RANK 6.0f
 
 
 #define SHAPE_CUBE_BALL_TORUS 1
@@ -308,8 +308,32 @@ struct Hit{
     int steps;
     bool hasHit;
 };
+float checkCloseAmbient(vec4 origin, vec4 direction, float distanceLimit) {
+    int n = 0; //count of steps
+    float totalRayLength = 0.0f; // counter for ray length
+    float depth = 0.0f; // accum for depth
 
-Hit march(vec3 origin, vec3 direction){
+
+    float temp; // used to temproary contaion ED for each step
+    vec4 prevPos = origin; // used to contain the prev value of curPos
+    vec4 curPos = prevPos;
+    vec4 dir = direction;
+
+    float ambient = 0.0f;
+    while((temp = closestDist(curPos)) > (totalRayLength < SPOUNGE_UNIT ? SPOUNGE_UNIT * epsilon : epsilon * totalRayLength) && totalRayLength < distanceLimit && n < maxSteps){
+
+        prevPos = curPos;
+        //if(log(length(curPos)) - log(temp) > 13.0f)
+        //temp = pow(2.715, log(length(curPos)) - 13.0f) ;
+        curPos += dir * temp * 0.995f;
+        n++;
+        totalRayLength += temp * 0.995f;
+        ambient += temp / totalRayLength;
+    }
+    return ambient;
+}
+
+Hit march(vec4 origin, vec4 direction){
     int n = 0; //count of steps
     float totalRayLength = 0.0f; // counter for ray length
     float depth = 0.0f; // accum for depth
@@ -317,9 +341,9 @@ Hit march(vec3 origin, vec3 direction){
 
     float temp; // used to temproary contaion ED for each step
     float lastL; // used to contain the prev value of temp var
-    vec4 prevPos = vec4(origin, 0.0f); // used to contain the prev value of curPos
+    vec4 prevPos = origin; // used to contain the prev value of curPos
     vec4 curPos = prevPos;
-    vec4 dir = vec4(direction, 0.0f);
+    vec4 dir = direction;
 
     /*
         Next cycle is representation of ray marching technic
@@ -346,6 +370,7 @@ Hit march(vec3 origin, vec3 direction){
 
     Hit ret;
     ret.hasHit = totalRayLength < maxLength;
+    ret.distance = totalRayLength;
     if(ret.hasHit){
         vec2 texCoords = closestTextureCoord(curPos);
         vec4 posColor = closestColor(curPos);
@@ -362,98 +387,128 @@ Hit march(vec3 origin, vec3 direction){
 
     return ret;
 }
+
+float occlusionFromSteps(int steps) {
+    return 1.0f - pow(2.715, -35.0f/float(steps));
+}
+vec4 disnatceDiffuse(vec4 Light, float distance){
+    vec4 fog = vec4(0.2f, 0.8f, 0.9f,1.0f);
+    float foggy = pow(distance, 3.0) / pow(maxLength, 3.0);
+    return foggy * fog + Light * (1.0f - foggy);
+}
+
+vec4 scatterColor(vec4 dir, vec4 DirectLight, float distance, float occlusionFactor){
+    float sunDot = (1.0f + dot(vec3(dir), vec3(-normalize(ubo.lightPos)))) / 2.0f;
+    float distanceFactor = min(1.0f, distance / maxLength);
+    float sunInscatterFactor = pow(sunDot, 32.0f) * occlusionFactor * distanceFactor;
+    float ambientInscatterFactor = distanceFactor;
+
+
+    float outScatterFactor = distanceFactor;
+    vec4 inscatteredLight = (vec4(2.0f) * sunInscatterFactor + vec4(0.2f, 0.8f, 0.9f,1.0f) * ambientInscatterFactor) * (1.0f - outScatterFactor / 3.0f);
+    return inscatteredLight + DirectLight * outScatterFactor;
+}
+
+vec4 skyColor(vec4 dir){
+    vec4 skyColor = vec4(0.2f, 0.8f, 0.9f,1.0f);
+    float sun = pow(100,  10.0f * (-1.0f + max(0.0f, dot(dir, -normalize(ubo.lightPos)))));
+    vec4 sunCol = vec4(sun, sun, sun * 0.8f, 0.0f);
+    return disnatceDiffuse(vec4(0.0f), maxLength) + sunCol;
+}
+
+vec4 inducedDiffuse(float distance){
+  float foggy = pow(distance, 3.0) / pow(maxLength, 3.0);
+  return foggy * skyColor(normalize(ubo.lightPos));
+}
+#define RAY_COLOR_FINAL                                                                                      \
+vec4 rayColorR(vec4 origin, vec4 direction, int recursiveDepth){                                                                    \
+    Hit hit = march(origin, direction);                                                                    \
+                                                                    \
+                                                                    \
+    float occlusion = occlusionFromSteps(hit.steps);                                                                    \
+    vec4 ret;                                                                    \
+    if(!hit.hasHit){                                                                    \
+                                                                   \
+        ret = scatterColor(direction, vec4(0.0f), hit.distance, occlusionFromSteps(hit.steps));                                                                    \
+    } else {                                                                    \
+                                                                       \
+vec4 normalVec = hit.normal;                                                                    \
+        float normDot = dot(normalVec, -normalize(ubo.lightPos));                                                                    \
+        float diffuse = normDot > 0.0f ? 0.5f + 0.3f * normDot : 0.5f + 0.1f * normDot;                                                                    \
+                                                                    \
+        vec3 reflectDir = normalize(reflect(vec3(direction), vec3(hit.normal)));                                                                    \
+                                                                    \
+        vec4 newOriginSun = hit.hitPoint - direction * hit.distance * 0.001f - normalize(ubo.lightPos) * hit.distance * 0.001f;                                                                    \
+        vec4 newOriginRef = hit.hitPoint - direction * hit.distance * 0.001f + vec4(reflectDir, 0.0f) * hit.distance * 0.001f;                                                                    \
+        vec4 newOriginAmbient = hit.hitPoint - direction * hit.distance * 0.001f + normalVec * hit.distance * 0.001f;                                                                    \
+        vec4 diffuseColor;                                                                    \
+        vec4 reflectColor;                                                                    \
+            Hit sunBeam = march(newOriginSun, -normalize(ubo.lightPos));                                                                    \
+            float ambient = checkCloseAmbient(newOriginAmbient, normalVec, 500.0f);                                                                    \
+            if(sunBeam.hasHit){                                                                    \
+                diffuseColor = hit.albedo * (scatterColor(-normalize(ubo.lightPos), vec4(0.0f), sunBeam.distance, occlusionFromSteps(sunBeam.steps)) + vec4(0.8f) * ambient / 10.0f);                                                                    \
+            } else {                                                                    \
+                diffuseColor = hit.albedo * (scatterColor(-normalize(ubo.lightPos), vec4(0.0f), sunBeam.distance, occlusionFromSteps(sunBeam.steps)) + vec4(0.8f) * ambient / 10.0f);                                                                    \
+            }                                                                    \
+            Hit refBeam = march(newOriginRef, vec4(reflectDir, 0.0f));                                                                    \
+            if(refBeam.hasHit) {                                                                    \
+                reflectColor = refBeam.albedo * occlusionFromSteps(refBeam.steps) + disnatceDiffuse(vec4(0.0f), refBeam.distance);                                                                    \
+            } else {                                                                    \
+                reflectColor =skyColor(vec4(reflectDir, 0.0f));                                                                    \
+            }                                                                    \
+                                                                    \
+        float alpha = hit.albedo.r;                                                                    \
+        ret = occlusion * (diffuseColor * diffuse * (1.0f - alpha) + alpha * reflectColor) + disnatceDiffuse(vec4(0.0f), hit.distance);                                                                    \
+    }                                                                    \
+    ret.w = hit.distance;                                                                    \
+    return ret;                                                                    \
+}
+
+#define RAY_COLOR_RECURSE(RECURSIVE)                                                                                      \
+vec4 rayColor ## RECURSIVE ## RECURSIVE(vec4 origin, vec4 direction, int recursiveDepth){                                                                    \
+    Hit hit = march(origin, direction);                                                                    \
+                                                                    \
+                                                                    \
+    float occlusion = occlusionFromSteps(hit.steps);                                                                    \
+    vec4 ret;                                                                    \
+    if(!hit.hasHit){                                                                    \
+        ret = scatterColor(direction, vec4(0.0f), hit.distance, occlusionFromSteps(hit.steps));                                                                    \
+    } else {                                                                    \
+        vec4 normalVec = hit.normal;                                                                    \
+        float normDot = dot(normalVec, -normalize(ubo.lightPos));                                                                    \
+        float diffuse = normDot > 0.0f ? 0.5f + 0.3f * normDot : 0.5f + 0.1f * normDot;                                                                    \
+                                                                    \
+        vec3 reflectDir = normalize(reflect(vec3(direction), vec3(hit.normal)));                                                                    \
+                                                                    \
+        vec4 newOriginSun = hit.hitPoint - direction * hit.distance * 0.001f - normalize(ubo.lightPos) * hit.distance * 0.001f;                                                                    \
+        vec4 newOriginRef = hit.hitPoint - direction * hit.distance * 0.001f + vec4(reflectDir, 0.0f) * hit.distance * 0.001f;                                                                    \
+        vec4 newOriginAmbient = hit.hitPoint - direction * hit.distance * 0.001f + normalVec * hit.distance * 0.001f;                                                                    \
+        vec4 diffuseColor;                                                                    \
+        vec4 reflectColor;                                                                    \
+        Hit sunBeam = march(newOriginSun, -normalize(ubo.lightPos));                                                                    \
+        float ambient = checkCloseAmbient(newOriginAmbient, normalVec, 500.0f);                                                                    \
+        if(sunBeam.hasHit){                                                                    \
+            diffuseColor = hit.albedo * (scatterColor(-normalize(ubo.lightPos), vec4(0.0f), sunBeam.distance, occlusionFromSteps(sunBeam.steps)) + vec4(0.8f) * ambient / 10.0f);                                                                    \
+        } else {                                                                    \
+            diffuseColor = hit.albedo * (scatterColor(-normalize(ubo.lightPos), vec4(0.0f), sunBeam.distance, occlusionFromSteps(sunBeam.steps)) + vec4(0.8f) * ambient / 10.0f);                                                                    \
+        }                                                                    \
+        reflectColor = rayColor ## RECURSIVE (newOriginRef, vec4(reflectDir, 0.0f), recursiveDepth - 1);                                                                    \
+        float alpha = hit.albedo.r;                                                                    \
+        ret = occlusion * (diffuseColor * diffuse * (1.0f - alpha) + alpha * reflectColor) + disnatceDiffuse(vec4(0.0f), hit.distance);                                                                    \
+    }                                                                    \
+    ret.w = hit.distance;                                                                    \
+    return ret;                                                                    \
+}
+
+RAY_COLOR_FINAL
+
+RAY_COLOR_RECURSE(R)
+RAY_COLOR_RECURSE(RR)
+RAY_COLOR_RECURSE(RRRR)
+RAY_COLOR_RECURSE(RRRRRRRR)
+RAY_COLOR_RECURSE(RRRRRRRRRRRRRRRR)
 vec4 fractal(){
-
-    vec4 outFragColor;
-    // color and mix used for the background. Now it just uses single color, but could be altered by texture
-
-    vec4 color = vec4(0.2f, 0.8f, 0.9f,1.0f); //texture(samplerColor1, vec2(inUVW.x, inUVW.y), 1.0f);
-    vec4 mix = vec4(1.0f, 1.0f, 1.0f, 1.0f) - color; //texture(samplerColor1, vec2(inUVW.x, inUVW.y), 1.0f);
-    vec4 glowCol = vec4(1.0f, 0.0f, 1.0f, 0.0f);
-
-
-    vec4 dir = getMarchDirection(); //direction od ray shooting out of camera
-    vec4 curPos = ubo.cameraPos; // contains the posirion of ray's front point
-    float depth;
-
-
-    Hit hit = march(vec3(curPos), vec3(dir));
-
-    if(!hit.hasHit){ //should draw background case
-
-        //sun function is to draw the light source
-        float sun = pow(100,  10.0f * (-1.0f + max(0.0f, dot(dir, -normalize(ubo.lightPos)))));
-
-        //float glowing = pow(2.715, -20.0f/float(n));
-        //color = color + mix * inUVW.y;
-        vec4 sunCol = vec4(sun, sun, sun * 0.8f, 0.0f);
-        outFragColor = (color + sunCol); //+ glowCol * glowing;
-        depth = maxLength;
-    }
-    else{
-        depth = hit.distance;
-        vec4 fog = color;
-        float foggy = pow(depth, 3.0) / pow(maxLength, 3.0);
-        float mip = foggy * 8.0f;
-        //ambient occlusion calculated from number of steps
-        float occlusion = 1.0f - pow(2.715, -35.0f/float(hit.steps));
-        //float occlusion = 1.0f - 0.8f * float(n) / float(maxSteps);
-
-        //enlighted calculated by the angle between surface normal and lightSource beam
-        vec4 normalVec = hit.normal;
-        float normDot = dot(normalVec, -normalize(ubo.lightPos));
-        float enlighted = normDot > 0.0f ? 0.5f + 0.3f * normDot : 0.5f + 0.1f * normDot;
-        vec4 refVec = reflect(dir, normalVec);
-        float specular = max(0.0f, pow(dot(normalize(refVec), -normalize(ubo.lightPos)), 32.0f));
-
-        //	next step is to calculate dropped shadow
-        //	for that we use same technic by shooting the ray from the object point
-        //	in the direction of light source
-
-        // here we use prevPos variable to start our marching from the point where we still
-        // didnt hit epsilon treshhold
-        Hit droppedShadow = march(vec3(hit.hitPoint - hit.distance * 0.001f * dir - normalize(ubo.lightPos) * hit.distance * 0.001f) , vec3(-normalize(ubo.lightPos)));
-
-        vec3 reflectDir = normalize(reflect(vec3(dir), vec3(hit.normal)));
-        Hit reflected = march(vec3(hit.hitPoint - hit.distance * 0.001f * dir + vec4(reflectDir, 0.0f) * hit.distance * 0.001f) , vec3(reflectDir));
-        vec4 reflectionColor;
-        if(reflected.hasHit){
-            float refOcclusion = 1.0f - pow(2.715, -35.0f/float(reflected.steps));
-            normalVec = reflected.normal;
-            normDot = dot(normalVec, -normalize(ubo.lightPos));
-            float refEnlighted = normDot > 0.0f ? 0.5f + 0.3f * normDot : 0.5f + 0.1f * normDot;
-            float refFoggy = pow(reflected.distance, 3.0) / pow(maxLength, 3.0);
-            float light = refOcclusion * refEnlighted;
-            reflectionColor = reflected.albedo * light * (1 - refFoggy) + fog * refFoggy;
-        } else{
-            reflectionColor = color;
-        }
-        // and finnaly the totalLight is calculated based on ambient occlusion and shadowing
-
-        float alpha = 0.8f; //hit.albedo.r;
-        color = hit.albedo * (1.0f - alpha) + reflectionColor * alpha;
-
-        float totalLight = occlusion;
-        if(droppedShadow.hasHit){
-            //color = color * 0.8f + droppedShadow.albedo * 0.2f;
-            specular = 0.0f;
-            totalLight *= 0.2f;
-        } else {
-            totalLight *= enlighted;
-        }
-
-        //object also has a color that could be replaced by texture if needed
-        //Now it is using previously calculated texture coordintes
-
-
-
-        specular *= occlusion;
-
-        outFragColor = (color * (1 - specular) + vec4(1.5f, 1.5f, 1.5f, 1.0f) * specular) * totalLight * (1 - foggy) + fog * foggy;
-    }
-
-    outFragColor.w = depth;
-    return outFragColor;
+     return rayColorRR(ubo.cameraPos, getMarchDirection(), 0);
 }
 
 SurfaceInfo Material(){
