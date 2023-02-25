@@ -1,18 +1,6 @@
-#include <SceneProjector.h>
-#include <thread>
-#include <SwapChainImpl.h>
-#include <RenderPassesImpl.h>
-#include <vkw/Fence.hpp>
-#include <RenderEngine/Shaders/ShaderLoader.h>
-#include <vkw/Semaphore.hpp>
-#include <vkw/CommandPool.hpp>
-#include "AssetPath.inc"
-#include <vkw/Queue.hpp>
 #include "Fractal.h"
-#include "RenderEngine/Window/Boxer.h"
 #include "ErrorCallbackWrapper.h"
-#include <vkw/Validation.hpp>
-#include "Utils.h"
+#include "CommonApp.h"
 
 using namespace TestApp;
 
@@ -73,194 +61,46 @@ private:
 
 };
 
+class FractalApp final: public CommonApp{
+public:
+    FractalApp(): CommonApp{AppCreateInfo{true, "Fractal"}},
+                  m_gui(std::make_unique<GUI>(window(), device(), onScreenPass(), 0, textureLoader())),
+                  m_fractal(device(), onScreenPass(), 0, textureLoader(), currentSurfaceExtents().width, currentSurfaceExtents().height),
+                  m_fractalSettings(*m_gui, m_fractal){
+        attachGUI(m_gui.get());
+    }
+
+protected:
+
+    void preMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool) override{
+        m_fractal.drawOffscreen(buffer, pool);
+    }
+
+    void onMainPass(RenderEngine::GraphicsRecordingState& recorder) override{
+        m_fractal.draw(recorder);
+    }
+
+    void onFramebufferResize() override{
+        m_fractal.resizeOffscreenBuffer(currentSurfaceExtents().width, currentSurfaceExtents().height);
+    };
+    void onPollEvents() override{
+        m_gui->frame();
+        m_gui->push();
+        m_fractal.update(window().camera());
+    }
+
+private:
+    std::unique_ptr<GUI> m_gui;
+    Fractal m_fractal;
+    FractalSettings m_fractalSettings;
+};
+
 int runFractal(){
-
-    TestApp::SceneProjector window{800, 600, "Fractal"};
-
-    vkw::Library vulkanLib{};
-
-    auto validationPossible = vulkanLib.hasLayer(vkw::layer::KHRONOS_validation);
-
-    if(!validationPossible)
-        std::cout << "Validation unavailable" << std::endl;
-    else
-        std::cout << "Validation enabled" << std::endl;
-
-    vkw::InstanceCreateInfo createInfo{};
-
-    if(validationPossible) {
-        createInfo.requestLayer(vkw::layer::KHRONOS_validation);
-        createInfo.requestExtension(vkw::ext::EXT_debug_utils);
-    }
-
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, createInfo);
-
-    std::optional<vkw::debug::Validation> validation;
-
-    if(validationPossible)
-        validation.emplace(renderInstance);
-    auto devs = renderInstance.enumerateAvailableDevices();
-
-    if (devs.empty()) {
-        std::cout << "No available devices supporting vulkan on this machine." << std::endl <<
-                  " Make sure your graphics drivers are installed and updated." << std::endl;
-        return 1;
-    }
-
-    vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
-
-    deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
-
-    TestApp::requestQueues(deviceDesc);
-
-    auto device = vkw::Device{renderInstance, deviceDesc};
-
-    auto surface = window.surface(renderInstance);
-    auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-
-    auto mySwapChain = TestApp::SwapChainImpl{device, surface, true};
-
-    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().format(),
-                                                      mySwapChain.depthAttachment().format(),
-                                                      VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-    std::vector<vkw::FrameBuffer> framebuffers;
-
-    for (auto &attachment: mySwapChain.attachments()) {
-        std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2> views = {&attachment, &mySwapChain.depthAttachment()};
-        framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                {views.begin(), views.end()}});
-    }
-
-    auto queue = device.anyGraphicsQueue();
-    auto fence = vkw::Fence{device};
-
-    auto shaderLoader = RenderEngine::ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-    auto textureLoader = RenderEngine::TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
-
-    GUI gui = GUI{window, device, lightPass, 0, textureLoader};
-
-    window.setContext(gui);
-
-    auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
-    auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
-
-    auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
-
-    auto presentComplete = vkw::Semaphore{device};
-    auto renderComplete = vkw::Semaphore{device};
-
-    auto submitInfo = vkw::SubmitInfo{commandBuffer, presentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                      renderComplete};
-
-    auto fractal = Fractal{device, lightPass, 0, textureLoader, framebuffers.front().extents().width, framebuffers.front().extents().height};
-    auto fractalSettings = FractalSettings{gui, fractal};
-
-    while(!window.shouldClose()){
-        window.pollEvents();
-        static bool firstEncounter = true;
-        if(!firstEncounter) {
-            fence.wait();
-            fence.reset();
-        }
-        else
-            firstEncounter = false;
-
-
-        window.update();
-        gui.frame();
-        gui.push();
-        recorder.reset();
-        fractal.update(window.camera());
-
-        if (extents.width == 0 || extents.height == 0){
-            extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-            firstEncounter = true;
-            continue;
-        }
-
-        try {
-            mySwapChain.acquireNextImage(presentComplete, 1000);
-        } catch (vkw::VulkanError &e) {
-            if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
-                {
-                    auto dummy = std::move(mySwapChain);
-                }
-                mySwapChain = TestApp::SwapChainImpl{device, surface};
-
-                framebuffers.clear();
-
-                extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-
-                for (auto &attachment: mySwapChain.attachments()) {
-                    std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2> views = {&attachment, &mySwapChain.depthAttachment()};
-                    framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                            {views.begin(), views.end()}});
-                }
-                fractal.resizeOffscreenBuffer(extents.width, extents.height);
-                firstEncounter = true;
-
-                continue;
-            } else {
-                throw;
-            }
-        }
-
-        std::array<VkClearValue, 2> values{};
-        values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
-        values.at(1).depthStencil.depth = 1.0f;
-        values.at(1).depthStencil.stencil = 0.0f;
-
-
-        VkViewport viewport;
-
-        viewport.height = extents.height;
-        viewport.width = extents.width;
-        viewport.x = viewport.y = 0.0f;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        VkRect2D scissor;
-        scissor.extent.width = extents.width;
-        scissor.extent.height = extents.height;
-        scissor.offset.x = 0;
-        scissor.offset.y = 0;
-
-
-        commandBuffer.begin(0);
-
-        fractal.drawOffscreen(commandBuffer, pipelinePool);
-
-        auto currentImage = mySwapChain.currentImage();
-
-        auto &fb = framebuffers.at(currentImage);
-        auto renderArea = framebuffers.at(currentImage).getFullRenderArea();
-
-        commandBuffer.beginRenderPass(lightPass, fb, renderArea, false, values.size(), values.data());
-
-        commandBuffer.setViewports({&viewport, 1}, 0);
-        commandBuffer.setScissors({&scissor, 1}, 0);
-
-        fractal.draw(recorder);
-        gui.draw(recorder);
-
-        commandBuffer.endRenderPass();
-        commandBuffer.end();
-        queue.submit(submitInfo, fence);
-        auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
-        queue.present(presentInfo);
-
-    }
-
-    fence.wait();
-    fence.reset();
-
-    device.waitIdle();
-
+    FractalApp app{};
+    app.run();
     return 0;
-
 }
 
 int main(){
-    return ErrorCallbackWrapper<runFractal>::run();
+    return ErrorCallbackWrapper<decltype(&runFractal)>::run(&runFractal);
 }

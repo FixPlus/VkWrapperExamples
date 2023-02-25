@@ -457,7 +457,7 @@ vec4 normalVec = hit.normal;                                                    
                 reflectColor =skyColor(vec4(reflectDir, 0.0f));                                                                    \
             }                                                                    \
                                                                     \
-        float alpha = hit.albedo.r;                                                                    \
+        float alpha = pow(hit.albedo.r, 1.5f);                                                                    \
         ret = occlusion * (diffuseColor * diffuse * (1.0f - alpha) + alpha * reflectColor) + disnatceDiffuse(vec4(0.0f), hit.distance);                                                                    \
     }                                                                    \
     ret.w = hit.distance;                                                                    \
@@ -493,7 +493,7 @@ vec4 rayColor ## RECURSIVE ## RECURSIVE(vec4 origin, vec4 direction, int recursi
             diffuseColor = hit.albedo * (scatterColor(-normalize(ubo.lightPos), vec4(0.0f), sunBeam.distance, occlusionFromSteps(sunBeam.steps)) + vec4(0.8f) * ambient / 10.0f);                                                                    \
         }                                                                    \
         reflectColor = rayColor ## RECURSIVE (newOriginRef, vec4(reflectDir, 0.0f), recursiveDepth - 1);                                                                    \
-        float alpha = hit.albedo.r;                                                                    \
+        float alpha = pow(hit.albedo.r, 1.5f);                                                                    \
         ret = occlusion * (diffuseColor * diffuse * (1.0f - alpha) + alpha * reflectColor) + disnatceDiffuse(vec4(0.0f), hit.distance);                                                                    \
     }                                                                    \
     ret.w = hit.distance;                                                                    \
@@ -503,10 +503,7 @@ vec4 rayColor ## RECURSIVE ## RECURSIVE(vec4 origin, vec4 direction, int recursi
 RAY_COLOR_FINAL
 
 RAY_COLOR_RECURSE(R)
-RAY_COLOR_RECURSE(RR)
-RAY_COLOR_RECURSE(RRRR)
-RAY_COLOR_RECURSE(RRRRRRRR)
-RAY_COLOR_RECURSE(RRRRRRRRRRRRRRRR)
+
 vec4 fractal(){
      return rayColorRR(ubo.cameraPos, getMarchDirection(), 0);
 }

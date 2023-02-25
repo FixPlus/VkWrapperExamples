@@ -39,6 +39,7 @@ namespace TestApp {
 
     void CubePool::bind(RenderEngine::GraphicsRecordingState &state) const {
         m_geometry.bind(state);
+        state.bindPipeline();
     }
 
 

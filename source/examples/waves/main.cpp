@@ -1,24 +1,11 @@
-#include <SceneProjector.h>
-#include <RenderEngine/AssetImport/AssetImport.h>
-#include <vkw/Library.hpp>
-#include <SwapChainImpl.h>
-#include <vkw/Queue.hpp>
 #include <vkw/Fence.hpp>
-#include "Utils.h"
-#include <RenderPassesImpl.h>
-#include <vkw/Semaphore.hpp>
-#include <RenderEngine/Shaders/ShaderLoader.h>
-#include "GUI.h"
-#include "AssetPath.inc"
-#include "Model.h"
 #include "GlobalLayout.h"
 #include "WaterSurface.h"
 #include "LandSurface.h"
 #include "SkyBox.h"
 #include "ShadowPass.h"
-#include "RenderEngine/Window/Boxer.h"
 #include "ErrorCallbackWrapper.h"
-#include <vkw/Validation.hpp>
+#include "CommonApp.h"
 
 using namespace TestApp;
 
@@ -78,285 +65,110 @@ private:
 
 };
 
-int runWaves() {
-    TestApp::SceneProjector window{800, 600, "Waves"};
+class WavesApp final: public CommonApp{
+public:
+    WavesApp(): CommonApp(AppCreateInfo{false, "Waves", [](auto& i){}, [](vkw::PhysicalDevice& device){
+        // to support wireframe display
+        device.enableFeature(vkw::PhysicalDevice::feature::fillModeNonSolid);
 
-    vkw::Library vulkanLib{};
-
-   // TODO : Fix validation error and re-enable it again
-    auto validationPossible = vulkanLib.hasLayer(vkw::layer::KHRONOS_validation) && false;
-
-    if(!validationPossible)
-        std::cout << "Validation unavailable" << std::endl;
-    else
-        std::cout << "Validation enabled" << std::endl;
-
-    vkw::InstanceCreateInfo createInfo{};
-
-    if(validationPossible) {
-        createInfo.requestLayer(vkw::layer::KHRONOS_validation);
-        createInfo.requestExtension(vkw::ext::EXT_debug_utils);
-    }
-
-    vkw::Instance renderInstance = RenderEngine::Window::vulkanInstance(vulkanLib, createInfo);
-
-    std::optional<vkw::debug::Validation> validation;
-
-    if(validationPossible)
-        validation.emplace(renderInstance);
-    auto devs = renderInstance.enumerateAvailableDevices();
-
-    if (devs.empty()) {
-        std::cout << "No available devices supporting vulkan on this machine." << std::endl <<
-                  " Make sure your graphics drivers are installed and updated." << std::endl;
-        return 1;
-    }
-
-    vkw::PhysicalDevice deviceDesc{renderInstance, 0u};
-
-    TestApp::requestQueues(deviceDesc, true, true);
-
-    deviceDesc.enableExtension(vkw::ext::KHR_swapchain);
-
-    // to support wireframe display
-    deviceDesc.enableFeature(vkw::PhysicalDevice::feature::fillModeNonSolid);
-
-    // to support anisotropy filtering (if possible) in ocean
-    if(deviceDesc.isFeatureSupported(vkw::PhysicalDevice::feature::samplerAnisotropy)) {
-        std::cout << "Sampler anisotropy enabled" << std::endl;
-        deviceDesc.enableFeature(vkw::PhysicalDevice::feature::samplerAnisotropy);
-    } else{
-        std::cout << "Sampler anisotropy disabled" << std::endl;
-    }
-
-    auto device = vkw::Device{renderInstance, deviceDesc};
-
-    auto surface = window.surface(renderInstance);
-    auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-
-    auto mySwapChain = TestApp::SwapChainImpl{device, surface, true};
-
-    TestApp::LightPass lightPass = TestApp::LightPass(device, mySwapChain.attachments().front().format(),
-                                                      mySwapChain.depthAttachment().format(),
-                                                      VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-    auto shadowPass = TestApp::ShadowRenderPass{device};
-    std::vector<vkw::FrameBuffer> framebuffers;
-
-    for (auto &attachment: mySwapChain.attachments()) {
-        std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2 > views = {&attachment, &mySwapChain.depthAttachment()};
-        framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                {views.begin(), views.end()}});
-    }
-
-    auto queue = device.anyGraphicsQueue();
-    auto fence = vkw::Fence{device};
-
-    auto shaderLoader = RenderEngine::ShaderLoader{device, EXAMPLE_ASSET_PATH + std::string("/shaders/")};
-    auto textureLoader = RenderEngine::TextureLoader{device, EXAMPLE_ASSET_PATH + std::string("/textures/")};
-    auto pipelinePool = RenderEngine::GraphicsPipelinePool(device, shaderLoader);
-
-    GUI gui = GUI{window, device, lightPass, 0, textureLoader};
-
-
-    window.setContext(gui);
-
-    auto skybox = SkyBox{device, lightPass, 0, shaderLoader};
-    skybox.update(window.camera());
-    skybox.recomputeOutScatter();
-
-    auto globalState = GlobalLayout{device, lightPass, 0, window.camera(), shadowPass, skybox};
-    auto globalStateSettings = GlobalLayoutSettings{gui, globalState};
-    auto waveSurfaceTexture = WaveSurfaceTexture(device, shaderLoader, 256, 3);
-    auto waves = WaterSurface(device, waveSurfaceTexture);
-    auto waveMaterial = WaterMaterial{device, waveSurfaceTexture};
-    auto waveMaterialWireframe = WaterMaterial{device, waveSurfaceTexture, true};
-
-
-    auto land = LandSurface(device);
-    auto landMaterial = LandMaterial{device};
-    auto landMaterialWireframe = LandMaterial{device, true};
-
-
-    window.camera().set(glm::vec3{0.0f, 25.0f, 0.0f});
-    window.camera().setOrientation(172.0f, 15.0f, 0.0f);
-
-
-    // Compute queue and buffer
-
-    auto computeQueue = device.getSpecificQueue(TestApp::dedicatedCompute());
-    auto computeCommandPool = vkw::CommandPool(device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                               computeQueue.family().index());
-    auto computeCommandBuffer = vkw::PrimaryCommandBuffer(computeCommandPool);
-
-    auto computeImageReady = vkw::Semaphore(device);
-    auto syncCSubmitInfo = vkw::SubmitInfo{std::span<vkw::Semaphore const>{&computeImageReady, 0}, {}, std::span<vkw::Semaphore const>{&computeImageReady, 1}};
-    computeQueue.submit(syncCSubmitInfo);
-    auto computeImageRelease = vkw::Semaphore(device);
-
-
-    // 3D queue and buffer
-
-    auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queue.family().index()};
-    auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
-    auto recorder = RenderEngine::GraphicsRecordingState{commandBuffer, pipelinePool};
-
-    auto presentComplete = vkw::Semaphore{device};
-    auto renderComplete = vkw::Semaphore{device};
-
-    auto computeSubmitInfo = vkw::SubmitInfo{computeCommandBuffer, computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeImageReady};
-
-    auto submitInfo = vkw::SubmitInfo{commandBuffer, std::array<vkw::SemaphoreCRef, 2>{computeImageReady, presentComplete},
-                                             {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-                                             std::array<vkw::SemaphoreCRef, 2>{computeImageRelease, renderComplete}};
-
-    auto waveSettings = WaveSettings{gui, waves, waveSurfaceTexture,
-                                     {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}};
-    auto landSettings = LandSettings{gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}};
-    auto skyboxSettings = SkyBoxSettings{gui, skybox, "Skybox"};
-
-    shadowPass.onPass = [&land, &globalState, &landSettings](RenderEngine::GraphicsRecordingState &state,
-                                                             const Camera &camera) {
-        if (landSettings.enabled())
-            land.draw(state, globalState.camera().position(), camera);
-    };
-    gui.customGui = [&globalState, &skybox, &window]() {
-
-        ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        static float splitL = window.camera().splitLambda();
-        if (ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)) {
-            window.camera().setSplitLambda(splitL);
+        // to support anisotropy filtering (if possible) in ocean
+        if(device.isFeatureSupported(vkw::PhysicalDevice::feature::samplerAnisotropy)) {
+            std::cout << "Sampler anisotropy enabled" << std::endl;
+            device.enableFeature(vkw::PhysicalDevice::feature::samplerAnisotropy);
+        } else{
+            std::cout << "Sampler anisotropy disabled" << std::endl;
         }
+        auto dedicatedComputeFamily = std::find_if(device.queueFamilies().begin(), device.queueFamilies().end(), [](auto& family){ return family.strictly(TestApp::dedicatedCompute());});
 
-        static float farClip = window.camera().farClip();
-        if (ImGui::SliderFloat("Far clip", &farClip, window.camera().nearPlane(), window.camera().farPlane())) {
-            window.camera().setFarClip(farClip);
-        }
-        ImGui::End();
-    };
+        if(dedicatedComputeFamily == device.queueFamilies().end())
+            throw std::runtime_error("Device does not have dedicated compute queue family");
 
-    // Prerecord compute command buffer
+        dedicatedComputeFamily->requestQueue();
+    }}), gui(window(), device(), onScreenPass(), 0, textureLoader()),
+                shadowPass(device()),
+                skybox(device(), onScreenPass(), 0, shaderLoader()),
+                globalState(device(), onScreenPass(), 0, window().camera(), shadowPass, skybox),
+                globalStateSettings(gui, globalState),
+                waveSurfaceTexture(device(), shaderLoader(), 256, 3),
+                waves(device(), waveSurfaceTexture),
+                waveMaterial(device(), waveSurfaceTexture),
+                waveMaterialWireframe(device(), waveSurfaceTexture, true),
+                land(device()),
+                landMaterial(device()),
+                landMaterialWireframe(device(), true),
+                computeQueue(device().getSpecificQueue(TestApp::dedicatedCompute())),
+                computeCommandPool(device(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                                   computeQueue.family().index()),
+                computeCommandBuffer(computeCommandPool),
+                computeImageReady(device()),
+                computeImageRelease(device()),
+                computeSubmitInfo(computeCommandBuffer, computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeImageReady),
+                fence(device()),
+                waveSettings(gui, waves, waveSurfaceTexture,
+                             {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}),
+                landSettings(gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}),
+                skyboxSettings(gui, skybox, "Skybox")
 
-    computeCommandBuffer.begin(0);
+    {
+        attachGUI(&gui);
+        skybox.update(window().camera());
+        skybox.recomputeOutScatter();
 
-    waveSurfaceTexture.acquireOwnership(computeCommandBuffer, commandBuffer.queueFamily(),
-                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
-                                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-    waveSurfaceTexture.dispatch(computeCommandBuffer);
-    waveSurfaceTexture.releaseOwnership(computeCommandBuffer, commandBuffer.queueFamily(),
-                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
-                                        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+        addMainPassDependency(computeImageReady, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+        signalOnMainPassComplete(computeImageRelease);
 
-    computeCommandBuffer.end();
+        auto syncCSubmitInfo = vkw::SubmitInfo{std::span<vkw::Semaphore const>{&computeImageReady, 0}, {}, std::span<vkw::Semaphore const>{&computeImageReady, 1}};
+        computeQueue.submit(syncCSubmitInfo);
 
+        shadowPass.onPass = [this](RenderEngine::GraphicsRecordingState &state,
+                                                                 const Camera &camera) {
+            if (landSettings.enabled())
+                land.draw(state, globalState.camera().position(), camera);
+        };
 
-    window.camera().setFarPlane(10000.0f);
-    while (!window.shouldClose()) {
-        window.pollEvents();
-
-
-        extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-
-        static bool firstEncounter = true;
-        if (!firstEncounter) {
-            fence.wait();
-            fence.reset();
-        } else
-            firstEncounter = false;
-
-        window.update();
-        gui.frame();
-        gui.push();
-        globalState.update();
-        skybox.update(window.camera());
-        waveSurfaceTexture.update(window.clock().frameTime());
-        waves.update(window.clock().frameTime());
-        waveMaterial.update();
-        waveMaterialWireframe.update();
-        land.update();
-        landMaterial.update();
-        landMaterialWireframe.update();
-        shadowPass.update(window.camera(), skybox.sunDirection());
-
-        if (waveSettings.needUpdateStaticSpectrum()) {
-            waveSurfaceTexture.computeSpectrum();
-            waveSettings.resetUpdateSpectrum();
-        }
-
-        if(skyboxSettings.needRecomputeOutScatter()){
-            skybox.recomputeOutScatter();
-        }
-
-        if (window.minimized()) {
-            firstEncounter = true;
-            continue;
-        }
-
-        try {
-            mySwapChain.acquireNextImage(presentComplete, 1000);
-        } catch (vkw::VulkanError &e) {
-            if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
-                {
-                    auto dummy = std::move(mySwapChain);
-                }
-                mySwapChain = TestApp::SwapChainImpl{device, surface};
-
-                framebuffers.clear();
-
-                for (auto &attachment: mySwapChain.attachments()) {
-                    std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2 > views = {&attachment, &mySwapChain.depthAttachment()};
-                    framebuffers.push_back(vkw::FrameBuffer{device, lightPass, extents,
-                                                            {views.begin(), views.end()}});
-                }
-                firstEncounter = true;
-                continue;
-            } else {
-                throw;
+        gui.customGui = [this]() {
+            ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+            static float splitL = window().camera().splitLambda();
+            if (ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)) {
+                window().camera().setSplitLambda(splitL);
             }
-        }
 
-        recorder.reset();
+            static float farClip = window().camera().farClip();
+            if (ImGui::SliderFloat("Far clip", &farClip, window().camera().nearPlane(), window().camera().farPlane())) {
+                window().camera().setFarClip(farClip);
+            }
+            ImGui::End();
+        };
 
+        // Prerecord compute command buffer
+        computeCommandBuffer.begin(0);
+        waveSurfaceTexture.acquireOwnership(computeCommandBuffer, mainPassQueueFamilyIndex(),
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+                                            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        waveSurfaceTexture.dispatch(computeCommandBuffer);
+        waveSurfaceTexture.releaseOwnership(computeCommandBuffer, mainPassQueueFamilyIndex(),
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+                                            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+        computeCommandBuffer.end();
 
-        commandBuffer.begin(0);
+        addFrameFence(fence);
 
-        shadowPass.execute(commandBuffer, recorder);
+        window().camera().set(glm::vec3{0.0f, 25.0f, 0.0f});
+        window().camera().setOrientation(172.0f, 15.0f, 0.0f);
+        window().camera().setFarPlane(10000.0f);
+    }
 
+protected:
+    void preMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool) override {
+        RenderEngine::GraphicsRecordingState recorder{buffer, pool};
+        shadowPass.execute(buffer, recorder);
 
-        std::array<VkClearValue, 2> values{};
-        values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
-        values.at(1).depthStencil.depth = 1.0f;
-        values.at(1).depthStencil.stencil = 0.0f;
-
-
-        VkViewport viewport;
-
-        viewport.height = extents.height;
-        viewport.width = extents.width;
-        viewport.x = viewport.y = 0.0f;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        VkRect2D scissor;
-        scissor.extent.width = extents.width;
-        scissor.extent.height = extents.height;
-        scissor.offset.x = 0;
-        scissor.offset.y = 0;
-
-
-        auto currentImage = mySwapChain.currentImage();
-
-        auto &fb = framebuffers.at(currentImage);
-        auto renderArea = framebuffers.at(currentImage).getFullRenderArea();
-
-        waveSurfaceTexture.acquireOwnershipFrom(commandBuffer, computeCommandBuffer.queueFamily(),
+        waveSurfaceTexture.acquireOwnershipFrom(buffer, computeCommandBuffer.queueFamily(),
                                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
                                                 VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    }
 
-        commandBuffer.beginRenderPass(lightPass, fb, renderArea, false, values.size(), values.data());
-
-        commandBuffer.setViewports({&viewport, 1}, 0);
-        commandBuffer.setScissors({&scissor, 1}, 0);
-
+    void onMainPass(RenderEngine::GraphicsRecordingState& recorder) override {
         if(!globalStateSettings.useSimpleLighting())
             skybox.draw(recorder);
 
@@ -372,37 +184,77 @@ int runWaves() {
             waves.draw(recorder, globalState.camera().position(), globalState.camera());
         }
 
-
-        gui.draw(recorder);
-
-
-        commandBuffer.endRenderPass();
-
-        waveSurfaceTexture.releaseOwnershipTo(commandBuffer, computeCommandBuffer.queueFamily(),
+    }
+    void afterMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool) override{
+        waveSurfaceTexture.releaseOwnershipTo(buffer, computeCommandBuffer.queueFamily(),
                                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
                                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-
-        commandBuffer.end();
-
-
-        queue.submit(submitInfo);
-
-        computeQueue.submit(computeSubmitInfo, fence);
-
-        auto presentInfo = vkw::PresentInfo{mySwapChain, renderComplete};
-        queue.present(presentInfo);
     }
 
+    void onFramebufferResize() override {};
+    void onPollEvents() override {
+        gui.frame();
+        gui.push();
+        globalState.update();
+        skybox.update(window().camera());
+        waveSurfaceTexture.update(window().clock().frameTime());
+        waves.update(window().clock().frameTime());
+        waveMaterial.update();
+        waveMaterialWireframe.update();
+        land.update();
+        landMaterial.update();
+        landMaterialWireframe.update();
+        shadowPass.update(window().camera(), skybox.sunDirection());
 
-    fence.wait();
-    fence.reset();
+        if (waveSettings.needUpdateStaticSpectrum()) {
+            waveSurfaceTexture.computeSpectrum();
+            waveSettings.resetUpdateSpectrum();
+        }
 
-    device.waitIdle();
+        if(skyboxSettings.needRecomputeOutScatter()){
+            skybox.recomputeOutScatter();
+        }
+    }
 
+    void postSubmit() override{
+        computeQueue.submit(computeSubmitInfo, fence);
+    }
+
+private:
+    GUI gui;
+    ShadowRenderPass shadowPass;
+    SkyBox skybox;
+    GlobalLayout globalState;
+    GlobalLayoutSettings globalStateSettings;
+    WaveSurfaceTexture waveSurfaceTexture;
+    WaterSurface waves;
+    WaterMaterial waveMaterial;
+    WaterMaterial waveMaterialWireframe;
+
+    LandSurface land;
+    LandMaterial landMaterial;
+    LandMaterial landMaterialWireframe;
+
+    // Compute
+    vkw::Queue computeQueue;
+    vkw::CommandPool computeCommandPool;
+    vkw::PrimaryCommandBuffer computeCommandBuffer;
+    vkw::Semaphore computeImageReady;
+    vkw::Semaphore computeImageRelease;
+    vkw::SubmitInfo computeSubmitInfo;
+    vkw::Fence fence;
+
+    WaveSettings waveSettings;
+    LandSettings landSettings;
+    SkyBoxSettings skyboxSettings;
+};
+
+int runWaves() {
+    WavesApp wavesApp{};
+    wavesApp.run();
     return 0;
 }
 
-
 int main(){
-    return ErrorCallbackWrapper<runWaves>::run();
+    return ErrorCallbackWrapper<decltype(&runWaves)>::run(&runWaves);
 }

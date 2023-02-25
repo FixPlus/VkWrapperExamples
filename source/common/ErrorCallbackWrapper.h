@@ -5,13 +5,14 @@
 #include <functional>
 #include <vkw/Exception.hpp>
 
-using PFN_int_void = int (*)();
-template<PFN_int_void function>
+template<typename Callable>
 class ErrorCallbackWrapper{
 public:
-    static int run() {
+    template<typename... Args>
+    static int run(Callable&& callable, Args&&... args) {
         try{
-            return function();
+            std::invoke(std::forward<Callable>(callable), std::forward<Args>(args)...);
+            return 0;
         }
         catch(vkw::VulkanError& e){
             RenderEngine::Boxer::show(e.what(), "Vulkan API error", RenderEngine::Boxer::Style::Error);
