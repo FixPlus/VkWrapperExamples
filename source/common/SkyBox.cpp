@@ -3,11 +3,10 @@
 #include <vkw/Queue.hpp>
 #include <vkw/CommandPool.hpp>
 
-static vkw::NullVertexInputState skybox_state{};
 
 SkyBox::SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpass, RenderEngine::ShaderLoaderInterface& shaderLoader) :
         m_device(device),
-        m_geometry_layout(device, RenderEngine::GeometryLayout::CreateInfo{&skybox_state,vkw::InputAssemblyStateCreateInfo{},RenderEngine::SubstageDescription{"skybox"}, 1}),
+        m_geometry_layout(device, RenderEngine::GeometryLayout::CreateInfo{nullptr,vkw::InputAssemblyStateCreateInfo{},RenderEngine::SubstageDescription{"skybox"}, 1}),
         m_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, 1),
         m_material_layout(device, RenderEngine::MaterialLayout::CreateInfo{
             RenderEngine::SubstageDescription{

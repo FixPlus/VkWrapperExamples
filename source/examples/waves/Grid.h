@@ -58,7 +58,9 @@ class Grid : public vkw::ReferenceGuard{
     protected:
         vkw::StrongReference<vkw::Device> m_device;
 
-        static vkw::VertexInputStateCreateInfo<vkw::per_vertex<PrimitiveAttrs, 0>> m_vertexInputStateCreateInfo;
+        auto m_createVertexState(){
+            return std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<PrimitiveAttrs, 0>>>();
+        }
 
         virtual void preDraw(RenderEngine::GraphicsRecordingState &buffer) {}
         virtual glm::vec4 arbitraryData(glm::vec2 tileBegin,  glm::vec2 tileEnd) { return glm::vec4{0.0f}; };

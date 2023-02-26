@@ -3,7 +3,7 @@
 
 TestApp::LandSurface::LandSurface(vkw::Device &device) : Grid(device, false),
          RenderEngine::GeometryLayout(device,
-                                       RenderEngine::GeometryLayout::CreateInfo{.vertexInputState = &m_vertexInputStateCreateInfo, .substageDescription={.shaderSubstageName="land",
+                                       RenderEngine::GeometryLayout::CreateInfo{.vertexInputState = m_createVertexState(), .substageDescription={.shaderSubstageName="land",
                                                .setBindings = {vkw::DescriptorSetLayoutBinding{0,
                                                                                                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}, .pushConstants={
                                                        VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0, .size=

@@ -3,12 +3,11 @@
 #include <memory>
 #include "Utils.h"
 
-static vkw::NullVertexInputState skybox_state{};
 
 TestApp::Fractal::Fractal(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
                           RenderEngine::TextureLoader &textureLoader, uint32_t texWidth, uint32_t texHeight) :
         m_geom_layout(device,
-                      RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&skybox_state, .substageDescription={.shaderSubstageName="skybox"}}),
+                      RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=nullptr, .substageDescription={.shaderSubstageName="skybox"}}),
         m_geometry(m_geom_layout),
         m_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, 1),
         m_projection(m_projection_layout),

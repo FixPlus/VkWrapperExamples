@@ -4,8 +4,8 @@
 namespace RenderEngine {
 
 
-    GeometryLayout::GeometryLayout(vkw::Device &device, const GeometryLayout::CreateInfo &createInfo) : PipelineStageLayout(device, createInfo.substageDescription, createInfo.maxGeometries),
-                                                                                                        m_vertexInputState(*createInfo.vertexInputState),
+    GeometryLayout::GeometryLayout(vkw::Device &device, GeometryLayout::CreateInfo&& createInfo) : PipelineStageLayout(device, createInfo.substageDescription, createInfo.maxGeometries),
+                                                                                                        m_vertexInputState(std::move(createInfo.vertexInputState)),
                                                                                                         m_inputAssemblyState(createInfo.inputAssemblyState){
 
     }

@@ -55,8 +55,6 @@ namespace TestApp {
 
         friend class Cube;
 
-        static const vkw::VertexInputStateCreateInfo<vkw::per_vertex<PerVertex, 0>, vkw::per_instance<PerInstance, 1>> m_vsci;
-
         RenderEngine::GeometryLayout m_geometry_layout;
 
         struct M_Cube_geometry : public RenderEngine::Geometry {

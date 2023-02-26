@@ -34,7 +34,7 @@ RenderEngine::GraphicsPipelinePool::pipelineOf(const RenderEngine::GeometryLayou
     vkw::GraphicsPipelineCreateInfo createInfo{lightingLayout.pass(), lightingLayout.subpass(), layoutOf(geometryLayout, projectionLayout, materialLayout, lightingLayout)};
 
     createInfo.addInputAssemblyState(geometryLayout.inputAssemblyState());
-    createInfo.addVertexInputState(*geometryLayout.vertexInputState());
+    createInfo.addVertexInputState(geometryLayout.vertexInputState());
     createInfo.addVertexShader(m_shaderLoader.get().loadVertexShader(geometryLayout, projectionLayout));
 
     if(!materialLayout.depthOnly()) {

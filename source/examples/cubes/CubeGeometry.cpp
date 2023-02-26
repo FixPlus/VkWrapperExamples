@@ -9,7 +9,10 @@
 namespace TestApp {
 
     CubePool::CubePool(vkw::Device &device, uint32_t maxCubes) : m_geometry_layout(device,
-                                                                                   RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&m_vsci, .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="cube"},
+                                                                                   RenderEngine::GeometryLayout::CreateInfo{
+        .vertexInputState=
+                std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<PerVertex, 0>, vkw::per_instance<PerInstance, 1>>>(),
+                        .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="cube"},
                                                                                            .maxGeometries=1}),
                                                                  m_geometry(device, m_geometry_layout, maxCubes) {
     }
@@ -34,8 +37,6 @@ namespace TestApp {
 
         state.commands().draw(36, m_cubeCount, 0, 0);
     }
-
-    const vkw::VertexInputStateCreateInfo<vkw::per_vertex<CubePool::PerVertex, 0>, vkw::per_instance<CubePool::PerInstance, 1>> CubePool::m_vsci{};
 
     void CubePool::bind(RenderEngine::GraphicsRecordingState &state) const {
         m_geometry.bind(state);

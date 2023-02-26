@@ -4,8 +4,6 @@
 
 namespace TestApp {
 
-    const vkw::VertexInputStateCreateInfo<vkw::per_vertex<GUIBackend::GUIVertex, 0>> GUIBackend::m_vertex_state{};
-
     static VkPipelineColorBlendAttachmentState getUIBlendState(){
         VkPipelineColorBlendAttachmentState state{};
         state.blendEnable = VK_TRUE;
@@ -24,7 +22,7 @@ namespace TestApp {
             m_sampler(m_sampler_init(device)),
             m_font_loader(std::move(textureLoader)),
             m_geometryLayout(device,
-                             RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=&m_vertex_state, .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="ui", .pushConstants={
+                             RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<GUIBackend::GUIVertex, 0>>>(), .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="ui", .pushConstants={
                                      VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0u, .size=
                                      sizeof(glm::vec2) * 2u}}}, .maxGeometries=1}),
             m_geometry(m_geometryLayout),

@@ -93,7 +93,6 @@ namespace TestApp {
         struct GUIVertex : public vkw::AttributeBase<vkw::VertexAttributeType::VEC2F,
                 vkw::VertexAttributeType::VEC2F, vkw::VertexAttributeType::RGBA8_UNORM>, public ImDrawVert {
         };
-        static const vkw::VertexInputStateCreateInfo<vkw::per_vertex<GUIVertex, 0>> m_vertex_state;
 
         // keep this in that initialization order
 

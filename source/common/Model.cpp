@@ -698,7 +698,7 @@ TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, DefaultTexturePool& p
 
 TestApp::ModelGeometryLayout::ModelGeometryLayout(vkw::Device &device) :
         RenderEngine::GeometryLayout(device,
-                                     RenderEngine::GeometryLayout::CreateInfo{&ModelVertexInputState, vkw::InputAssemblyStateCreateInfo{}, RenderEngine::SubstageDescription{"model", {
+                                     RenderEngine::GeometryLayout::CreateInfo{std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<TestApp::ModelAttributes, 0>>>(), vkw::InputAssemblyStateCreateInfo{}, RenderEngine::SubstageDescription{"model", {
                                              vkw::DescriptorSetLayoutBinding{0,
                                                                              VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1000}) {
 

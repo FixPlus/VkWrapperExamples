@@ -4,7 +4,7 @@
 
 WaterSurface::WaterSurface(vkw::Device &device, WaveSurfaceTexture &texture) : TestApp::Grid(device),
                                                                                RenderEngine::GeometryLayout(device,
-                                                                                                            RenderEngine::GeometryLayout::CreateInfo{.vertexInputState = &m_vertexInputStateCreateInfo, .substageDescription={.shaderSubstageName="waves",
+                                                                                                            RenderEngine::GeometryLayout::CreateInfo{.vertexInputState = m_createVertexState(), .substageDescription={.shaderSubstageName="waves",
                                                                                                                     .setBindings = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                                                                                                                                     {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                                                                                                                                     {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
