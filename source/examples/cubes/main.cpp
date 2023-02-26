@@ -64,6 +64,7 @@ protected:
     }
 
 private:
+    // TODO: rewite to StrongReference
     std::reference_wrapper<TestApp::SceneProjector> m_window;
 
 };

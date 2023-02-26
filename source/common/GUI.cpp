@@ -72,9 +72,16 @@ namespace TestApp {
         mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-        auto* key = m_views_storage.emplace_back(std::make_unique<TextureView>(m_device, fontTexture, fontTexture.format())).get();
+        assert(!m_font_textures.contains(nullptr) && "Broken map");
+        auto &newTexture = m_font_textures.emplace(nullptr, std::move(fontTexture)).first->second;
 
-        auto &newTexture = m_font_textures.emplace(key, std::move(fontTexture)).first->second;
+        auto* key = m_views_storage.emplace_back(std::make_unique<TextureView>(m_device, newTexture, fontTexture.format())).get();
+
+        auto textureReplace = m_font_textures.extract(nullptr);
+        textureReplace.key() = key;
+        m_font_textures.insert(std::move(textureReplace));
+
+
 
         m_materials.emplace(key, Material{m_device, m_materialLayout, *key, m_sampler});
         atlas->TexID = key;

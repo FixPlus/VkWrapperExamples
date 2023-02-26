@@ -110,19 +110,6 @@ namespace TestApp {
 
     class GLTFModel;
 
-#if 0
-    class TexturePool{
-    public:
-        TexturePool(TextureLoader& loader);
-
-        vkw::ColorImage2D const& texture(std::string name);
-
-    private:
-        std::map<std::string, vkw::ColorImage2D> m_textures;
-        std::reference_wrapper<TextureLoader> m_loader;
-    };
-#endif
-
     class DefaultTexturePool;
 
     struct MaterialInfo {
@@ -226,7 +213,7 @@ namespace TestApp {
 
     class GLTFModelInstance;
 
-    class DefaultTexturePool{
+    class DefaultTexturePool : public vkw::ReferenceGuard{
     public:
 
         explicit DefaultTexturePool(vkw::Device& device, uint32_t textureDim = 256);
@@ -251,15 +238,17 @@ namespace TestApp {
     };
 
     class GLTFModel {
+        std::vector<Texture2D> textures;
+        vkw::StrongReference<DefaultTexturePool> m_defaultTexturePool;
         ModelMaterialLayout materialLayout;
         ModelGeometryLayout geometryLayout;
         std::vector<ModelMaterial> materials;
 
-        std::vector<Texture2D> textures;
+
         std::vector<std::shared_ptr<MNode>> rootNodes;
         std::vector<std::shared_ptr<MNode>> linearNodes;
-        std::reference_wrapper<vkw::Device> renderer_;
-        std::reference_wrapper<DefaultTexturePool> m_defaultTexturePool;
+        vkw::StrongReference<vkw::Device> renderer_;
+
         vkw::Sampler sampler;
         std::stack<size_t> freeIDs;
         size_t instanceCount = 0;

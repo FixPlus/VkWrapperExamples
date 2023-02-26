@@ -80,7 +80,7 @@ namespace TestApp{
 
     class LandSettings: public GridSettings{
     public:
-        LandSettings(TestApp::GUIFrontEnd& gui, LandSurface& water, std::map<std::string, std::reference_wrapper<LandMaterial>> materials);
+        LandSettings(TestApp::GUIFrontEnd& gui, LandSurface& water, std::map<std::string, vkw::StrongReference<LandMaterial>> materials);
         LandMaterial& pickedMaterial() const{
             return m_materials.at(m_materialNames.at(m_pickedMaterial));
         }
@@ -90,8 +90,8 @@ namespace TestApp{
         void onGui() override;
 
     private:
-        std::reference_wrapper<LandSurface> m_land;
-        std::map<std::string, std::reference_wrapper<LandMaterial>> m_materials;
+        vkw::StrongReference<LandSurface, TestApp::Grid> m_land;
+        std::map<std::string, vkw::StrongReference<LandMaterial>> m_materials;
         std::vector<const char*> m_materialNames;
         int m_pickedMaterial = 0;
 

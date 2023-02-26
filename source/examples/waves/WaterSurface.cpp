@@ -113,7 +113,7 @@ WaterMaterial::Material::Material(vkw::Device &device, WaterMaterial &waterMater
 }
 
 WaveSettings::WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water, WaveSurfaceTexture &texture,
-                           std::map<std::string, std::reference_wrapper<WaterMaterial>> materials)
+                           std::map<std::string, vkw::StrongReference<WaterMaterial>> materials)
         : TestApp::GridSettings(gui, water, "Waves"),
           m_water(water), m_materials(std::move(materials)), m_texture(texture) {
     if (m_materials.empty())

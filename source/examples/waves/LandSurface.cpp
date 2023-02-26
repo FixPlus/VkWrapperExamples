@@ -34,7 +34,7 @@ TestApp::LandMaterial::Material::Material(vkw::Device &device, TestApp::LandMate
 }
 
 TestApp::LandSettings::LandSettings(TestApp::GUIFrontEnd &gui, TestApp::LandSurface &land,
-                                    std::map<std::string, std::reference_wrapper<LandMaterial>> materials):
+                                    std::map<std::string, vkw::StrongReference<LandMaterial>> materials):
         GridSettings(gui, land, "Land"), m_land(land), m_materials(std::move(materials))
                                     {
     for(auto& material: m_materials){

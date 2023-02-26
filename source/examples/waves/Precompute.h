@@ -62,7 +62,7 @@ namespace TestApp {
         void dispatch(vkw::CommandBuffer &buffer);
 
     private:
-        std::reference_wrapper<vkw::BasicImage<vkw::COLOR, vkw::I2D, vkw::ARRAY>> m_image;
+        vkw::StrongReference<vkw::BasicImage<vkw::COLOR, vkw::I2D, vkw::ARRAY>> m_image;
         vkw::ImageView<vkw::COLOR, vkw::V2DA> m_imageView;
         std::pair<uint32_t, uint32_t> m_cached_group_size;
     };

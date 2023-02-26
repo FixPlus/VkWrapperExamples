@@ -7,27 +7,35 @@
 #include "RenderPassesImpl.h"
 #include <vkw/Fence.hpp>
 #include "AssetPath.inc"
+#include "RenderEngine/Window/Boxer.h"
 
 namespace TestApp{
 
-class SwapChainWithFramebuffers: public SwapChainImpl, public LightPass, public std::vector<vkw::FrameBuffer>{
+class SwapChainWithFramebuffers: public SwapChainImpl{
 public:
-    SwapChainWithFramebuffers(vkw::Device &device, vkw::Surface& surface): SwapChainImpl(device, surface, true),
-                                                                           LightPass(device, attachments().front().format(),
-                                                                                     depthAttachment().format(),
-                                                                                     VK_IMAGE_LAYOUT_PRESENT_SRC_KHR){
-        auto extents = surface.getSurfaceCapabilities(device.physicalDevice()).currentExtent;
-        std::transform(attachments().begin(), attachments().end(), std::back_inserter(*this), [this, &extents, &device](auto &attachment){
+    SwapChainWithFramebuffers(vkw::Device &device, vkw::Surface& surface): SwapChainImpl(device, surface, true), m_device(device), m_surface(surface){
+
+    }
+    void createFrameBuffers(vkw::RenderPass &pass, std::vector<vkw::FrameBuffer>& framebuffers) {
+        auto& surface = m_surface.get();
+        auto extents = surface.getSurfaceCapabilities(m_device.get().physicalDevice()).currentExtent;
+        std::transform(attachments().begin(), attachments().end(), std::back_inserter(framebuffers), [this, &extents, &pass](auto &attachment){
             std::array<vkw::ImageViewVT<vkw::V2DA> const*, 2> views = {&attachment, &depthAttachment()};
-            return vkw::FrameBuffer{device, *this, extents,
-                                                    {views.begin(), views.end()}};
+            return vkw::FrameBuffer{m_device.get(), pass, extents,
+                                    {views.begin(), views.end()}};
         });
     }
+
+private:
+    vkw::StrongReference<vkw::Device> m_device;
+    vkw::StrongReference<vkw::Surface> m_surface;
 };
+
 
 struct CommonApp::InternalState{
 
-    InternalState(vkw::Device& device, RenderEngine::ShaderLoader &shaderLoader):
+    InternalState(vkw::Device& device, RenderEngine::ShaderLoader &shaderLoader, VkFormat colorFormat, VkFormat depthFormat):
+            pass(device, colorFormat, depthFormat, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR),
             renderQueue(device.anyGraphicsQueue()),
             mainPool(device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, renderQueue.family().index()),
             mainBuffer(mainPool),
@@ -42,15 +50,15 @@ struct CommonApp::InternalState{
     }
 
     void updateSubmitInfo(){
-        std::vector<vkw::SemaphoreCRef> deps;
+        std::vector<std::reference_wrapper<vkw::Semaphore const>> deps;
         deps.emplace_back(presentComplete);
-        std::transform(externalDeps.begin(), externalDeps.end(), std::back_inserter(deps), [](auto& ext){ return vkw::SemaphoreCRef(*ext.first);});
+        std::transform(externalDeps.begin(), externalDeps.end(), std::back_inserter(deps), [](auto& ext) ->std::reference_wrapper<vkw::Semaphore const>{ return *ext.first;});
         std::vector<VkPipelineStageFlags> depStages;
         depStages.emplace_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
         std::transform(externalDeps.begin(), externalDeps.end(), std::back_inserter(depStages), [](auto& ext){ return ext.second;});
-        std::vector<vkw::SemaphoreCRef> signals;
+        std::vector<std::reference_wrapper<vkw::Semaphore const>> signals;
         signals.emplace_back(renderComplete);
-        std::transform(externalSignals.begin(), externalSignals.end(), std::back_inserter(signals), [](auto& ext){ return vkw::SemaphoreCRef(*ext);});
+        std::transform(externalSignals.begin(), externalSignals.end(), std::back_inserter(signals), [](auto& ext) ->std::reference_wrapper<vkw::Semaphore const>{ return *ext;});
 
         submitInfo = vkw::SubmitInfo{mainBuffer, deps, depStages, signals};
     }
@@ -58,13 +66,15 @@ struct CommonApp::InternalState{
         fence.wait();
         fence.reset();
         for(auto& ext: externalFences){
-            ext.get().wait();
-            ext.get().reset();
+            ext->wait();
+            ext->reset();
         }
     }
     void submit(){
         renderQueue.submit(submitInfo, fence);
     }
+    LightPass pass;
+    std::vector<vkw::FrameBuffer> framebuffers;
     vkw::Queue renderQueue;
     vkw::CommandPool mainPool;
     vkw::PrimaryCommandBuffer mainBuffer;
@@ -75,12 +85,15 @@ struct CommonApp::InternalState{
     RenderEngine::GraphicsRecordingState recordingState;
     vkw::SubmitInfo submitInfo;
     SwapChainWithFramebuffers *swapChain = nullptr;
-    std::vector<std::pair<vkw::Semaphore*, VkPipelineStageFlags>> externalDeps;
-    std::vector<vkw::Semaphore*> externalSignals;
-    std::vector<vkw::FenceRef> externalFences;
+    std::vector<std::pair<std::shared_ptr<vkw::Semaphore>, VkPipelineStageFlags>> externalDeps;
+    std::vector<std::shared_ptr<vkw::Semaphore>> externalSignals;
+    std::vector<std::shared_ptr<vkw::Fence>> externalFences;
 };
 
 CommonApp::CommonApp(AppCreateInfo const& createInfo) {
+    vkw::addIrrecoverableErrorCallback([](vkw::Error& e) {
+        RenderEngine::Boxer::show(e.codeString().append(": ").append(e.what()), "Irrecoverable vkw::Error", RenderEngine::Boxer::Style::Error);
+    });
     m_window = std::make_unique<TestApp::SceneProjector>(800, 600, createInfo.applicationName.data());
 
     m_library = std::make_unique<vkw::Library>();
@@ -114,6 +127,7 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
         m_validation = std::make_unique<vkw::debug::Validation>(instance());
     auto devs = instance().enumerateAvailableDevices();
 
+
     if (devs.empty()) {
         std::stringstream ss;
         ss << "No available devices supporting vulkan on this machine." << std::endl <<
@@ -133,12 +147,14 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
     m_surface = std::make_unique<vkw::Surface>(window().surface(instance()));
 
     m_swapChain = std::make_unique<SwapChainWithFramebuffers>(device(), surface());
+    auto* swapChain = dynamic_cast<SwapChainWithFramebuffers*>(m_swapChain.get());
 
     m_shaderLoader = std::make_unique<RenderEngine::ShaderLoader>(device(), EXAMPLE_ASSET_PATH + std::string("/shaders/"));
     m_textureLoader = std::make_unique<RenderEngine::TextureLoader>(device(), EXAMPLE_ASSET_PATH + std::string("/textures/"));
 
-    m_internalState = std::make_unique<InternalState>(device(), shaderLoader());
-    m_internalState->swapChain = dynamic_cast<SwapChainWithFramebuffers*>(m_swapChain.get());
+    m_internalState = std::make_unique<InternalState>(device(), shaderLoader(), swapChain->attachments().front().format(), swapChain->depthAttachment().format());
+    m_internalState->swapChain = swapChain;
+    m_internalState->swapChain->createFrameBuffers(m_internalState->pass, m_internal().framebuffers);
 
     assert(m_internalState->swapChain && "You messed up with types");
 
@@ -148,7 +164,7 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
     CommonApp::~CommonApp() = default;
 
     vkw::RenderPass &CommonApp::onScreenPass() {
-        return *m_internalState->swapChain;
+        return m_internalState->pass;
     }
 
     void CommonApp::attachGUI(GUIBackend *gui) {
@@ -156,7 +172,7 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
         m_window->setContext(*gui);
     }
 
-    void CommonApp::run(){
+    void CommonApp::run() try{
         m_current_surface_extents = surface().getSurfaceCapabilities(physDevice()).currentExtent;
         auto& extents = m_current_surface_extents;
 
@@ -190,9 +206,10 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
                     if (extents.width == 0 || extents.height == 0)
                         continue;
 
-
+                    m_internal().framebuffers.clear();
                     m_swapChain.reset();
                     m_internal().swapChain = new TestApp::SwapChainWithFramebuffers{device(), surface()};
+                    m_internal().swapChain->createFrameBuffers(m_internalState->pass, m_internal().framebuffers);
                     m_swapChain.reset(m_internal().swapChain);
 
 
@@ -234,11 +251,11 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
             preMainPass(commandBuffer, m_internal().pipelinePool);
             auto currentImage = swapChain().currentImage();
 
-            auto &fb = m_internal().swapChain->at(currentImage);
+            auto &fb = m_internal().framebuffers.at(currentImage);
 
             auto renderArea = fb.getFullRenderArea();
 
-            commandBuffer.beginRenderPass(*m_internal().swapChain, fb, renderArea, false, values.size(), values.data());
+            commandBuffer.beginRenderPass(m_internal().pass, fb, renderArea, false, values.size(), values.data());
 
             commandBuffer.setViewports({&viewport, 1}, 0);
             commandBuffer.setScissors({&scissor, 1}, 0);
@@ -264,16 +281,18 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
         m_internal().waitForFences();
 
         device().waitIdle();
-
+        m_internal().pipelinePool.clear();
+    } catch(...){
+        m_internal().pipelinePool.clear();
     }
 
-    void CommonApp::addMainPassDependency(vkw::Semaphore& waitFor, VkPipelineStageFlags stage) {
-        m_internal().externalDeps.emplace_back(&waitFor, stage);
+    void CommonApp::addMainPassDependency(std::shared_ptr<vkw::Semaphore> waitFor, VkPipelineStageFlags stage) {
+        m_internal().externalDeps.emplace_back(waitFor, stage);
         m_internal().updateSubmitInfo();
     }
 
-    void CommonApp::signalOnMainPassComplete(vkw::Semaphore& signal){
-        m_internal().externalSignals.emplace_back(&signal);
+    void CommonApp::signalOnMainPassComplete(std::shared_ptr<vkw::Semaphore> signal){
+        m_internal().externalSignals.emplace_back(signal);
         m_internal().updateSubmitInfo();
     }
 
@@ -281,7 +300,11 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
         return m_internalState->mainBuffer.queueFamily();
     }
 
-    void CommonApp::addFrameFence(vkw::Fence &fence) {
+    void CommonApp::addFrameFence(std::shared_ptr<vkw::Fence> fence) {
         m_internal().externalFences.emplace_back(fence);
+    }
+
+    void CommonApp::clearPipelinePool() {
+        m_internal().pipelinePool.clear();
     }
 }

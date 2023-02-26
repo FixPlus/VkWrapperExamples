@@ -46,6 +46,10 @@ namespace TestApp {
             m_context = gui.m_context;
         }
 
+        void setNullContext() {
+            m_context = ImGui::CreateContext();
+        }
+
     protected:
         bool guiWantCaptureMouse() const;
         bool guiWantCaptureKeyboard() const;
@@ -93,7 +97,7 @@ namespace TestApp {
 
         // keep this in that initialization order
 
-        std::reference_wrapper<vkw::Device> m_device;
+        vkw::StrongReference<vkw::Device> m_device;
         RenderEngine::TextureLoader m_font_loader;
 
         RenderEngine::GeometryLayout m_geometryLayout;
@@ -137,7 +141,7 @@ namespace TestApp {
 
     class GUIWindow;
 
-    class GUIFrontEnd : virtual public GUIBase {
+    class GUIFrontEnd : virtual public GUIBase, public vkw::ReferenceGuard {
     public:
 
         void frame();
@@ -195,7 +199,7 @@ namespace TestApp {
 
     private:
         friend class GUIFrontEnd;
-        std::reference_wrapper<GUIFrontEnd> m_parent;
+        vkw::StrongReference<GUIFrontEnd> m_parent;
         bool m_opened = true;
         WindowSettings m_settings;
         ImGuiWindowFlags m_flags{};

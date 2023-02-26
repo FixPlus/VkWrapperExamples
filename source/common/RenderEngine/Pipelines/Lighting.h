@@ -2,6 +2,7 @@
 #define TESTAPP_LIGHTING_H
 
 #include "RenderEngine/Pipelines/PipelineStage.h"
+#include "vkw/RenderPass.hpp"
 
 namespace RenderEngine{
 
@@ -10,12 +11,12 @@ namespace RenderEngine{
     public:
         struct CreateInfo{
             SubstageDescription substageDescription;
-            vkw::RenderPassCRef pass;
+            vkw::StrongReference<vkw::RenderPass const> pass;
             uint32_t subpass;
             boost::container::small_vector<std::pair<VkPipelineColorBlendAttachmentState, uint32_t>, 2> blendStates{};
         };
         LightingLayout(vkw::Device& device, CreateInfo const& desc, uint32_t maxSets = 0):
-                PipelineStageLayout(device, desc.substageDescription, maxSets), m_pass(desc.pass), m_subpass(desc.subpass), m_blend_states(desc.blendStates){}
+                PipelineStageLayout(device, desc.substageDescription, maxSets), m_pass(desc.pass.get()), m_subpass(desc.subpass), m_blend_states(desc.blendStates){}
 
         auto const& blendStates() const{
             return m_blend_states;
@@ -28,7 +29,7 @@ namespace RenderEngine{
             return m_subpass;
         }
     protected:
-        vkw::RenderPassCRef m_pass;
+        vkw::StrongReference<vkw::RenderPass const> m_pass;
         uint32_t m_subpass;
         boost::container::small_vector<std::pair<VkPipelineColorBlendAttachmentState, uint32_t>, 2> m_blend_states;
     };

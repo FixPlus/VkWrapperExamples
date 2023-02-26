@@ -59,6 +59,7 @@ protected:
     }
 
 private:
+    // TODO: rewite to StrongReference
     std::reference_wrapper<TestApp::SceneProjector> m_window;
 
 };
@@ -135,6 +136,7 @@ public:
                 }
                 instance.reset();
                 instances.clear();
+                clearPipelinePool();
                 model.reset();
                 model = std::make_unique<GLTFModel>(device(), defaultTextures, modelList.at(current_model));
                 instance = std::make_unique<GLTFModelInstance>(model->createNewInstance());

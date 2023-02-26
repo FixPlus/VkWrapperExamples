@@ -47,8 +47,6 @@ namespace RenderEngine {
             return m_inputAssemblyState;
         }
 
-        virtual ~GeometryLayout() = default;
-
     private:
         vkw::VertexInputStateCreateInfoBase m_vertexInputState;
         vkw::InputAssemblyStateCreateInfo m_inputAssemblyState;

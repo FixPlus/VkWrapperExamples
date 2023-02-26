@@ -11,7 +11,7 @@
 
 namespace RenderEngine{
 
-    class GraphicsPipelinePool{
+    class GraphicsPipelinePool: public vkw::ReferenceGuard{
     public:
 
         explicit GraphicsPipelinePool(vkw::Device& device, ShaderLoaderInterface& loader): m_device(device), m_cache(device),
@@ -23,11 +23,15 @@ namespace RenderEngine{
         vkw::GraphicsPipeline const& pipelineOf(GeometryLayout const&geometryLayout,
                                                 ProjectionLayout const&projectionLayout, MaterialLayout const&materialLayout, LightingLayout const&lightingLayout);
 
+        void clear() {
+            m_pipelines.clear();
+            m_layouts.clear();
+        }
     private:
 
         using M_PipelineKey = std::tuple<GeometryLayout const*, ProjectionLayout const*, MaterialLayout const*, LightingLayout const*>;
-        std::reference_wrapper<vkw::Device> m_device;
-        std::reference_wrapper<ShaderLoaderInterface> m_shaderLoader;
+        vkw::StrongReference<vkw::Device> m_device;
+        vkw::StrongReference<ShaderLoaderInterface> m_shaderLoader;
         vkw::PipelineCache m_cache;
         std::map<M_PipelineKey, vkw::PipelineLayout> m_layouts;
         std::map<M_PipelineKey, vkw::GraphicsPipeline> m_pipelines;

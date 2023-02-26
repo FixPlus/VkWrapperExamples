@@ -57,6 +57,7 @@ protected:
     }
 
 private:
+    // TODO: rewite to StrongReference
     std::reference_wrapper<TestApp::SceneProjector> m_window;
 
 };
@@ -66,7 +67,7 @@ public:
     FractalApp(): CommonApp{AppCreateInfo{true, "Fractal"}},
                   m_gui(std::make_unique<GUI>(window(), device(), onScreenPass(), 0, textureLoader())),
                   m_fractal(device(), onScreenPass(), 0, textureLoader(), currentSurfaceExtents().width, currentSurfaceExtents().height),
-                  m_fractalSettings(*m_gui, m_fractal){
+                  m_fractalSettings(*m_gui, m_fractal) {
         attachGUI(m_gui.get());
     }
 

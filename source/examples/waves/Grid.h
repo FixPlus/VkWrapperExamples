@@ -11,7 +11,7 @@
 
 namespace TestApp {
 
-    class Grid {
+class Grid : public vkw::ReferenceGuard{
     public:
         struct PrimitiveAttrs
                 : public vkw::AttributeBase<vkw::VertexAttributeType::VEC3F, vkw::VertexAttributeType::VEC2F> {
@@ -56,7 +56,7 @@ namespace TestApp {
         std::map<int, vkw::IndexBuffer<VK_INDEX_TYPE_UINT32>> m_full_tiles;
 
     protected:
-        std::reference_wrapper<vkw::Device> m_device;
+        vkw::StrongReference<vkw::Device> m_device;
 
         static vkw::VertexInputStateCreateInfo<vkw::per_vertex<PrimitiveAttrs, 0>> m_vertexInputStateCreateInfo;
 
@@ -78,7 +78,7 @@ namespace TestApp {
     protected:
         void onGui() override;
 
-        std::reference_wrapper<Grid> m_grid;
+        vkw::StrongReference<Grid> m_grid;
     private:
         bool m_enabled = true;
     };

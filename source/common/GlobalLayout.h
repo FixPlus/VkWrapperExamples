@@ -14,7 +14,7 @@
 #include "common/GUI.h"
 
 namespace TestApp {
-    class GlobalLayout {
+    class GlobalLayout : public vkw::ReferenceGuard{
     public:
 
         GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera,
@@ -76,6 +76,7 @@ namespace TestApp {
             SimpleLight(vkw::Device &device, RenderEngine::LightingLayout &layout, const SkyBox &skyBox);
         } m_simple_light;
 
+        // TODO: rewrite to StrongReference
         std::reference_wrapper<TestApp::Camera const> m_camera;
     };
 
@@ -90,7 +91,7 @@ namespace TestApp {
         void onGui() override;
     private:
         bool m_use_simple_lighting = false;
-        std::reference_wrapper<GlobalLayout> m_globalLayout;
+        vkw::StrongReference<GlobalLayout> m_globalLayout;
     };
 
 }

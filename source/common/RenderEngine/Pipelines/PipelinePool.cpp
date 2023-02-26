@@ -17,7 +17,7 @@ RenderEngine::GraphicsPipelinePool::layoutOf(const RenderEngine::GeometryLayout 
     std::copy(materialLayout.description().pushConstants.begin(), materialLayout.description().pushConstants.end(), std::back_inserter(pushConstants));
     std::copy(lightingLayout.description().pushConstants.begin(), lightingLayout.description().pushConstants.end(), std::back_inserter(pushConstants));
 
-    std::vector<vkw::DescriptorSetLayoutCRef> bindings{geometryLayout.layout(), projectionLayout.layout(), materialLayout.layout(), lightingLayout.layout()};
+    std::vector<std::reference_wrapper<vkw::DescriptorSetLayout const>> bindings{geometryLayout.layout(), projectionLayout.layout(), materialLayout.layout(), lightingLayout.layout()};
 
     return m_layouts.emplace(key, vkw::PipelineLayout{m_device, bindings, pushConstants}).first->second;
 }

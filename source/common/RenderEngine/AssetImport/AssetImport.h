@@ -64,7 +64,7 @@ namespace RenderEngine {
                     VmaMemoryUsage = VMA_MEMORY_USAGE_GPU_ONLY) const;
 
     private:
-        std::reference_wrapper<vkw::Device> m_device;
+        vkw::StrongReference<vkw::Device> m_device;
     };
 
     class ShaderImporter : public AssetImporterBase {
@@ -82,7 +82,7 @@ namespace RenderEngine {
         vkw::ComputeShader loadComputeShader(std::string const& name) const;
 
     private:
-        std::reference_wrapper<vkw::Device> m_device;
+        vkw::StrongReference<vkw::Device> m_device;
         vkw::SPIRVModule m_general_vert;
         vkw::SPIRVModule m_general_frag;
 

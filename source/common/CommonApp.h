@@ -66,13 +66,15 @@ protected:
     auto currentSurfaceExtents() const{
         return m_current_surface_extents;
     }
+
+    void clearPipelinePool();
     vkw::RenderPass& onScreenPass();
 
     void attachGUI(GUIBackend* gui);
 
-    void addMainPassDependency(vkw::Semaphore& waitFor, VkPipelineStageFlags stage);
-    void signalOnMainPassComplete(vkw::Semaphore& signal);
-    void addFrameFence(vkw::Fence& fence);
+    void addMainPassDependency(std::shared_ptr<vkw::Semaphore> waitFor, VkPipelineStageFlags stage);
+    void signalOnMainPassComplete(std::shared_ptr<vkw::Semaphore> signal);
+    void addFrameFence(std::shared_ptr<vkw::Fence> fence);
 
     unsigned mainPassQueueFamilyIndex() const;
 

@@ -10,7 +10,7 @@
 #include "common/GUI.h"
 #include "common/Utils.h"
 
-class SkyBox {
+class SkyBox : public vkw::ReferenceGuard{
 public:
 
     SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpass, RenderEngine::ShaderLoaderInterface& shaderLoader);
@@ -75,7 +75,7 @@ public:
     }
 private:
 
-    std::reference_wrapper<vkw::Device> m_device;
+    vkw::StrongReference<vkw::Device> m_device;
 
     RenderEngine::GeometryLayout m_geometry_layout;
     RenderEngine::ProjectionLayout m_projection_layout;
@@ -144,7 +144,7 @@ public:
 protected:
     void onGui() override;
 
-    std::reference_wrapper<SkyBox> m_skybox;
+    vkw::StrongReference<SkyBox> m_skybox;
     bool m_need_recompute_outscatter = false;
 };
 

@@ -18,7 +18,7 @@ namespace RenderEngine{
 
     class PipelineStageBase;
 
-    class PipelineStageLayout{
+    class PipelineStageLayout: public vkw::ReferenceGuard{
     public:
         PipelineStageLayout(vkw::Device& device, SubstageDescription desc, uint32_t maxSets): m_layout(device,
                                                                                                        desc.setBindings, 0),
@@ -90,7 +90,7 @@ namespace RenderEngine{
         }
     private:
         friend class PipelineStageLayout;
-        std::reference_wrapper<PipelineStageLayout> m_layout;
+        vkw::StrongReference<PipelineStageLayout> m_layout;
         std::optional<vkw::DescriptorSet> m_set;
     };
 

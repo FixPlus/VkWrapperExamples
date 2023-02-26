@@ -6,7 +6,7 @@
 RenderEngine::ComputeLayout::ComputeLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
                                            const RenderEngine::SubstageDescription &desc, uint32_t maxSets):
         PipelineStageLayout(device, desc, maxSets),
-        m_layout(device, std::array<vkw::DescriptorSetLayoutCRef, 1>{layout()}, {description().pushConstants.data(), description().pushConstants.size()}),
+        m_layout(device, std::array<std::reference_wrapper<vkw::DescriptorSetLayout const>, 1>{layout()}, {description().pushConstants.data(), description().pushConstants.size()}),
         m_pipeline(device, {m_layout, shaderLoader.loadComputeShader(desc.shaderSubstageName)}){
 
 }

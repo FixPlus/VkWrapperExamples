@@ -3,6 +3,7 @@
 #include "vkw/SwapChain.hpp"
 #include "vkw/FrameBuffer.hpp"
 #include "vkw/Image.hpp"
+#include "vkw/Surface.hpp"
 
 namespace TestApp{
 
@@ -42,13 +43,15 @@ namespace TestApp{
         }
     private:
 
-        boost::container::small_vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>, 3> m_image_views;
+
         boost::container::small_vector<vkw::SwapChainImage, 3> m_images;
+        boost::container::small_vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>, 3> m_image_views;
+
         std::optional<vkw::Image<vkw::DEPTH, vkw::I2D, vkw::SINGLE>> m_depth{};
         std::unique_ptr<vkw::ImageView<vkw::DEPTH, vkw::V2DA>> m_depth_view{};
         static VkSwapchainCreateInfoKHR compileInfo(vkw::Device &device, vkw::Surface &surface, bool vsync);
 
-        std::reference_wrapper<vkw::Surface> m_surface;
+        vkw::StrongReference<vkw::Surface> m_surface;
     };
 
 }

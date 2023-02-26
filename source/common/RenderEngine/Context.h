@@ -22,7 +22,8 @@ namespace RenderEngine{
 
     public:
 
-        std::reference_wrapper<vkw::Device> m_device;
+        vkw::StrongReference<vkw::Device> m_device;
+        // TODO: rewrite to StrongReference
         std::reference_wrapper<Window> m_window;
     };
 }

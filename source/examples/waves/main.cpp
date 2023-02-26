@@ -61,6 +61,7 @@ protected:
     }
 
 private:
+    // TODO: rewrite to StrongReference
     std::reference_wrapper<TestApp::SceneProjector> m_window;
 
 };
@@ -100,10 +101,10 @@ public:
                 computeCommandPool(device(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                                    computeQueue.family().index()),
                 computeCommandBuffer(computeCommandPool),
-                computeImageReady(device()),
-                computeImageRelease(device()),
-                computeSubmitInfo(computeCommandBuffer, computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeImageReady),
-                fence(device()),
+                computeImageReady(std::make_shared<vkw::Semaphore>(device())),
+                computeImageRelease(std::make_shared<vkw::Semaphore>(device())),
+                computeSubmitInfo(computeCommandBuffer, *computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, *computeImageReady),
+                fence(std::make_shared<vkw::Fence>(device())),
                 waveSettings(gui, waves, waveSurfaceTexture,
                              {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}),
                 landSettings(gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}),
@@ -117,7 +118,7 @@ public:
         addMainPassDependency(computeImageReady, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
         signalOnMainPassComplete(computeImageRelease);
 
-        auto syncCSubmitInfo = vkw::SubmitInfo{std::span<vkw::Semaphore const>{&computeImageReady, 0}, {}, std::span<vkw::Semaphore const>{&computeImageReady, 1}};
+        auto syncCSubmitInfo = vkw::SubmitInfo{std::span<vkw::Semaphore const>{computeImageReady.get(), 0}, {}, std::span<vkw::Semaphore const>{computeImageReady.get(), 1}};
         computeQueue.submit(syncCSubmitInfo);
 
         shadowPass.onPass = [this](RenderEngine::GraphicsRecordingState &state,
@@ -217,7 +218,7 @@ protected:
     }
 
     void postSubmit() override{
-        computeQueue.submit(computeSubmitInfo, fence);
+        computeQueue.submit(computeSubmitInfo, *fence);
     }
 
 private:
@@ -239,10 +240,10 @@ private:
     vkw::Queue computeQueue;
     vkw::CommandPool computeCommandPool;
     vkw::PrimaryCommandBuffer computeCommandBuffer;
-    vkw::Semaphore computeImageReady;
-    vkw::Semaphore computeImageRelease;
+    std::shared_ptr<vkw::Semaphore> computeImageReady;
+    std::shared_ptr<vkw::Semaphore> computeImageRelease;
     vkw::SubmitInfo computeSubmitInfo;
-    vkw::Fence fence;
+    std::shared_ptr<vkw::Fence> fence;
 
     WaveSettings waveSettings;
     LandSettings landSettings;

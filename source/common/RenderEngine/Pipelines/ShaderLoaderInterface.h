@@ -10,7 +10,7 @@ namespace RenderEngine{
     class MaterialLayout;
     class LightingLayout;
 
-    class ShaderLoaderInterface{
+    class ShaderLoaderInterface: public vkw::ReferenceGuard{
     public:
         virtual vkw::VertexShader const& loadVertexShader(GeometryLayout const& geometry, ProjectionLayout const& projection) = 0;
 

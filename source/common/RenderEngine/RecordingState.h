@@ -68,8 +68,8 @@ namespace RenderEngine{
         ProjectionLayout const* m_projection_layout = nullptr;
         MaterialLayout const* m_material_layout = nullptr;
         LightingLayout const* m_lighting_layout = nullptr;
-        std::reference_wrapper<vkw::CommandBuffer> m_commandBuffer;
-        std::reference_wrapper<GraphicsPipelinePool> m_pool;
+        vkw::StrongReference<vkw::CommandBuffer> m_commandBuffer;
+        vkw::StrongReference<GraphicsPipelinePool> m_pool;
     };
 }
 #endif //TESTAPP_RECORDINGSTATE_H

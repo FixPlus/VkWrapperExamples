@@ -13,7 +13,7 @@
 
 namespace TestApp{
 
-    class Fractal{
+    class Fractal: public vkw::ReferenceGuard{
     public:
 
         using ColorImage2D = vkw::Image<vkw::COLOR, vkw::I2D>;
@@ -122,7 +122,7 @@ namespace TestApp{
             vkw::Sampler m_sampler;
             vkw::Sampler m_sampler_with_mips;
             bool m_sampler_mode = false;
-            std::reference_wrapper<vkw::Device> m_device;
+            vkw::StrongReference<vkw::Device> m_device;
         } m_material;
 
         RenderEngine::LightingLayout m_offscreen_lighting_layout;
@@ -139,6 +139,8 @@ namespace TestApp{
 
             void update(FilterUBO const& ubo);
 
+            void removeTargetViews();
+
             void updateTargetViews(OffscreenBuffer& offscreenBuffer);
 
             void rewriteOffscreenTextures(OffscreenBuffer& offscreenBuffer, vkw::Device& device);
@@ -147,12 +149,12 @@ namespace TestApp{
             vkw::UniformBuffer<FilterUBO> m_buffer;
             FilterUBO* m_mapped;
             vkw::Sampler m_sampler;
-            vkw::ImageView<vkw::COLOR, vkw::V2D> m_colorTargetView;
-            vkw::ImageView<vkw::COLOR, vkw::V2D> m_depthTargetView;
-            std::reference_wrapper<vkw::Device> m_device;
+            std::unique_ptr<vkw::ImageView<vkw::COLOR, vkw::V2D>> m_colorTargetView;
+            std::unique_ptr<vkw::ImageView<vkw::COLOR, vkw::V2D>> m_depthTargetView;
+            vkw::StrongReference<vkw::Device> m_device;
         } m_filter_material;
 
-        std::reference_wrapper<vkw::Device> m_device;
+        vkw::StrongReference<vkw::Device> m_device;
     };
 
     class FractalSettings: public GUIWindow{
@@ -163,7 +165,7 @@ namespace TestApp{
     private:
         bool m_sampler_mode = false;
         bool m_fxaa_on = false;
-        std::reference_wrapper<Fractal> m_fractal;
+        vkw::StrongReference<Fractal> m_fractal;
     };
 }
 #endif //TESTAPP_FRACTAL_H

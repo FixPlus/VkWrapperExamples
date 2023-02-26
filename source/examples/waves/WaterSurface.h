@@ -53,7 +53,7 @@ private:
 
 };
 
-class WaveSurfaceTexture {
+class WaveSurfaceTexture : public vkw::ReferenceGuard{
 public:
     WaveSurfaceTexture(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, uint32_t baseCascadeSize,
                        uint32_t cascades = 1);
@@ -333,8 +333,8 @@ private:
         } m_texture_combiner;
 
         size_t cascade_size;
-        std::reference_wrapper<vkw::Device> m_device;
-        std::reference_wrapper<TestApp::PrecomputeImageLayout> m_layout;
+        vkw::StrongReference<vkw::Device> m_device;
+        vkw::StrongReference<TestApp::PrecomputeImageLayout> m_layout;
     public:
         DynamicSpectrumTextures &spectrum() {
             return m_dynamic_spectrum;
@@ -352,7 +352,7 @@ private:
     UBO* m_scales_buffer_mapped;
 
     std::vector<WaveSurfaceTextureCascade> m_cascades;
-    std::reference_wrapper<vkw::Device> m_device;
+    vkw::StrongReference<vkw::Device> m_device;
     vkw::UniformBuffer<DynamicSpectrumParams> m_dyn_params;
     DynamicSpectrumParams *m_dyn_params_mapped;
     FFT m_fft;
@@ -433,7 +433,7 @@ class WaveSettings : public TestApp::GridSettings {
 public:
 
     WaveSettings(TestApp::GUIFrontEnd &gui, WaterSurface &water, WaveSurfaceTexture &texture,
-                 std::map<std::string, std::reference_wrapper<WaterMaterial>> materials);
+                 std::map<std::string, vkw::StrongReference<WaterMaterial>> materials);
 
     WaterMaterial &pickedMaterial() const {
         return m_materials.at(m_materialNames.at(m_pickedMaterial));
@@ -460,9 +460,10 @@ private:
     float m_wind_speed = 100.0f;
     float m_fetch = 100000.0f;
     bool m_need_update_static_spectrum = true;
-    std::reference_wrapper<WaterSurface> m_water;
-    std::reference_wrapper<WaveSurfaceTexture> m_texture;
-    std::map<std::string, std::reference_wrapper<WaterMaterial>> m_materials;
+    // TODO: rewrite to StrongReference
+    vkw::StrongReference<WaterSurface, TestApp::Grid> m_water;
+    vkw::StrongReference<WaveSurfaceTexture> m_texture;
+    std::map<std::string, vkw::StrongReference<WaterMaterial>> m_materials;
     std::vector<const char *> m_materialNames;
     int m_pickedMaterial = 0;
 
