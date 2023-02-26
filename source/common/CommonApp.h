@@ -67,7 +67,6 @@ protected:
         return m_current_surface_extents;
     }
 
-    void clearPipelinePool();
     vkw::RenderPass& onScreenPass();
 
     void attachGUI(GUIBackend* gui);
@@ -80,7 +79,7 @@ protected:
 
     virtual void preMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool) {}
 
-    virtual void onMainPass(RenderEngine::GraphicsRecordingState& recorder) {}
+    virtual void onMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsRecordingState& recorder) {}
 
     virtual void afterMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool) {}
 

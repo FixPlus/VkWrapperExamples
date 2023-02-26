@@ -77,7 +77,7 @@ protected:
         m_fractal.drawOffscreen(buffer, pool);
     }
 
-    void onMainPass(RenderEngine::GraphicsRecordingState& recorder) override{
+    void onMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsRecordingState& recorder) override{
         m_fractal.draw(recorder);
     }
 

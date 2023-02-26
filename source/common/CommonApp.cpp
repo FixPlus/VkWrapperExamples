@@ -8,6 +8,7 @@
 #include <vkw/Fence.hpp>
 #include "AssetPath.inc"
 #include "RenderEngine/Window/Boxer.h"
+#include <iostream>
 
 namespace TestApp{
 
@@ -31,6 +32,46 @@ private:
     vkw::StrongReference<vkw::Surface> m_surface;
 };
 
+class CommonValidation: public vkw::debug::Validation{
+public:
+
+    CommonValidation(vkw::Instance const&instance):vkw::debug::Validation(instance){}
+
+    void onValidationMessage(vkw::debug::MsgSeverity severity,
+                             vkw::debug::Validation::Message const &message) override {
+        std::string prefix;
+        switch(severity){
+            case vkw::debug::MsgSeverity::Error:
+                prefix = "ERROR: ";
+                break;
+            case vkw::debug::MsgSeverity::Warning:
+                prefix = "WARNING: ";
+                break;
+            case vkw::debug::MsgSeverity::Info:
+                prefix = "INFO: ";
+                break;
+            case vkw::debug::MsgSeverity::Verbose:
+                prefix = "VERBOSE: ";
+                break;
+        }
+
+        std::stringstream debugMessage;
+        debugMessage << prefix << "[" << message.id << "]["
+                     << message.name
+                     << "] : " << message.what;
+        std::cout << debugMessage.str() << std::endl;
+        fflush(stdout);
+    }
+
+    void onPerformanceMessage(vkw::debug::MsgSeverity severity,
+                                      vkw::debug::Validation::Message const &message) override{
+        onValidationMessage(severity, message);
+    }
+
+    void onGeneralMessage(vkw::debug::MsgSeverity severity, vkw::debug::Validation::Message const &message) override{
+        onValidationMessage(severity, message);
+    }
+};
 
 struct CommonApp::InternalState{
 
@@ -42,8 +83,6 @@ struct CommonApp::InternalState{
             renderComplete(device),
             presentComplete(device),
             fence(device),
-            pipelinePool(device, shaderLoader),
-            recordingState(mainBuffer, pipelinePool),
             submitInfo(mainBuffer, presentComplete, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                        renderComplete){
 
@@ -81,8 +120,7 @@ struct CommonApp::InternalState{
     vkw::Semaphore renderComplete;
     vkw::Semaphore presentComplete;
     vkw::Fence fence;
-    RenderEngine::GraphicsPipelinePool pipelinePool;
-    RenderEngine::GraphicsRecordingState recordingState;
+
     vkw::SubmitInfo submitInfo;
     SwapChainWithFramebuffers *swapChain = nullptr;
     std::vector<std::pair<std::shared_ptr<vkw::Semaphore>, VkPipelineStageFlags>> externalDeps;
@@ -124,7 +162,7 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
     std::optional<vkw::debug::Validation> validation;
 
     if(validationPossible)
-        m_validation = std::make_unique<vkw::debug::Validation>(instance());
+        m_validation = std::make_unique<CommonValidation>(instance());
     auto devs = instance().enumerateAvailableDevices();
 
 
@@ -172,7 +210,12 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
         m_window->setContext(*gui);
     }
 
-    void CommonApp::run() try{
+    void CommonApp::run() {
+        RenderEngine::GraphicsPipelinePool pipelinePool{device(), shaderLoader()};
+        RenderEngine::GraphicsRecordingState recordingState{m_internal().mainBuffer, pipelinePool};
+        auto customDel = [](vkw::Device* device){ device->waitIdle();};
+        auto deviceKeeper = std::unique_ptr<vkw::Device, decltype(customDel)>(&device(), customDel);
+
         m_current_surface_extents = surface().getSurfaceCapabilities(physDevice()).currentExtent;
         auto& extents = m_current_surface_extents;
 
@@ -186,6 +229,7 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
                 firstEncounter = false;
 
             window().update();
+            recordingState.reset();
             onPollEvents();
 
             if (extents.width == 0 || extents.height == 0){
@@ -245,10 +289,10 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
 
             auto& commandBuffer = m_internal().mainBuffer;
             commandBuffer.begin(0);
-            auto &recorder = m_internal().recordingState;
+            auto &recorder = recordingState;
             recorder.reset();
 
-            preMainPass(commandBuffer, m_internal().pipelinePool);
+            preMainPass(commandBuffer, pipelinePool);
             auto currentImage = swapChain().currentImage();
 
             auto &fb = m_internal().framebuffers.at(currentImage);
@@ -260,13 +304,13 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
             commandBuffer.setViewports({&viewport, 1}, 0);
             commandBuffer.setScissors({&scissor, 1}, 0);
 
-            onMainPass(recorder);
+            onMainPass(commandBuffer, recorder);
             if(m_gui)
                 m_gui->draw(recorder);
 
             commandBuffer.endRenderPass();
 
-            afterMainPass(commandBuffer, m_internal().pipelinePool);
+            afterMainPass(commandBuffer, pipelinePool);
 
             commandBuffer.end();
 
@@ -281,9 +325,6 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
         m_internal().waitForFences();
 
         device().waitIdle();
-        m_internal().pipelinePool.clear();
-    } catch(...){
-        m_internal().pipelinePool.clear();
     }
 
     void CommonApp::addMainPassDependency(std::shared_ptr<vkw::Semaphore> waitFor, VkPipelineStageFlags stage) {
@@ -302,9 +343,5 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
 
     void CommonApp::addFrameFence(std::shared_ptr<vkw::Fence> fence) {
         m_internal().externalFences.emplace_back(fence);
-    }
-
-    void CommonApp::clearPipelinePool() {
-        m_internal().pipelinePool.clear();
     }
 }

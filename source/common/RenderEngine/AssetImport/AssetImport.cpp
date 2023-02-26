@@ -8,7 +8,6 @@
 #include <vkw/CommandBuffer.hpp>
 #include <vkw/SPIRVModule.hpp>
 #include <cstring>
-#include <iostream>
 #include <array>
 
 bool RenderEngine::AssetImporterBase::try_open(const std::string &filename) const {

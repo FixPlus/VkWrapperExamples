@@ -174,7 +174,7 @@ protected:
         shadow.execute(buffer, recorder);
     }
 
-    void onMainPass(RenderEngine::GraphicsRecordingState& recorder) override{
+    void onMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsRecordingState& recorder) override{
         skybox.draw(recorder);
         globals.bind(recorder);
         recorder.setMaterial(texturedSurface.get());

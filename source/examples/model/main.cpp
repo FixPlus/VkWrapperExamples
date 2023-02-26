@@ -87,7 +87,8 @@ public:
                 skybox(device(), onScreenPass(), 0, shaderLoader()),
                 globalState{device(), onScreenPass(), 0, window().camera(), shadowPass, skybox},
                 skyboxSettings(*gui, skybox, "Sky box"),
-                defaultTextures(device()){
+                defaultTextures(device()),
+                modelPipelinePool(device(), shaderLoader()){
         modelList = listAvailableModels("data/models");
 
         std::transform(modelList.begin(), modelList.end(), std::back_inserter(modelListString),
@@ -136,7 +137,7 @@ public:
                 }
                 instance.reset();
                 instances.clear();
-                clearPipelinePool();
+                modelPipelinePool.clear();
                 model.reset();
                 model = std::make_unique<GLTFModel>(device(), defaultTextures, modelList.at(current_model));
                 instance = std::make_unique<GLTFModelInstance>(model->createNewInstance());
@@ -174,24 +175,25 @@ public:
     }
 
 protected:
-    virtual void preMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool) {
-        RenderEngine::GraphicsRecordingState recorder{buffer, pool};
+    void preMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsPipelinePool& pool) override{
+        RenderEngine::GraphicsRecordingState recorder{buffer, modelPipelinePool};
         shadowPass.execute(buffer, recorder);
     }
 
-    virtual void onMainPass(RenderEngine::GraphicsRecordingState& recorder) {
+    void onMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsRecordingState& recorder) override{
+        RenderEngine::GraphicsRecordingState localRecorder{buffer, modelPipelinePool};
         skybox.draw(recorder);
 
-        globalState.bind(recorder);
+        globalState.bind(localRecorder);
 
-        instance->draw(recorder);
+        instance->draw(localRecorder);
 
         for(auto& inst: instances)
-            inst.draw(recorder);
+            inst.draw(localRecorder);
 
     }
 
-    virtual void onPollEvents() {
+    void onPollEvents() override{
         gui->frame();
         gui->push();
         globalState.update();
@@ -214,6 +216,7 @@ private:
     std::unique_ptr<GLTFModel> model;
     std::vector<GLTFModelInstance> instances;
     std::unique_ptr<GLTFModelInstance> instance;
+    RenderEngine::GraphicsPipelinePool modelPipelinePool;
     std::vector<std::filesystem::path> modelList;
     std::vector<std::string> modelListString{};
     std::vector<const char *> modelListCstr{};

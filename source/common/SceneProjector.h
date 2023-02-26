@@ -3,7 +3,6 @@
 
 #include "RenderEngine/Window/Window.h"
 #include "Camera.h"
-#include <iostream>
 #include "GUI.h"
 
 namespace TestApp {

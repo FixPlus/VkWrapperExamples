@@ -6,6 +6,7 @@
 #include "ShadowPass.h"
 #include "ErrorCallbackWrapper.h"
 #include "CommonApp.h"
+#include <iostream>
 
 using namespace TestApp;
 
@@ -169,7 +170,7 @@ protected:
                                                 VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     }
 
-    void onMainPass(RenderEngine::GraphicsRecordingState& recorder) override {
+    void onMainPass(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsRecordingState& recorder) override {
         if(!globalStateSettings.useSimpleLighting())
             skybox.draw(recorder);
 

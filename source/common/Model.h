@@ -17,7 +17,6 @@
 #include <vkw/DescriptorSet.hpp>
 #include <vkw/DescriptorPool.hpp>
 #include <vkw/Sampler.hpp>
-#include <iostream>
 #include <RenderEngine/Pipelines/PipelinePool.h>
 
 namespace TestApp {
