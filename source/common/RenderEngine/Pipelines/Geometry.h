@@ -1,7 +1,6 @@
 #ifndef TESTAPP_GEOMETRY_H
 #define TESTAPP_GEOMETRY_H
 
-#include "vkw/Common.hpp"
 #include <string>
 #include <vkw/DescriptorSet.hpp>
 #include <vkw/DescriptorPool.hpp>

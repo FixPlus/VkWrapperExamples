@@ -11,6 +11,7 @@ protected:
 };
 class LightPass: public PassBase, public vkw::RenderPass{
 public:
+    using PassBase::m_attachments;
   LightPass(vkw::Device& device, VkFormat colorFormat, VkFormat depthFormat, VkImageLayout colorLayout): vkw::RenderPass(device, m_compile_info(colorFormat, depthFormat, colorLayout)){
 
   }
@@ -20,6 +21,7 @@ private:
 
 class ShadowPass: public PassBase, public vkw::RenderPass{
 public:
+    using PassBase::m_attachments;
     ShadowPass(vkw::Device& device, VkFormat depthFormat): vkw::RenderPass(device, m_compile_info(depthFormat)){
 
     }

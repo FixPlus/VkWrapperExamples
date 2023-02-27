@@ -2,6 +2,7 @@
 #define TESTAPP_COMPUTE_H
 
 #include <vkw/Pipeline.hpp>
+#include <vkw/CommandBuffer.hpp>
 #include "RenderEngine/Pipelines/PipelineStage.h"
 #include "RenderEngine/Pipelines/ShaderLoaderInterface.h"
 

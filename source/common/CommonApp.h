@@ -3,6 +3,9 @@
 
 #include <vkw/Library.hpp>
 #include <vkw/Validation.hpp>
+#include <vkw/Semaphore.hpp>
+#include <vkw/Fence.hpp>
+#include <vkw/SwapChain.hpp>
 
 #include <SceneProjector.h>
 #include <RenderEngine/Shaders/ShaderLoader.h>

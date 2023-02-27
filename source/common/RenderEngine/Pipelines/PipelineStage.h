@@ -1,7 +1,6 @@
 #ifndef TESTAPP_PIPELINESTAGE_H
 #define TESTAPP_PIPELINESTAGE_H
 
-#include "vkw/Common.hpp"
 #include <string>
 #include <vkw/DescriptorSet.hpp>
 #include <vkw/DescriptorPool.hpp>

@@ -5,7 +5,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <optional>
 #include <vkw/VertexBuffer.hpp>
-#include <vkw/Common.hpp>
 #include <map>
 #include <vkw/Pipeline.hpp>
 #include <RenderEngine/Pipelines/PipelinePool.h>
