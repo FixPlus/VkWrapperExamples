@@ -10,6 +10,7 @@
 #include <SceneProjector.h>
 #include <RenderEngine/Shaders/ShaderLoader.h>
 #include <RenderEngine/AssetImport/AssetImport.h>
+#include "VulkanMemoryMonitor.h"
 
 #include <memory>
 
@@ -70,9 +71,9 @@ protected:
         return m_current_surface_extents;
     }
 
-    vkw::RenderPass& onScreenPass();
+    GUIFrontEnd& gui();
 
-    void attachGUI(GUIBackend* gui);
+    vkw::RenderPass& onScreenPass();
 
     void addMainPassDependency(std::shared_ptr<vkw::Semaphore> waitFor, VkPipelineStageFlags stage);
     void signalOnMainPassComplete(std::shared_ptr<vkw::Semaphore> signal);
@@ -99,6 +100,7 @@ private:
         return *m_internalState;
     }
 
+    std::unique_ptr<VulkanMemoryMonitor> m_allocator;
     std::unique_ptr<vkw::Library> m_library;
     std::unique_ptr<SceneProjector> m_window;
     std::unique_ptr<vkw::Instance> m_instance;
@@ -111,8 +113,6 @@ private:
     std::unique_ptr<RenderEngine::TextureLoader> m_textureLoader;
     std::unique_ptr<InternalState> m_internalState;
     VkExtent2D m_current_surface_extents;
-
-    GUIBackend* m_gui = nullptr;
 };
 }
 #endif //TESTAPP_COMMONAPP_H

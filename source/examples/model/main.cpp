@@ -7,61 +7,16 @@
 
 using namespace TestApp;
 
-class GUI : public GUIFrontEnd, public GUIBackend {
+class ModelTransform: public GUIWindow{
 public:
-    GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-        RenderEngine::TextureLoader const &textureLoader)
-            : GUIBackend(device, pass, subpass, textureLoader),
-              m_window(window) {
-        ImGui::SetCurrentContext(context());
-        auto &io = ImGui::GetIO();
+    ModelTransform(GUIFrontEnd& gui): GUIWindow(gui, WindowSettings{.title="Model transform"}){}
 
-        ImGuiStyle &style = ImGui::GetStyle();
-        style.Colors[ImGuiCol_TitleBg] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(1.0f, 0.0f, 0.0f, 0.1f);
-        style.Colors[ImGuiCol_MenuBarBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_Header] = ImVec4(0.8f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_HeaderActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_CheckMark] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_SliderGrab] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(1.0f, 1.0f, 1.0f, 0.1f);
-        style.Colors[ImGuiCol_FrameBgActive] = ImVec4(1.0f, 1.0f, 1.0f, 0.2f);
-        style.Colors[ImGuiCol_Button] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.6f);
-        style.Colors[ImGuiCol_ButtonActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-
-        m_updateFontTexture();
-
-        io.DisplaySize = {800, 600};
-    }
-
-    std::function<void(void)> customGui = []() {};
-
+    std::function<void(void)> gui_impl = [](){};
 protected:
-    void gui() const override {
-        ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("FPS: %.2f", m_window.get().clock().fps());
-        auto &camera = m_window.get().camera();
-        auto pos = camera.position();
-        ImGui::Text("X: %.2f, Y: %.2f, Z: %.2f,", pos.x, pos.y, pos.z);
-        ImGui::Text("(%.2f,%.2f)", camera.phi(), camera.psi());
 
-        ImGui::SliderFloat("Cam rotate inertia", &camera.rotateInertia, 0.1f, 5.0f);
-        ImGui::SliderFloat("Mouse sensitivity", &m_window.get().mouseSensitivity, 1.0f, 10.0f);
-
-        ImGui::End();
-
-        customGui();
+    void onGui() override {
+        gui_impl();
     }
-
-private:
-    // TODO: rewite to StrongReference
-    std::reference_wrapper<TestApp::SceneProjector> m_window;
-
 };
 
 std::vector<std::filesystem::path> listAvailableModels(std::filesystem::path const &root) {
@@ -83,12 +38,12 @@ class ModelApp final: public CommonApp{
 public:
     ModelApp(): CommonApp(AppCreateInfo{true, "Model"}),
                 shadowPass(device()),
-                gui(new GUI(window(), device(), onScreenPass(), 0, textureLoader())),
                 skybox(device(), onScreenPass(), 0, shaderLoader()),
                 globalState{device(), onScreenPass(), 0, window().camera(), shadowPass, skybox},
-                skyboxSettings(*gui, skybox, "Sky box"),
+                skyboxSettings(gui(), skybox, "Sky box"),
                 defaultTextures(device()),
-                modelPipelinePool(device(), shaderLoader()){
+                modelPipelinePool(device(), shaderLoader()),
+                modelTransform(gui()){
         modelList = listAvailableModels("data/models");
 
         std::transform(modelList.begin(), modelList.end(), std::back_inserter(modelListString),
@@ -114,9 +69,7 @@ public:
         instance->update();
 
 
-        gui->customGui = [this]() {
-            //ImGui::SetNextWindowSize({400.0f, 150.0f}, ImGuiCond_Once);
-            ImGui::Begin("Model", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
+        modelTransform.gui_impl = [this]() {
 
             static int current_model = 0;
             bool upd = false;
@@ -149,11 +102,6 @@ public:
                 }
             }
 
-
-            ImGui::End();
-
-            ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-
             static float splitL = window().camera().splitLambda();
             if(ImGui::SliderFloat("Split lambda", &splitL, 0.0f, 1.0f)){
                 window().camera().setSplitLambda(splitL);
@@ -162,7 +110,6 @@ public:
             if(ImGui::SliderFloat("Far clip", &farClip, window().camera().nearPlane(), window().camera().farPlane())){
                 window().camera().setFarClip(farClip);
             }
-            ImGui::End();
         };
 
         shadowPass.onPass = [this](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
@@ -171,7 +118,6 @@ public:
             for(auto& inst: instances)
                 inst.drawGeometryOnly(state);
         };
-        attachGUI(gui.get());
     }
 
 protected:
@@ -194,8 +140,6 @@ protected:
     }
 
     void onPollEvents() override{
-        gui->frame();
-        gui->push();
         globalState.update();
         shadowPass.update(window().camera(), skybox.sunDirection());
         skybox.update(window().camera());
@@ -208,7 +152,6 @@ protected:
 
 private:
     ShadowRenderPass shadowPass;
-    std::unique_ptr<GUI> gui;
     SkyBox skybox;
     GlobalLayout globalState;
     SkyBoxSettings skyboxSettings;
@@ -220,6 +163,7 @@ private:
     std::vector<std::filesystem::path> modelList;
     std::vector<std::string> modelListString{};
     std::vector<const char *> modelListCstr{};
+    ModelTransform modelTransform;
 };
 
 int runModel() {

@@ -10,63 +10,6 @@
 
 using namespace TestApp;
 
-class GUI : public GUIFrontEnd, public GUIBackend {
-public:
-    GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-        RenderEngine::TextureLoader const &textureLoader)
-            : GUIBackend(device, pass, subpass, textureLoader),
-              m_window(window) {
-        ImGui::SetCurrentContext(context());
-        auto &io = ImGui::GetIO();
-
-        ImGuiStyle &style = ImGui::GetStyle();
-        style.Colors[ImGuiCol_TitleBg] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(1.0f, 0.0f, 0.0f, 0.1f);
-        style.Colors[ImGuiCol_MenuBarBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_Header] = ImVec4(0.8f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_HeaderActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_CheckMark] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_SliderGrab] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(1.0f, 1.0f, 1.0f, 0.1f);
-        style.Colors[ImGuiCol_FrameBgActive] = ImVec4(1.0f, 1.0f, 1.0f, 0.2f);
-        style.Colors[ImGuiCol_Button] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.6f);
-        style.Colors[ImGuiCol_ButtonActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-
-        m_updateFontTexture();
-
-        io.DisplaySize = {800, 600};
-    }
-
-    std::function<void(void)> customGui = []() {};
-
-protected:
-    void gui() const override {
-        ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("FPS: %.2f", m_window.get().clock().fps());
-        auto &camera = m_window.get().camera();
-        auto pos = camera.position();
-        ImGui::Text("X: %.2f, Y: %.2f, Z: %.2f,", pos.x, pos.y, pos.z);
-        ImGui::Text("(%.2f,%.2f)", camera.phi(), camera.psi());
-
-        ImGui::SliderFloat("Cam rotate inertia", &camera.rotateInertia, 0.1f, 5.0f);
-        ImGui::SliderFloat("Mouse sensitivity", &m_window.get().mouseSensitivity, 1.0f, 10.0f);
-
-        ImGui::End();
-
-        customGui();
-    }
-
-private:
-    // TODO: rewrite to StrongReference
-    std::reference_wrapper<TestApp::SceneProjector> m_window;
-
-};
-
 class WavesApp final: public CommonApp{
 public:
     WavesApp(): CommonApp(AppCreateInfo{false, "Waves", [](auto& i){}, [](vkw::PhysicalDevice& device){
@@ -86,11 +29,11 @@ public:
             throw std::runtime_error("Device does not have dedicated compute queue family");
 
         dedicatedComputeFamily->requestQueue();
-    }}), gui(window(), device(), onScreenPass(), 0, textureLoader()),
+    }}),
                 shadowPass(device()),
                 skybox(device(), onScreenPass(), 0, shaderLoader()),
                 globalState(device(), onScreenPass(), 0, window().camera(), shadowPass, skybox),
-                globalStateSettings(gui, globalState),
+                globalStateSettings(gui(), globalState),
                 waveSurfaceTexture(device(), shaderLoader(), 256, 3),
                 waves(device(), waveSurfaceTexture),
                 waveMaterial(device(), waveSurfaceTexture),
@@ -106,13 +49,12 @@ public:
                 computeImageRelease(std::make_shared<vkw::Semaphore>(device())),
                 computeSubmitInfo(computeCommandBuffer, *computeImageRelease, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, *computeImageReady),
                 fence(std::make_shared<vkw::Fence>(device())),
-                waveSettings(gui, waves, waveSurfaceTexture,
+                waveSettings(gui(), waves, waveSurfaceTexture,
                              {{"solid", waveMaterial}, {"wireframe", waveMaterialWireframe}}),
-                landSettings(gui, land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}),
-                skyboxSettings(gui, skybox, "Skybox")
+                landSettings(gui(), land, {{"solid", landMaterial}, {"wireframe", landMaterialWireframe}}),
+                skyboxSettings(gui(), skybox, "Skybox")
 
     {
-        attachGUI(&gui);
         skybox.update(window().camera());
         skybox.recomputeOutScatter();
 
@@ -127,7 +69,8 @@ public:
             if (landSettings.enabled())
                 land.draw(state, globalState.camera().position(), camera);
         };
-
+        // TODO: enable it
+#if 0
         gui.customGui = [this]() {
             ImGui::Begin("Globals", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
             static float splitL = window().camera().splitLambda();
@@ -141,7 +84,7 @@ public:
             }
             ImGui::End();
         };
-
+#endif
         // Prerecord compute command buffer
         computeCommandBuffer.begin(0);
         waveSurfaceTexture.acquireOwnership(computeCommandBuffer, mainPassQueueFamilyIndex(),
@@ -195,8 +138,6 @@ protected:
 
     void onFramebufferResize() override {};
     void onPollEvents() override {
-        gui.frame();
-        gui.push();
         globalState.update();
         skybox.update(window().camera());
         waveSurfaceTexture.update(window().clock().frameTime());
@@ -218,12 +159,12 @@ protected:
         }
     }
 
+
     void postSubmit() override{
         computeQueue.submit(computeSubmitInfo, *fence);
     }
 
 private:
-    GUI gui;
     ShadowRenderPass shadowPass;
     SkyBox skybox;
     GlobalLayout globalState;

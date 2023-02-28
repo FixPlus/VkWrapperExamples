@@ -155,7 +155,7 @@ namespace TestApp {
 
     protected:
 
-        virtual void gui() const = 0;
+        virtual void gui() const { };
 
     private:
         friend class GUIWindow;

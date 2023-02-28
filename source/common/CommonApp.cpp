@@ -12,6 +12,68 @@
 
 namespace TestApp{
 
+class GUI : public GUIFrontEnd, public GUIBackend {
+public:
+    GUI(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
+        RenderEngine::TextureLoader const &textureLoader)
+            : GUIBackend(device, pass, subpass, textureLoader) {
+        ImGui::SetCurrentContext(context());
+        auto &io = ImGui::GetIO();
+
+        ImGuiStyle &style = ImGui::GetStyle();
+        style.Colors[ImGuiCol_TitleBg] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(1.0f, 0.0f, 0.0f, 0.1f);
+        style.Colors[ImGuiCol_MenuBarBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_Header] = ImVec4(0.8f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_HeaderActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.8f);
+        style.Colors[ImGuiCol_CheckMark] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
+        style.Colors[ImGuiCol_SliderGrab] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
+        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(1.0f, 1.0f, 1.0f, 0.1f);
+        style.Colors[ImGuiCol_FrameBgActive] = ImVec4(1.0f, 1.0f, 1.0f, 0.2f);
+        style.Colors[ImGuiCol_Button] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
+        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.6f);
+        style.Colors[ImGuiCol_ButtonActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
+
+        m_updateFontTexture();
+
+        io.DisplaySize = {800, 600};
+    }
+
+};
+
+class ApplicationStatistics: public GUIWindow{
+public:
+    ApplicationStatistics(GUIFrontEnd& gui, TestApp::SceneProjector& window, VulkanMemoryMonitor const& monitor):
+    GUIWindow(gui, WindowSettings{.title="Application stat", .autoSize=true}), m_window(window), m_monitor(monitor){
+
+    }
+
+protected:
+    void onGui() override{
+        ImGui::Text("FPS: %.2f", m_window.get().clock().fps());
+        ImGui::Text("vk mem: %lluK; a:%llu; r:%llu; f:%llu", m_monitor.get().totalHostMemory() / 1000,
+                    m_monitor.get().totalAllocations(),
+                    m_monitor.get().totalReallocations(),
+                    m_monitor.get().totalFrees());
+        auto &camera = m_window.get().camera();
+        auto pos = camera.position();
+        ImGui::Text("X: %.2f, Y: %.2f, Z: %.2f,", pos.x, pos.y, pos.z);
+        ImGui::Text("(%.2f,%.2f)", camera.phi(), camera.psi());
+
+        ImGui::SliderFloat("Cam rotate inertia", &camera.rotateInertia, 0.1f, 5.0f);
+        ImGui::SliderFloat("Mouse sensitivity", &m_window.get().mouseSensitivity, 1.0f, 10.0f);
+        ImGui::SliderFloat("Camera speed", &m_window.get().camera().force, 20.0f, 1000.0f);
+    }
+private:
+    // TODO: rewite to StrongReference
+    std::reference_wrapper<TestApp::SceneProjector> m_window;
+    vkw::StrongReference<VulkanMemoryMonitor const> m_monitor;
+};
+
 class SwapChainWithFramebuffers: public SwapChainImpl{
 public:
     SwapChainWithFramebuffers(vkw::Device &device, vkw::Surface& surface): SwapChainImpl(device, surface, true), m_device(device), m_surface(surface){
@@ -126,6 +188,8 @@ struct CommonApp::InternalState{
     std::vector<std::pair<std::shared_ptr<vkw::Semaphore>, VkPipelineStageFlags>> externalDeps;
     std::vector<std::shared_ptr<vkw::Semaphore>> externalSignals;
     std::vector<std::shared_ptr<vkw::Fence>> externalFences;
+    std::unique_ptr<GUI> gui;
+    std::unique_ptr<ApplicationStatistics> appStat;
 };
 
 CommonApp::CommonApp(AppCreateInfo const& createInfo) {
@@ -134,7 +198,9 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
     });
     m_window = std::make_unique<TestApp::SceneProjector>(800, 600, createInfo.applicationName.data());
 
-    m_library = std::make_unique<vkw::Library>();
+    m_allocator = std::make_unique<VulkanMemoryMonitor>();
+
+    m_library = std::make_unique<vkw::Library>(nullptr, m_allocator.get());
 
     auto validationPossible = library().hasLayer(vkw::layer::KHRONOS_validation);
 
@@ -197,17 +263,16 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
     assert(m_internalState->swapChain && "You messed up with types");
 
     m_current_surface_extents = surface().getSurfaceCapabilities(physDevice()).currentExtent;
+
+    m_internal().gui = std::make_unique<GUI>(device(), m_internal().pass, 0, textureLoader());
+    window().setContext(*m_internal().gui);
+    m_internal().appStat = std::make_unique<ApplicationStatistics>(gui(), window(), *m_allocator);
 }
 
     CommonApp::~CommonApp() = default;
 
     vkw::RenderPass &CommonApp::onScreenPass() {
         return m_internalState->pass;
-    }
-
-    void CommonApp::attachGUI(GUIBackend *gui) {
-        m_gui = gui;
-        m_window->setContext(*gui);
     }
 
     void CommonApp::run() {
@@ -231,6 +296,8 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
             window().update();
             recordingState.reset();
             onPollEvents();
+            m_internal().gui->frame();
+            m_internal().gui->push();
 
             if (extents.width == 0 || extents.height == 0){
                 extents = surface().getSurfaceCapabilities(physDevice()).currentExtent;
@@ -305,8 +372,8 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
             commandBuffer.setScissors({&scissor, 1}, 0);
 
             onMainPass(commandBuffer, recorder);
-            if(m_gui)
-                m_gui->draw(recorder);
+
+            m_internal().gui->draw(recorder);
 
             commandBuffer.endRenderPass();
 
@@ -343,5 +410,9 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
 
     void CommonApp::addFrameFence(std::shared_ptr<vkw::Fence> fence) {
         m_internal().externalFences.emplace_back(fence);
+    }
+
+    GUIFrontEnd& CommonApp::gui(){
+        return *m_internal().gui;
     }
 }

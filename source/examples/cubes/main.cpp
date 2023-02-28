@@ -12,63 +12,6 @@
 
 using namespace TestApp;
 
-class GUI : public GUIFrontEnd, public GUIBackend {
-public:
-    GUI(TestApp::SceneProjector &window, vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-        RenderEngine::TextureLoader const &textureLoader)
-            : GUIBackend(device, pass, subpass, textureLoader),
-              m_window(window) {
-        ImGui::SetCurrentContext(context());
-        auto &io = ImGui::GetIO();
-
-        ImGuiStyle &style = ImGui::GetStyle();
-        style.Colors[ImGuiCol_TitleBg] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgActive] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-        style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(1.0f, 0.0f, 0.0f, 0.1f);
-        style.Colors[ImGuiCol_MenuBarBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_Header] = ImVec4(0.8f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_HeaderActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_HeaderHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_FrameBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_CheckMark] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_SliderGrab] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(1.0f, 1.0f, 1.0f, 0.1f);
-        style.Colors[ImGuiCol_FrameBgActive] = ImVec4(1.0f, 1.0f, 1.0f, 0.2f);
-        style.Colors[ImGuiCol_Button] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-        style.Colors[ImGuiCol_ButtonHovered] = ImVec4(1.0f, 0.0f, 0.0f, 0.6f);
-        style.Colors[ImGuiCol_ButtonActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-
-        m_updateFontTexture();
-
-        io.DisplaySize = {800, 600};
-    }
-
-    std::function<void(void)> customGui = []() {};
-
-protected:
-    void gui() const override {
-        ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("FPS: %.2f", m_window.get().clock().fps());
-        auto &camera = m_window.get().camera();
-        auto pos = camera.position();
-        ImGui::Text("X: %.2f, Y: %.2f, Z: %.2f,", pos.x, pos.y, pos.z);
-        ImGui::Text("(%.2f,%.2f)", camera.phi(), camera.psi());
-
-        ImGui::SliderFloat("Cam rotate inertia", &camera.rotateInertia, 0.1f, 5.0f);
-        ImGui::SliderFloat("Mouse sensitivity", &m_window.get().mouseSensitivity, 1.0f, 10.0f);
-
-        ImGui::End();
-
-        customGui();
-    }
-
-private:
-    // TODO: rewite to StrongReference
-    std::reference_wrapper<TestApp::SceneProjector> m_window;
-
-};
-
 class TexturedSurface {
 public:
     TexturedSurface(vkw::Device &device, RenderEngine::TextureLoader &loader, vkw::Sampler &sampler,
@@ -112,15 +55,12 @@ public:
                 shadow(device()),
                 textureSampler(device(), m_fillSamplerCI(device())),
                 skybox(device(), onScreenPass(), 0, shaderLoader()),
-                skyboxSettings(gui, skybox, "SkyBox"),
+                skyboxSettings(gui(), skybox, "SkyBox"),
                 globals(device(), onScreenPass(), 0, window().camera(), shadow, skybox),
-                globalLayoutSettings(gui, globals),
+                globalLayoutSettings(gui(), globals),
                 cubePool(device(), cubeCount),
-                texturedSurface(device(), textureLoader(), textureSampler, "image"),
-                gui{window(), device(), onScreenPass(), 0, textureLoader()}{
+                texturedSurface(device(), textureLoader(), textureSampler, "image"){
 
-
-        attachGUI(&gui);
 
         shadow.update(window().camera(), skybox.sunDirection());
 
@@ -132,7 +72,8 @@ public:
             auto scale = glm::vec3(scale_mag);
             cubes.emplace_back(cubePool, pos, scale, rotate);
         }
-
+        // TODO: enable it
+#if 0
         gui.customGui = [this]() {
             ImGui::SetNextWindowSize({300, 200}, ImGuiCond_FirstUseEver);
             ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoResize);
@@ -141,7 +82,7 @@ public:
             window().camera().setSplitLambda(splitLambda);
             ImGui::End();
         };
-
+#endif
         shadow.onPass = [this](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
             cubePool.bind(state);
             state.bindPipeline();
@@ -184,8 +125,6 @@ protected:
     }
 
     void onPollEvents() override{
-        gui.frame();
-        gui.push();
         skybox.update(window().camera());
         globals.update();
         shadow.update(window().camera(), skybox.sunDirection());
@@ -213,7 +152,6 @@ private:
         }
         return samplerCI;
     }
-    GUI gui;
     ShadowRenderPass shadow;
     vkw::Sampler textureSampler;
     SkyBox skybox;
