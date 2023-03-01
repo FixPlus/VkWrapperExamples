@@ -8,7 +8,7 @@ include_directories(external/glm)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 find_package(glfw3 3.3 REQUIRED)
-find_package(VkWrapper 1.0 REQUIRED)
+find_package(VkWrapper 2.0 REQUIRED)
 set(GLFW_LIBRARY glfw)
 
 include_directories(source)

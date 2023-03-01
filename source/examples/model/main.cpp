@@ -6,6 +6,7 @@
 #include "CommonApp.h"
 #include "AssetPath.inc"
 #include "RenderEngine/Window/Boxer.h"
+#include <cwchar>
 
 using namespace TestApp;
 
@@ -21,19 +22,19 @@ protected:
     }
 };
 std::optional<std::filesystem::path> modelPath(std::filesystem::path const &modelDir){
-    auto binary_path = modelDir / "glTF-Binary";
+    auto binary_path = modelDir / L"glTF-Binary";
     if(exists(binary_path)){
         auto dirIt = std::filesystem::directory_iterator(binary_path);
-        auto foundGLB = std::ranges::find_if(dirIt, [](auto& file){ return file.path().extension() == ".glb"; });
+        auto foundGLB = std::ranges::find_if(dirIt, [](auto& file){ return file.path().extension() == L".glb"; });
         if(foundGLB != std::ranges::end(dirIt)){
             return foundGLB->path();
         }
     }
 
-    auto json_path = modelDir / "glTF";
+    auto json_path = modelDir / L"glTF";
     if(exists(json_path)){
         auto dirIt = std::filesystem::directory_iterator(json_path);
-        auto foundGLTF = std::ranges::find_if(dirIt, [](auto& file){ return file.path().extension() == ".gltf"; });
+        auto foundGLTF = std::ranges::find_if(dirIt, [](auto& file){ return file.path().extension() == L".gltf"; });
         if(foundGLTF != std::ranges::end(dirIt)){
             return foundGLTF->path();
         }
@@ -58,7 +59,7 @@ std::unique_ptr<GLTFModel> tryLoad(vkw::Device &renderer, DefaultTexturePool& po
 
     try{
         return std::make_unique<GLTFModel>(renderer, pool, path);
-    } catch (vkw::VulkanError& e){
+    } catch (std::runtime_error& e){
         std::stringstream ss;
         ss << "Error while loading " << path.filename();
         RenderEngine::Boxer::show(e.what(), ss.str(), RenderEngine::Boxer::Style::Error);
@@ -198,6 +199,8 @@ private:
 };
 
 int runModel() {
+    setlocale(LC_ALL, "en_us.utf8");
+    _wsetlocale(LC_ALL, L"en_us.utf8");
     ModelApp app{};
     app.run();
     return 0;
