@@ -4,6 +4,8 @@
 #include "SkyBox.h"
 #include "ErrorCallbackWrapper.h"
 #include "CommonApp.h"
+#include "AssetPath.inc"
+#include "RenderEngine/Window/Boxer.h"
 
 using namespace TestApp;
 
@@ -18,22 +20,52 @@ protected:
         gui_impl();
     }
 };
+std::optional<std::filesystem::path> modelPath(std::filesystem::path const &modelDir){
+    auto binary_path = modelDir / "glTF-Binary";
+    if(exists(binary_path)){
+        auto dirIt = std::filesystem::directory_iterator(binary_path);
+        auto foundGLB = std::ranges::find_if(dirIt, [](auto& file){ return file.path().extension() == ".glb"; });
+        if(foundGLB != std::ranges::end(dirIt)){
+            return foundGLB->path();
+        }
+    }
 
+    auto json_path = modelDir / "glTF";
+    if(exists(json_path)){
+        auto dirIt = std::filesystem::directory_iterator(json_path);
+        auto foundGLTF = std::ranges::find_if(dirIt, [](auto& file){ return file.path().extension() == ".gltf"; });
+        if(foundGLTF != std::ranges::end(dirIt)){
+            return foundGLTF->path();
+        }
+    }
+
+    return {};
+}
 std::vector<std::filesystem::path> listAvailableModels(std::filesystem::path const &root) {
     if (!exists(root))
         return {};
     std::vector<std::filesystem::path> ret{};
     for (const auto &entry: std::filesystem::directory_iterator(root)) {
-        auto &entry_path = entry.path();
-        if (entry_path.has_extension()) {
-            if (entry_path.extension() == ".gltf" || entry_path.extension() == ".glb") {
-                ret.emplace_back(entry_path);
-            }
-        }
+        if(!entry.is_directory())
+            continue;
+        auto entryFile = modelPath(entry.path());
+        if(entryFile)
+            ret.push_back(entryFile.value());
     }
     return ret;
 }
+std::unique_ptr<GLTFModel> tryLoad(vkw::Device &renderer, DefaultTexturePool& pool, std::filesystem::path const &path){
 
+    try{
+        return std::make_unique<GLTFModel>(renderer, pool, path);
+    } catch (vkw::VulkanError& e){
+        std::stringstream ss;
+        ss << "Error while loading " << path.filename();
+        RenderEngine::Boxer::show(e.what(), ss.str(), RenderEngine::Boxer::Style::Error);
+    }
+
+    return nullptr;
+}
 class ModelApp final: public CommonApp{
 public:
     ModelApp(): CommonApp(AppCreateInfo{true, "Model"}),
@@ -44,7 +76,7 @@ public:
                 defaultTextures(device()),
                 modelPipelinePool(device(), shaderLoader()),
                 modelTransform(gui()){
-        modelList = listAvailableModels("data/models");
+        modelList = listAvailableModels(EXAMPLE_GLTF_PATH);
 
         std::transform(modelList.begin(), modelList.end(), std::back_inserter(modelListString),
                        [](std::filesystem::path const &path) {
@@ -55,23 +87,30 @@ public:
                            return name.c_str();
                        });
         if (modelList.empty()) {
-            throw std::runtime_error("No GLTF model files found in data/models");
+            std::stringstream ss;
+            ss << "No GLTF model files found in " << EXAMPLE_GLTF_PATH;
+            throw std::runtime_error(ss.str());
+        }
+
+        int loadedModel = 0;
+        for(auto& modelPath: modelList){
+            model = tryLoad(device(), defaultTextures, modelPath);
+            if(model)
+                break;
+            loadedModel++;
+        }
+        if(loadedModel == modelList.size()){
+            throw std::runtime_error("Failed to load any GLTF model");
         }
 
         model = std::make_unique<GLTFModel>(device(), defaultTextures, modelList.front());
-        instances.reserve(100);
-        for(int i = 0; i < 100; ++i){
-            auto& inst = instances.emplace_back(model->createNewInstance());
-            inst.translation = glm::vec3((float)(i % 10) * 5.0f, -10.0f, (float)(i / 10) * 5.0f);
-            inst.update();
-        }
         instance = std::make_unique<GLTFModelInstance>(model->createNewInstance());
         instance->update();
 
 
-        modelTransform.gui_impl = [this]() {
+        modelTransform.gui_impl = [this, loadedModel]() {
 
-            static int current_model = 0;
+            static int current_model = loadedModel;
             bool upd = false;
             upd = ImGui::SliderFloat("rot x", &instance->rotation.x, -180.0f, 180.0f) | upd;
             upd = ImGui::SliderFloat("rot y", &instance->rotation.y, -180.0f, 180.0f) | upd;
@@ -83,23 +122,23 @@ public:
             if (upd)
                 instance->update();
 
+            auto oldSelect = current_model;
             if (ImGui::Combo("models", &current_model, modelListCstr.data(), modelListCstr.size())) {
                 {
                     // hack to get instance destroyed
                     auto dummy = std::move(instance);
                 }
                 instance.reset();
-                instances.clear();
                 modelPipelinePool.clear();
-                model.reset();
-                model = std::make_unique<GLTFModel>(device(), defaultTextures, modelList.at(current_model));
+                auto expectModel = tryLoad(device(), defaultTextures, modelList.at(current_model));
+                if(!expectModel){
+                    current_model = oldSelect;
+                } else{
+                    model.reset();
+                    model = std::move(expectModel);
+                }
                 instance = std::make_unique<GLTFModelInstance>(model->createNewInstance());
                 instance->update();
-                for(int i = 0; i < 100; ++i){
-                    auto& inst = instances.emplace_back(model->createNewInstance());
-                    inst.translation = glm::vec3((float)(i % 10) * 5.0f, -10.0f, (float)(i / 10) * 5.0f);
-                    inst.update();
-                }
             }
 
             static float splitL = window().camera().splitLambda();
@@ -114,9 +153,6 @@ public:
 
         shadowPass.onPass = [this](RenderEngine::GraphicsRecordingState& state, const Camera& camera){
             instance->drawGeometryOnly(state);
-
-            for(auto& inst: instances)
-                inst.drawGeometryOnly(state);
         };
     }
 
@@ -133,10 +169,6 @@ protected:
         globalState.bind(localRecorder);
 
         instance->draw(localRecorder);
-
-        for(auto& inst: instances)
-            inst.draw(localRecorder);
-
     }
 
     void onPollEvents() override{
@@ -157,7 +189,6 @@ private:
     SkyBoxSettings skyboxSettings;
     TestApp::DefaultTexturePool defaultTextures;
     std::unique_ptr<GLTFModel> model;
-    std::vector<GLTFModelInstance> instances;
     std::unique_ptr<GLTFModelInstance> instance;
     RenderEngine::GraphicsPipelinePool modelPipelinePool;
     std::vector<std::filesystem::path> modelList;

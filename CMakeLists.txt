@@ -17,6 +17,7 @@ add_subdirectory(external)
 add_subdirectory(source)
 
 set(EXAMPLE_ASSET_PATH "./data")
+set(EXAMPLE_GLTF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/gltf-samples/2.0/")
 
 configure_file(source/common/AssetPath.inc.in AssetPath.inc)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/source/data/shaders)
