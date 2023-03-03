@@ -21,7 +21,6 @@ namespace TestApp{
 
         SwapChainImpl(SwapChainImpl&& another) noexcept:
             vkw::SwapChain(std::move(another)),
-            m_images(std::move(another.m_images)),
             m_image_views(std::move(another.m_image_views)),
             m_surface(another.m_surface),
             m_depth_view(another.m_depth_view.release())
@@ -33,7 +32,6 @@ namespace TestApp{
         SwapChainImpl& operator=(SwapChainImpl&& another) noexcept{
             vkw::SwapChain::operator=(std::move(another));
             m_image_views = std::move(another.m_image_views);
-            m_images = std::move(another.m_images);
             if(another.m_depth.has_value())
                 m_depth.emplace(std::move(another.m_depth.value()));
             std::swap(m_depth_view, another.m_depth_view);
@@ -42,9 +40,6 @@ namespace TestApp{
             return *this;
         }
     private:
-
-
-        boost::container::small_vector<vkw::SwapChainImage, 3> m_images;
         boost::container::small_vector<vkw::ImageView<vkw::COLOR, vkw::V2DA>, 3> m_image_views;
 
         std::optional<vkw::Image<vkw::DEPTH, vkw::I2D, vkw::SINGLE>> m_depth{};

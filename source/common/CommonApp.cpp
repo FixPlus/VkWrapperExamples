@@ -305,33 +305,33 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
                 continue;
             }
 
-            try {
-                swapChain().acquireNextImage(m_internal().presentComplete, 1000);
-            } catch (vkw::VulkanError &e) {
-                if (e.result() == VK_ERROR_OUT_OF_DATE_KHR) {
+            auto acquireResult = swapChain().acquireNextImage(m_internal().presentComplete, 1000);
+            if(acquireResult == vkw::SwapChain::AcquireStatus::TIMEOUT)
+                continue;
+            if(acquireResult == vkw::SwapChain::AcquireStatus::OUT_OF_DATE ||
+               acquireResult == vkw::SwapChain::AcquireStatus::SUBOPTIMAL
+            ) {
 
-                    extents = surface().getSurfaceCapabilities(physDevice()).currentExtent;
-                    firstEncounter = true;
+                extents = surface().getSurfaceCapabilities(physDevice()).currentExtent;
+                firstEncounter = true;
 
-                    // can't create a new framebuffer if surface is practically empty
-                    if (extents.width == 0 || extents.height == 0)
-                        continue;
-
-                    m_internal().framebuffers.clear();
-                    m_swapChain.reset();
-                    m_internal().swapChain = new TestApp::SwapChainWithFramebuffers{device(), surface()};
-                    m_internal().swapChain->createFrameBuffers(m_internalState->pass, m_internal().framebuffers);
-                    m_swapChain.reset(m_internal().swapChain);
-
-
-                    onFramebufferResize();
-
-                    firstEncounter = true;
-
+                // can't create a new framebuffer if surface is practically empty
+                if (extents.width == 0 || extents.height == 0)
                     continue;
-                } else {
-                    throw;
-                }
+
+                m_internal().framebuffers.clear();
+                m_swapChain.reset();
+                m_internal().swapChain = new TestApp::SwapChainWithFramebuffers{device(), surface()};
+                m_internal().swapChain->createFrameBuffers(m_internalState->pass, m_internal().framebuffers);
+                m_swapChain.reset(m_internal().swapChain);
+
+
+                onFramebufferResize();
+
+                firstEncounter = true;
+
+                continue;
+
             }
 
             std::array<VkClearValue, 2> values{};

@@ -16,7 +16,7 @@ public:
     auto totalFrees() const{ return m_totalFrees; }
 protected:
     void *allocate(size_t size, size_t alignment,
-                           VkSystemAllocationScope scope) override{
+                           VkSystemAllocationScope scope) noexcept override {
         auto* allocated = vkw::HostAllocator::allocate(size, alignment, scope);
         m_allocations_track.emplace(allocated, size);
         m_totalHostMemory += size;
@@ -25,7 +25,7 @@ protected:
     }
 
     virtual void *reallocate(void *original, size_t size, size_t alignment,
-                             VkSystemAllocationScope scope) override{
+                             VkSystemAllocationScope scope) noexcept override{
         auto* reallocated = vkw::HostAllocator::reallocate(original, size, alignment, scope);
         auto entry = m_allocations_track.extract(original);
         m_totalHostMemory -= entry.mapped();
@@ -35,7 +35,7 @@ protected:
         return reallocated;
     }
 
-    virtual void free(void *memory) override{
+    virtual void free(void *memory) noexcept override{
         vkw::HostAllocator::free(memory);
         if(!memory)
             return;

@@ -11,11 +11,11 @@
 namespace TestApp{
     SwapChainImpl::SwapChainImpl(vkw::Device &device, vkw::Surface &surface, bool createDepthBuffer, bool vsync) :
     vkw::SwapChain(device, compileInfo(device, surface, vsync)),
-    m_surface(surface), m_images(retrieveImages()) {
+    m_surface(surface) {
 
             std::vector<VkImageMemoryBarrier> transitLayouts;
 
-            for (auto &image: m_images) {
+            for (auto &image: images()) {
                 VkImageMemoryBarrier transitLayout{};
                 transitLayout.image = image.vkw::NonOwingImage::operator VkImage_T *();
                 transitLayout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -59,7 +59,7 @@ namespace TestApp{
             mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
             mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
-            for (auto &image: m_images) {
+            for (auto &image: images()) {
                 m_image_views.emplace_back(device, image, image.format(), 0u, 1u, 0u, 1u, mapping);
             }
 
