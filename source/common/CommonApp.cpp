@@ -220,6 +220,8 @@ CommonApp::CommonApp(AppCreateInfo const& createInfo) {
         instanceCreateInfo.requestLayer(vkw::layer::KHRONOS_validation);
         instanceCreateInfo.requestExtension(vkw::ext::EXT_debug_utils);
     }
+    instanceCreateInfo.applicationName = createInfo.applicationName.data();
+    instanceCreateInfo.engineName = "Common test engine";
 
     createInfo.amendInstanceCreateInfo(instanceCreateInfo);
 
