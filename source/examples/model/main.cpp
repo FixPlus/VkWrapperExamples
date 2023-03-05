@@ -200,7 +200,9 @@ private:
 
 int runModel() {
     setlocale(LC_ALL, "en_us.utf8");
+#ifdef _MSC_VER
     _wsetlocale(LC_ALL, L"en_us.utf8");
+#endif
     ModelApp app{};
     app.run();
     return 0;

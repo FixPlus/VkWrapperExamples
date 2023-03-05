@@ -730,7 +730,7 @@ TestApp::DefaultTexturePool::DefaultTexturePool(vkw::Device &device, uint32_t te
 
     for(int i = 0; i < textureDim; ++i)
         for(int j = 0; j < textureDim; ++j)
-            textureData[i * textureDim + j] = (i < textureDim / 2 && j < textureDim / 2) || (i > textureDim / 2 && j > textureDim / 2) ? 0xFFFF00FF : 0xFF000000;
+            textureData[i * textureDim + j] = (((i / 4) + (j / 4)) % 2) ? 0xFFFF00FF : 0xFF000000;
 
     stageBuffer.flush();
 
