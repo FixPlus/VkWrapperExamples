@@ -7,6 +7,8 @@
 #include <vkw/CommandBuffer.hpp>
 #include <vkw/Queue.hpp>
 #include <vkw/Image.hpp>
+#include <vkw/StagingBuffer.hpp>
+
 namespace TestApp{
 
 
@@ -56,6 +58,31 @@ namespace TestApp{
         queue.waitIdle();
 
         return ret;
+    }
+
+    template<typename T>
+    void loadUsingStaging(vkw::Device& device, vkw::UniformBuffer<T> const& buffer, T const& data){
+      vkw::StagingBuffer<T> stagingBuffer{device, {&data, 1}};
+
+      auto& queue = device.anyTransferQueue();
+
+      auto commandPool = vkw::CommandPool{device, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, queue.family().index()};
+
+      auto commandBuffer = vkw::PrimaryCommandBuffer{commandPool};
+
+      commandBuffer.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+      VkBufferCopy region{};
+
+      region.size = stagingBuffer.bufferSize();
+
+      commandBuffer.copyBufferToBuffer(stagingBuffer, buffer, {&region, 1});
+
+      commandBuffer.end();
+
+      queue.submit(vkw::SubmitInfo{commandBuffer});
+
+      queue.waitIdle();
     }
 
     vkw::Image<vkw::DEPTH, vkw::I2D, vkw::SINGLE> createDepthStencilImage(vkw::Device &device, uint32_t width, uint32_t height);

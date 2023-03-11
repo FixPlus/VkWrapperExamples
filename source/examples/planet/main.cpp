@@ -1,15 +1,15 @@
 #include "CommonApp.h"
 #include "ErrorCallbackWrapper.h"
-#include "SphereMesh.hpp"
+#include "Planet.hpp"
 
 using namespace TestApp;
-
+#if 0
 class SimpleGeometryDisplay {
 public:
   SimpleGeometryDisplay(vkw::Device &device,
                         RenderEngine::TextureLoader &textureLoader,
                         vkw::RenderPass const &pass, unsigned subpass,
-                        Camera const &camera)
+                        CameraPerspective &camera)
       : m_projection(device, camera),
         m_texture(textureLoader.loadTexture("earth_color")),
         m_sampler(device, m_getSamplerCreateInfo()),
@@ -37,6 +37,10 @@ public:
     m_lighting.update(lightDirection, lightColor);
   }
 
+  auto& camera() {
+    return m_projection.camera;
+  }
+
   bool hasWireframeMaterial() const { return m_wireframe_material.has_value(); }
 
 private:
@@ -54,7 +58,7 @@ private:
   }
   struct Projection : public RenderEngine::ProjectionLayout,
                       public RenderEngine::Projection {
-    Projection(vkw::Device &device, Camera const &camera)
+    Projection(vkw::Device &device, CameraPerspective &camera)
         : RenderEngine::
               ProjectionLayout{device,
                                RenderEngine::SubstageDescription{
@@ -80,7 +84,7 @@ private:
       ubo.flush();
     }
 
-    std::reference_wrapper<Camera const> camera;
+    std::reference_wrapper<CameraPerspective> camera;
     vkw::UniformBuffer<std::pair<glm::mat4, glm::mat4>> ubo;
   } m_projection;
   struct Material : public RenderEngine::MaterialLayout,
@@ -157,7 +161,11 @@ class SimpleGeometryDisplayOptions : public GUIWindow {
 public:
   SimpleGeometryDisplayOptions(GUIFrontEnd &gui, SimpleGeometryDisplay &handle)
       : GUIWindow(gui, WindowSettings{.title = "Scene options"}),
-        m_handle(handle) {}
+        m_handle(handle) {
+    m_farPlane = m_handle.get().camera().get().farPlane();
+    m_nearPlane = m_handle.get().camera().get().nearPlane();
+
+  }
 
   bool wireframeSelected() const { return m_wireframe; }
   bool cullingEnabled() const { return m_culling; }
@@ -176,10 +184,19 @@ protected:
     }
     ImGui::ColorEdit3("light color", &lightColor.x);
 
+    if(ImGui::SliderFloat("Far plane", &m_farPlane, 1000.0f, 100000.0f)){
+      m_handle.get().camera().get().setFarPlane(m_farPlane);
+    }
+    if(ImGui::SliderFloat("Near plane", &m_nearPlane, 0.001f, 1.0f)){
+      m_handle.get().camera().get().setNearPlane(m_nearPlane);
+    }
     m_handle.get().update(lightDirection, lightColor);
   }
 
 private:
+  float m_farPlane;
+  float m_nearPlane;
+
   bool m_wireframe = false;
   bool m_culling = false;
   glm::vec3 lightDirection = glm::vec3{1.0f, 0.0f, 0.0f};
@@ -187,6 +204,8 @@ private:
 
   std::reference_wrapper<SimpleGeometryDisplay> m_handle;
 };
+#endif
+
 class PlanetApp : public CommonApp {
 public:
   PlanetApp()
@@ -200,26 +219,33 @@ public:
                     device.enableFeature(
                         vkw::PhysicalDevice::feature::fillModeNonSolid);
                 }}),
-        m_mesh(device(), 0, false), m_meshOptions(gui(), m_mesh),
-        m_geometryDisplay(device(), textureLoader(), onScreenPass(), 0,
-                          window().camera()),
-        m_geometryDisplayOptions(gui(), m_geometryDisplay) {}
+        m_sunlight(device()), m_sunlightOptions(gui(), m_sunlight),
+        m_planetPool(device(), shaderLoader(), m_sunlight, window().camera(), onScreenPass(), 0),
+        m_sphereMeshProperties(gui(), m_planetPool.mesh()),
+        m_image(textureLoader().loadTexture("earth_color")),
+        m_planetTexture(device(), m_planetPool, m_image),
+        m_planet(m_planetPool, m_planetTexture),
+        m_planetProperties(gui(), m_planet) {}
 
 protected:
-  void onPollEvents() override { m_mesh.update(); }
+  void onPollEvents() override { m_planetPool.update(); }
   void onMainPass(vkw::PrimaryCommandBuffer &buffer,
                   RenderEngine::GraphicsRecordingState &recorder) override {
-    m_geometryDisplay.bind(recorder,
-                           m_geometryDisplayOptions.wireframeSelected(),
-                           m_geometryDisplayOptions.cullingEnabled());
-    m_mesh.draw(recorder);
+    m_planetPool.bindMesh(recorder);
+    m_planetPool.setLighting(recorder);
+    m_planet.drawSurface(recorder);
+    m_planet.drawSkyDome(recorder);
   }
 
 private:
-  SimpleSphereMesh m_mesh;
-  SimpleSphereMeshOptions m_meshOptions;
-  SimpleGeometryDisplay m_geometryDisplay;
-  SimpleGeometryDisplayOptions m_geometryDisplayOptions;
+  SunLight m_sunlight;
+  SunLightProperties m_sunlightOptions;
+  PlanetPool m_planetPool;
+  SphereMeshOptions m_sphereMeshProperties;
+  vkw::Image<vkw::COLOR, vkw::I2D> m_image;
+  PlanetTexture m_planetTexture;
+  Planet m_planet;
+  PlanetProperties m_planetProperties;
 };
 
 int runPlanet() {

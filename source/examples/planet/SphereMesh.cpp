@@ -146,10 +146,6 @@ createIcosahedron(bool inverseNormal) {
   indices.emplace_back(3);
   indices.emplace_back(5);
 
-  indices.emplace_back(0);
-  indices.emplace_back(3);
-  indices.emplace_back(5);
-
   indices.emplace_back(1);
   indices.emplace_back(6);
   indices.emplace_back(2);
@@ -384,7 +380,9 @@ void SphereMesh::remesh(unsigned subdivisions, bool inverseNormal) {
 SphereMeshOptions::SphereMeshOptions(GUIFrontEnd &gui, SphereMesh &mesh,
                                      std::string_view title)
     : GUIWindow(gui, WindowSettings{.title = std::string(title)}),
-      m_mesh(mesh) {}
+      m_mesh(mesh) {
+  mesh.remesh(m_subdivisions, m_inverseNormal);
+}
 
 void SphereMeshOptions::onGui() {
   auto oldSubdivs = m_subdivisions;

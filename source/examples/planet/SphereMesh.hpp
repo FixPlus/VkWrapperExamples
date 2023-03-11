@@ -72,7 +72,7 @@ protected:
 
 private:
   bool m_inverseNormal = false;
-  int m_subdivisions = 0;
+  int m_subdivisions = 6;
   std::reference_wrapper<SphereMesh> m_mesh;
 };
 

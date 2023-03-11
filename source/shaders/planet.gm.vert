@@ -10,11 +10,14 @@ layout (set = 0, binding = 0) uniform PrimitiveTransform{
     mat4 local;
 } transform;
 
+layout (push_constant) uniform PushConstants {
+    float preScale;
+} pushConstants;
 
 WorldVertexInfo Geometry(){
     WorldVertexInfo ret;
     ret.UVW = vec3(inUV, 0.0f);
-    ret.position = vec3(transform.local * vec4(inPos, 1.0f));
+    ret.position = vec3(transform.local * vec4(inPos * pushConstants.preScale, 1.0f));
     ret.normal = normalize(vec3(transform.local * vec4(inNormal, 0.0f)));
     ret.color = vec4(1.0f);
     return ret;
