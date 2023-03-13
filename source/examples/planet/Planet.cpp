@@ -40,11 +40,14 @@ Planet::Planet(PlanetPool &planetPool, PlanetTexture const &texture)
       m_surfaceProj(planetPool.device(), planetPool.emissiveProjLayout(),
                     m_atmosphere, planetPool.sunlight(),
                     planetPool.cameraBuffer()),
-      m_surfaceMaterial(texture), m_planetPool(planetPool) {}
+      m_surfaceMaterial(texture), m_planetPool(planetPool) {
+  update();
+}
 
 void Planet::update() {
   m_atmosphere.properties.planetRadius = properties.planetRadius;
   m_atmosphere.properties.atmosphereRadius = properties.atmosphereRadius;
+  m_atmosphere.properties.planetPosition = glm::vec4{properties.position, 1.0f};
   m_atmosphere.update();
   m_meshGeometry.update(properties);
 }
@@ -106,6 +109,9 @@ Planet::SkyDomeProjection::SkyDomeProjection(
   set().write(0, atmosphere.propertiesBuffer());
   set().write(1, sunLight.propertiesBuffer());
   set().write(2, cameraBuf);
+  set().write(3, atmosphere.outScatterTexture(),
+              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+              atmosphere.outScatterTextureSampler());
 }
 
 Planet::SurfaceProjection::SurfaceProjection(
@@ -116,12 +122,15 @@ Planet::SurfaceProjection::SurfaceProjection(
   set().write(0, atmosphere.propertiesBuffer());
   set().write(1, sunLight.propertiesBuffer());
   set().write(2, cameraBuf);
+  set().write(3, atmosphere.outScatterTexture(),
+              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+              atmosphere.outScatterTextureSampler());
 }
 
-PlanetTexture::PlanetTexture(vkw::Device &device,
-                             PlanetPool &pool,
+PlanetTexture::PlanetTexture(vkw::Device &device, PlanetPool &pool,
                              const vkw::Image<vkw::COLOR, vkw::I2D> &colorMap)
-    : RenderEngine::Material(pool.planetSurfaceMaterialLayout()), m_sampler(createDefaultSampler(device)),
+    : RenderEngine::Material(pool.planetSurfaceMaterialLayout()),
+      m_sampler(createDefaultSampler(device)),
       m_colorMap(device, colorMap, colorMap.format()) {
   set().write(0, m_colorMap, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
               m_sampler);
@@ -155,7 +164,9 @@ PlanetPool::EmissiveSurfaceProjectionLayout::EmissiveSurfaceProjectionLayout(
                vkw::DescriptorSetLayoutBinding{
                    1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                vkw::DescriptorSetLayoutBinding{
-                   2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                   2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+               vkw::DescriptorSetLayoutBinding{
+                   3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
           maxSets) {}
 
 PlanetPool::TransparentSurfaceProjectionLayout::
@@ -170,7 +181,9 @@ PlanetPool::TransparentSurfaceProjectionLayout::
                vkw::DescriptorSetLayoutBinding{
                    1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                vkw::DescriptorSetLayoutBinding{
-                   2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                   2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+               vkw::DescriptorSetLayoutBinding{
+                   3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
           maxSets) {}
 
 PlanetPool::SkyDomeMaterialLayout::SkyDomeMaterialLayout(vkw::Device &device,

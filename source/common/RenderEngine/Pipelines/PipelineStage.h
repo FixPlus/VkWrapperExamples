@@ -13,6 +13,7 @@ namespace RenderEngine{
         std::string shaderSubstageName;
         boost::container::small_vector<vkw::DescriptorSetLayoutBinding, 3> setBindings;
         boost::container::small_vector<VkPushConstantRange, 3> pushConstants;
+        boost::container::small_vector<std::string, 2> additionalShaderFiles;
     };
 
     class PipelineStageBase;

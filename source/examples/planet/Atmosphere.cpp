@@ -1,9 +1,25 @@
 #include "Atmosphere.hpp"
 #include <vkw/Queue.hpp>
 #include <vkw/StagingBuffer.hpp>
+#include "Utils.h"
 
 namespace TestApp {
 
+vkw::Sampler createSampler(vkw::Device& device) {
+  VkSamplerCreateInfo createInfo{};
+  createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  createInfo.pNext = nullptr;
+  createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  createInfo.magFilter = VK_FILTER_NEAREST;
+  createInfo.minFilter = VK_FILTER_NEAREST;
+  createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  createInfo.anisotropyEnable = false;
+  createInfo.minLod = 0.0f;
+  createInfo.maxLod = 1;
+  return vkw::Sampler(device, createInfo);
+}
 Atmosphere::OutScatterTexture::OutScatterTexture(
     vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
     const vkw::UniformBuffer<Properties> &atmo, uint32_t psiRate,
@@ -25,12 +41,13 @@ Atmosphere::OutScatterTexture::OutScatterTexture(
       RenderEngine::ComputeLayout(
           device, shaderLoader,
           RenderEngine::SubstageDescription{
-              .shaderSubstageName = "atmosphere_outscatter",
+              .shaderSubstageName = "atmosphere_outscatter2",
               .setBindings = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
                               {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}},
           1),
       RenderEngine::Compute(static_cast<RenderEngine::ComputeLayout &>(*this)),
-      m_view(device, *this, format()) {
+      m_view(device, *this, format()),
+      m_sampler(createSampler(device)){
 
   set().write(0, atmo);
   set().writeStorageImage(1, m_view);

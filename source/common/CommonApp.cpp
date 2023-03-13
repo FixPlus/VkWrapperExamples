@@ -384,7 +384,7 @@ void CommonApp::run() {
     }
 
     std::array<VkClearValue, 2> values{};
-    values.at(0).color = {0.1f, 0.0f, 0.0f, 0.0f};
+    values.at(0).color = {0.0f, 0.0f, 0.0f, 0.0f};
     values.at(1).depthStencil.depth = 1.0f;
     values.at(1).depthStencil.stencil = 0.0f;
 

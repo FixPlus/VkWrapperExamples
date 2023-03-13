@@ -56,6 +56,10 @@ void SunLightProperties::onGui() {
     needUpdate = true;
   }
 
+  if(ImGui::SliderFloat("intensity", &m_sunlight.get().properties.intensity, 0.0f, 100000.0f)){
+    needUpdate = true;
+  }
+
   if(ImGui::SliderFloat("distance", &m_sunlight.get().properties.distance, 0.0f, 10000000.0f)){
     needUpdate = true;
   }

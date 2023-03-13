@@ -258,29 +258,47 @@ vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(
 }
 
 vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(
-    const std::string &geometry, const std::string &projection) const {
+    const std::string &geometry, const std::string &projection,
+    std::span<const std::string_view> additionalStages) const {
 
   std::string geom_filename = geometry + ".gm.vert.spv";
   std::string proj_filename = projection + ".pr.vert.spv";
-  auto GeometryModule = vkw::SPIRVModule{read_binary<uint32_t>(geom_filename)};
-  auto ProjectionModule =
-      vkw::SPIRVModule{read_binary<uint32_t>(proj_filename)};
-  return vkw::VertexShader{
-      m_device.get(), vkw::SPIRVModule{std::array{
-                          GeometryModule, ProjectionModule, m_general_vert}}};
+  boost::container::small_vector<vkw::SPIRVModule, 3> stages;
+
+  stages.emplace_back(read_binary<uint32_t>(geom_filename));
+  stages.emplace_back(read_binary<uint32_t>(proj_filename));
+  stages.emplace_back(m_general_vert);
+
+  std::transform(additionalStages.begin(), additionalStages.end(),
+                 std::back_inserter(stages), [this](auto &stageName) {
+                   return vkw::SPIRVModule{read_binary<uint32_t>(
+                       std::string(stageName) + ".vert.spv")};
+                 });
+
+  return vkw::VertexShader{m_device.get(), vkw::SPIRVModule{stages}};
 }
 
 vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(
-    const std::string &material, const std::string &lighting) const {
+    const std::string &material, const std::string &lighting,
+    std::span<const std::string_view> additionalStages) const {
   std::string material_filename = material + ".mt.frag.spv";
   std::string lighting_filename = lighting + ".lt.frag.spv";
   auto MaterialModule =
       vkw::SPIRVModule{read_binary<uint32_t>(material_filename)};
   auto LightingModule =
       vkw::SPIRVModule{read_binary<uint32_t>(lighting_filename)};
-  return vkw::FragmentShader{
-      m_device.get(), vkw::SPIRVModule{std::array{
-                          MaterialModule, LightingModule, m_general_frag}}};
+  boost::container::small_vector<vkw::SPIRVModule, 3> stages;
+  stages.emplace_back(read_binary<uint32_t>(material_filename));
+  stages.emplace_back(read_binary<uint32_t>(lighting_filename));
+  stages.emplace_back(m_general_frag);
+
+  std::transform(additionalStages.begin(), additionalStages.end(),
+                 std::back_inserter(stages), [this](auto &stageName) {
+                   return vkw::SPIRVModule{read_binary<uint32_t>(
+                       std::string(stageName) + ".frag.spv")};
+                 });
+
+  return vkw::FragmentShader{m_device.get(), vkw::SPIRVModule{stages}};
 }
 
 RenderEngine::ShaderImporter::ShaderImporter(vkw::Device &device,

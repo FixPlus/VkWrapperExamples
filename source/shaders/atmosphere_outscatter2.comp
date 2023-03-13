@@ -1,0 +1,71 @@
+#version 450
+
+#define PI 3.1415926
+
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0) uniform Atmosphere{
+    vec4 K; // K.xyz - scattering constants in Rayleigh scatter model for rgb chanells accrodingly, k.w - scattering constant for Mie scattering
+    vec4 params; // x - planet radius, y - atmosphere radius, z - H0: atmosphere density factor, w - g: coef for Phase Function modeling Mie scattering
+    vec4 center; // planetCenter
+    int samples;
+} atmosphere;
+
+layout (binding = 1, rgba32f) uniform image2D outscatterTexture;
+
+vec4 outScattering(float height, float psi){
+
+    vec4 ret;
+
+    float normalizedHeight = height / atmosphere.params.y;
+    ret.x = exp(-normalizedHeight / atmosphere.params.z);
+    ret.z = exp(-normalizedHeight / atmosphere.params.z);
+
+    float samples =  50; //atmosphere.samples;
+
+    vec2 P1 = vec2(atmosphere.params.x + height, 0.0f);
+    float Thetha = 0.0f;
+    float lowestPoint = 0.0f;
+    bool psiGreaterThanPI2 = psi > PI / 2.0f;
+    float outerRadius = atmosphere.params.x + atmosphere.params.y;
+    if(!psiGreaterThanPI2){
+        lowestPoint = (height + atmosphere.params.x) * sin(psi);
+        Thetha = acos(lowestPoint / outerRadius) - (PI / 2.0f - psi);
+    }
+    else {
+        lowestPoint = (height + atmosphere.params.x) * sin(PI - psi);
+        Thetha = acos(lowestPoint / outerRadius) + (psi - PI / 2.0f);
+    }
+#if 0
+    // If ray hits atmosphere we don't calculate optical depth here
+    if(psiGreaterThanPI2 && (lowestPoint < atmosphere.params.x)){
+        ret.y = 0.0f;
+        ret.w = 0.0f;
+        return ret;
+    }
+#endif
+    vec2 P2 = vec2(cos(Thetha), sin(Thetha)) * outerRadius;
+
+    float distancePerStep = length(P1 - P2) / (outerRadius * float(samples));
+    for(int i = 0; i < samples; ++i){
+        float currentHeight = clamp((length((P1 * float(samples - i) + P2 * float(i)) / float(samples)) - atmosphere.params.x) / atmosphere.params.y, 0.0f, 1.0f);
+        ret.y += exp(-currentHeight/ atmosphere.params.z) * distancePerStep;
+        ret.w += exp(-currentHeight/ atmosphere.params.z) * distancePerStep;
+    }
+
+    return ret;
+}
+
+void main(){
+
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+    uint sizeX = 16 * gl_NumWorkGroups.x;
+    uint sizeY = 16 * gl_NumWorkGroups.y;
+
+    float psi = float(id.y) / float(sizeY) * PI;
+    float height = (float(id.x) / float(sizeX)) * atmosphere.params.y;
+
+    vec4 scatter = outScattering(height, psi);
+
+    imageStore(outscatterTexture, id, vec4(scatter));
+
+}

@@ -14,8 +14,8 @@ namespace RenderEngine{
         vkw::FragmentShader const& loadFragmentShader(RenderEngine::MaterialLayout const& material, RenderEngine::LightingLayout const& lighting) override;
         vkw::ComputeShader const& loadComputeShader(std::string const& name) override;
     private:
-        std::map<std::pair<std::string, std::string>, vkw::VertexShader> m_vertexShaders;
-        std::map<std::pair<std::string, std::string>, vkw::FragmentShader> m_fragmentShaders;
+        std::map<std::pair<RenderEngine::GeometryLayout const*, RenderEngine::ProjectionLayout const*>, vkw::VertexShader> m_vertexShaders;
+        std::map<std::pair<RenderEngine::MaterialLayout const*, RenderEngine::LightingLayout const*>, vkw::FragmentShader> m_fragmentShaders;
         std::map<std::string, vkw::ComputeShader> m_computeShaders;
     };
 

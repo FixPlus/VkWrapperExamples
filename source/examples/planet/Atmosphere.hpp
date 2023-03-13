@@ -19,18 +19,19 @@ public:
     float atmosphereRadius = 100.0f;
     float H0 = 0.25f;
     float g = -0.9999f;
+    glm::vec4 planetPosition = glm::vec4{0.0f};
     int samples = 10;
   } properties;
 
   auto &outScatterTexture() const { return m_out_scatter_texture.m_view; }
-
+  auto &outScatterTextureSampler() const { return m_out_scatter_texture.m_sampler; }
   const vkw::UniformBuffer<Properties> &propertiesBuffer() const {
     return m_ubo;
   }
 
   void update() {
-    m_out_scatter_texture.recompute(m_device.get());
     m_ubo.update(m_device.get(), properties);
+    m_out_scatter_texture.recompute(m_device.get());
   }
 
   Atmosphere(vkw::Device &device,
@@ -50,6 +51,7 @@ private:
                             public RenderEngine::Compute {
   public:
     vkw::ImageView<vkw::COLOR, vkw::V2D> m_view;
+    vkw::Sampler m_sampler;
 
     OutScatterTexture(vkw::Device &device,
                       RenderEngine::ShaderLoaderInterface &shaderLoader,
