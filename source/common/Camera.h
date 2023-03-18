@@ -108,7 +108,7 @@ namespace TestApp {
 
     class CameraPerspective: virtual public Camera {
     public:
-        explicit CameraPerspective(float fov = 60.0f, float ratio = 16.0f / 9.0f) : m_fov(fov), m_ratio(ratio) {
+        explicit CameraPerspective(float fov = 60.0f, float ratio = 16.0f / 9.0f) : m_fov(glm::radians(fov)), m_ratio(ratio) {
         }
 
         float fov() const {

@@ -148,6 +148,15 @@ namespace TestApp {
 
     void Camera::lookAt(glm::vec3 eyePos, glm::vec3 center, glm::vec3 up) {
         m_view = glm::lookAt(eyePos, center, up);
+        m_position = eyePos;
+        glm::vec3 dir = glm::normalize(center - eyePos);
+        m_Psi = glm::asin(dir.y);
+        m_Phi = glm::acos(dir.x / glm::cos(glm::asin(dir.y)));
+        if(dir.z < 0.0f)
+          m_Phi = 2.0f * glm::pi<float>() - m_Phi;
+        m_Tilt = 0.0f;
+        m_projection = m_get_projection();
+        m_projection[1][1] *= -1.0f;
     }
 
     glm::mat4 CameraOrtho::m_get_projection() const{

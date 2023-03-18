@@ -46,13 +46,11 @@ public:
 
 class ApplicationStatistics : public GUIWindow {
 public:
-  ApplicationStatistics(GUIFrontEnd &gui, TestApp::SceneProjector &window,
+  ApplicationStatistics(GUIFrontEnd &gui, TestApp::WindowIO &window,
                         VulkanMemoryMonitor const &monitor)
       : GUIWindow(
             gui, WindowSettings{.title = "Application stat", .autoSize = true}),
-        m_window(window), m_monitor(monitor),
-        m_nearClip(window.camera().nearPlane()),
-        m_farClip(window.camera().farPlane()) {}
+        m_window(window), m_monitor(monitor) {}
 
 protected:
   void onGui() override {
@@ -62,6 +60,27 @@ protected:
                 m_monitor.get().totalAllocations(),
                 m_monitor.get().totalReallocations(),
                 m_monitor.get().totalFrees());
+  }
+
+private:
+  // TODO: rewite to StrongReference
+  std::reference_wrapper<TestApp::WindowIO> m_window;
+  vkw::StrongReference<VulkanMemoryMonitor const> m_monitor;
+};
+
+class ApplicationStatisticsExtended : public ApplicationStatistics {
+public:
+  ApplicationStatisticsExtended(GUIFrontEnd &gui, TestApp::SceneProjector &window,
+                        VulkanMemoryMonitor const &monitor)
+      : ApplicationStatistics(
+            gui, window, monitor),
+        m_window(window),
+        m_nearClip(window.camera().nearPlane()),
+        m_farClip(window.camera().farPlane()) {}
+
+protected:
+  void onGui() override {
+    ApplicationStatistics::onGui();
     auto &camera = m_window.get().camera();
     auto pos = camera.position();
     ImGui::Text("X: %.2f, Y: %.2f, Z: %.2f,", pos.x, pos.y, pos.z);
@@ -86,7 +105,6 @@ private:
   float m_nearClip;
   // TODO: rewite to StrongReference
   std::reference_wrapper<TestApp::SceneProjector> m_window;
-  vkw::StrongReference<VulkanMemoryMonitor const> m_monitor;
 };
 
 class SwapChainWithFramebuffers : public SwapChainImpl {
@@ -231,8 +249,11 @@ CommonApp::CommonApp(AppCreateInfo const &createInfo) {
                               "Irrecoverable vkw::Error",
                               RenderEngine::Boxer::Style::Error);
   });
-  m_window = std::make_unique<TestApp::SceneProjector>(
+  if(!createInfo.customWindow)
+    m_window = std::make_unique<SceneProjector>(
       800, 600, createInfo.applicationName.data());
+  else
+    m_window.reset(createInfo.customWindow);
 
   m_allocator = std::make_unique<VulkanMemoryMonitor>();
 
@@ -287,7 +308,7 @@ CommonApp::CommonApp(AppCreateInfo const &createInfo) {
 
   m_device = std::make_unique<vkw::Device>(instance(), physDevice());
 
-  m_surface = std::make_unique<vkw::Surface>(window().surface(instance()));
+  m_surface = std::make_unique<vkw::Surface>(m_window->surface(instance()));
 
   m_swapChain =
       std::make_unique<SwapChainWithFramebuffers>(device(), surface());
@@ -313,9 +334,13 @@ CommonApp::CommonApp(AppCreateInfo const &createInfo) {
 
   m_internal().gui =
       std::make_unique<GUI>(device(), m_internal().pass, 0, textureLoader());
-  window().setContext(*m_internal().gui);
-  m_internal().appStat =
-      std::make_unique<ApplicationStatistics>(gui(), window(), *m_allocator);
+  m_window->setContext(*m_internal().gui);
+  if(auto* SceneProj = dynamic_cast<SceneProjector*>(m_window.get()))
+    m_internal().appStat =
+      std::make_unique<ApplicationStatisticsExtended>(gui(), *SceneProj, *m_allocator);
+  else
+    m_internal().appStat =
+        std::make_unique<ApplicationStatistics>(gui(), window<WindowIO>(), *m_allocator);
 }
 
 CommonApp::~CommonApp() = default;
@@ -334,19 +359,20 @@ void CommonApp::run() {
       surface().getSurfaceCapabilities(physDevice()).currentExtent;
   auto &extents = m_current_surface_extents;
 
-  while (!window().shouldClose()) {
-    window().pollEvents();
+  while (!m_window->shouldClose()) {
+    m_window->pollEvents();
     static bool firstEncounter = true;
     if (!firstEncounter) {
       m_internal().waitForFences();
     } else
       firstEncounter = false;
 
-    window().update();
+    if(auto* SceneProj = dynamic_cast<SceneProjector*>(m_window.get()))
+      SceneProj->update();
     recordingState.reset();
-    onPollEvents();
     m_internal().gui->frame();
     m_internal().gui->push();
+    onPollEvents();
 
     if (extents.width == 0 || extents.height == 0) {
       extents = surface().getSurfaceCapabilities(physDevice()).currentExtent;
@@ -464,8 +490,11 @@ void CommonApp::addFrameFence(std::shared_ptr<vkw::Fence> fence) {
 
 GUIFrontEnd &CommonApp::gui() { return *m_internal().gui; }
 void CommonApp::onFramebufferResize() {
-  auto extents = window().framebufferExtents();
-  window().camera().setRatio(static_cast<float>(extents.first) /
-                             static_cast<float>(extents.second));
+  if(auto* SceneProj = dynamic_cast<SceneProjector*>(m_window.get())) {
+    auto extents = SceneProj->framebufferExtents();
+    SceneProj->camera().setRatio(static_cast<float>(extents.first) /
+                               static_cast<float>(extents.second));
+  }
 }
+
 } // namespace TestApp

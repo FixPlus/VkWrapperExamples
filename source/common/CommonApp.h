@@ -23,6 +23,7 @@ struct AppCreateInfo {
       [](auto &i) {};
   std::function<void(vkw::PhysicalDevice &)> amendDeviceCreateInfo =
       [](auto &d) {};
+  WindowIO* customWindow = nullptr;
 };
 
 class CommonApp {
@@ -35,7 +36,8 @@ public:
 
 protected:
   auto &library() { return *m_library; }
-  auto &window() { return *m_window; }
+  template<class Upcast = SceneProjector>
+  auto &window() { return static_cast<Upcast&>(*m_window); }
 
   auto &instance() { return *m_instance; }
 
@@ -86,7 +88,7 @@ private:
 
   std::unique_ptr<VulkanMemoryMonitor> m_allocator;
   std::unique_ptr<vkw::Library> m_library;
-  std::unique_ptr<SceneProjector> m_window;
+  std::unique_ptr<WindowIO> m_window;
   std::unique_ptr<vkw::Instance> m_instance;
   std::unique_ptr<vkw::debug::Validation> m_validation;
   std::unique_ptr<vkw::PhysicalDevice> m_physDevice;

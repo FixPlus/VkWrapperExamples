@@ -25,7 +25,7 @@ namespace TestApp {
         using SceneCameraT = SceneCamera<SHADOW_CASCADES_COUNT>;
 
         SceneProjector(uint32_t width, uint32_t height, std::string const &title) : Window(width, height, title),
-                                                                                    m_camera(glm::radians(60.0f),
+                                                                                    m_camera(60.0f,
                                                                                              (float) width /
                                                                                              (float) height) {
 
