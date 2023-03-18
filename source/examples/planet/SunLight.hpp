@@ -13,7 +13,7 @@ public:
   struct Properties {
     glm::vec4 color = glm::vec4{1.0f, 1.0f, 1.0f, 0.0f};
     glm::vec2 eulerAngle = glm::vec2{0.0f, 0.0f};
-    float intensity = 10.0f;
+    float intensity = 70.0f;
     float distance = 1000.0f;
   } properties;
 

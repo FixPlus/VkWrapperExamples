@@ -13,14 +13,14 @@ namespace TestApp {
 class Atmosphere {
 public:
   struct Properties {
-    glm::vec3 RayleighConstants = glm::vec3{0.02f, 0.085f, 0.128f};
-    float MeiConstants = 0.04f;
+    glm::vec3 RayleighConstants = glm::vec3{0.1f, 0.4f, 0.8f};
+    float MeiConstants = 0.3f;
     float planetRadius = 10000.0f;
     float atmosphereRadius = 100.0f;
     float H0 = 0.25f;
     float g = -0.9999f;
     glm::vec4 planetPosition = glm::vec4{0.0f};
-    int samples = 10;
+    int samples = 50;
   } properties;
 
   auto &outScatterTexture() const { return m_out_scatter_texture.m_view; }
