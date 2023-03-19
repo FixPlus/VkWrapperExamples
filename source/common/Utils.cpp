@@ -107,11 +107,15 @@ namespace TestApp{
                 transferFamily = std::find_if(transferFamily, families.end(), [](vkw::QueueFamily const&family){ return family.transfer();});
             }
 
-            if(transferFamily == families.end()){
-                throw vkw::Error{"Device has no supported dedicated transfer queues"};
+            if(transferFamily != families.end()){
+                transferFamily->requestQueue();
+            } else{
+#if 0
+              throw vkw::Error{"Device has no supported dedicated transfer queues"};
+#endif
             }
 
-            transferFamily->requestQueue();
+
         }
 
         // find DEDICATED compute queue family if needed
@@ -124,11 +128,14 @@ namespace TestApp{
                 computeFamily = std::find_if(computeFamily, families.end(), [](vkw::QueueFamily const&family){ return family.compute();});
             }
 
-            if(computeFamily == families.end()){
-                throw vkw::Error{"Device has no supported dedicated compute queues"};
+            if(computeFamily != families.end()){
+                computeFamily->requestQueue();
+            } else {
+#if 0
+              throw vkw::Error{"Device has no supported dedicated compute queues"};
+#endif
             }
 
-            computeFamily->requestQueue();
         }
     }
 }
