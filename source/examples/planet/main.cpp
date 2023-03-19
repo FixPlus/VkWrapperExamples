@@ -9,7 +9,7 @@ class PlanetApp : public CommonApp {
 public:
   PlanetApp()
       : CommonApp(AppCreateInfo{
-            .enableValidation = true,
+            .enableValidation = false,
             .applicationName = "Planet",
             .amendDeviceCreateInfo =
                 [](vkw::PhysicalDevice &device) {

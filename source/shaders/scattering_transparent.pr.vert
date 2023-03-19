@@ -91,15 +91,7 @@ struct Scatter{
 };
 
 float psiAngle(vec3 From, vec3 To){
-    float rayLength = length(From - To);
-    float diffAngleCos = dot(normalize(From), normalize(To));
-    float endProjected = length(To) * diffAngleCos;
-    float x = abs(length(From) - endProjected);
-    float psi = acos(x / rayLength);
-    if(endProjected < length(From))
-        psi = PI - psi;
-    psi /= PI;
-    return psi;
+    return clamp(acos(dot(normalize(From), normalize(To - From))) / PI, 0.0f, 1.0f);
 }
 Scatter inScatter(vec3 pov, vec3 vertex){
     Scatter ret;

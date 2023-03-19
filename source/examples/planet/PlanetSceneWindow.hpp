@@ -47,11 +47,8 @@ protected:
     WindowIO::mouseMove(xpos, ypos, xdelta, ydelta);
     if (guiWantCaptureMouse() || !cursorDisabled())
       return;
-
-    // if (cursorDisabled()) {
     m_camera.controls.axisDeltaX += xdelta;
     m_camera.controls.axisDeltaY += ydelta;
-    //}
   };
 
 private:
@@ -59,7 +56,18 @@ private:
   void keyDown(int key, int mods) {
 
     switch (key) {
-
+    case GLFW_KEY_W:
+      m_camera.controls.forward = true;
+      break;
+    case GLFW_KEY_A:
+      m_camera.controls.left = true;
+      break;
+    case GLFW_KEY_S:
+      m_camera.controls.backward = true;
+      break;
+    case GLFW_KEY_D:
+      m_camera.controls.right = true;
+      break;
     case GLFW_KEY_C:
       toggleCursor();
       break;
@@ -69,7 +77,21 @@ private:
 
   void keyUp(int key, int mods) {
 
-    switch (key) { default:; }
+    switch (key) {
+    case GLFW_KEY_W:
+      m_camera.controls.forward = false;
+      break;
+    case GLFW_KEY_A:
+      m_camera.controls.left = false;
+      break;
+    case GLFW_KEY_S:
+      m_camera.controls.backward = false;
+      break;
+    case GLFW_KEY_D:
+      m_camera.controls.right = false;
+      break;
+    default:;
+    }
   }
 
   void keyRepeat(int key, int mods) {}
