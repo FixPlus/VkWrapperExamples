@@ -4,7 +4,9 @@ namespace TestApp {
 
 PlanetSceneWindow::PlanetSceneWindow(uint32_t width, uint32_t height,
                                      const std::string &title)
-    : Window(width, height, title) {}
+    : Window(width, height, title) {
+  PlanetSceneWindow::onWindowResize(width, height);
+}
 void PlanetSceneWindow::update() {
   auto deltaTime = clock().frameTime();
 

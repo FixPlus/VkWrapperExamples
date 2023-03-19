@@ -94,9 +94,7 @@ public:
   auto &shaderLoader() { return m_shaderLoader.get(); }
   auto &device() { return m_device.get(); }
 
-  SphereMesh& mesh() {
-    return m_baseMesh;
-  }
+  SphereMesh &mesh() { return m_baseMesh; }
 
 private:
   MeshGeometryLayout m_meshGeometryLayout;
@@ -117,8 +115,7 @@ private:
 
 class PlanetTexture : public RenderEngine::Material {
 public:
-  PlanetTexture(vkw::Device &device,
-                PlanetPool &pool,
+  PlanetTexture(vkw::Device &device, PlanetPool &pool,
                 vkw::Image<vkw::COLOR, vkw::I2D> const &colorMap);
 
 private:
@@ -131,8 +128,8 @@ public:
   struct Properties {
     glm::vec3 position = glm::vec3{0.0f};
     glm::vec2 rotation = glm::vec2{0.0f};
-    float planetRadius = 10.0f;
-    float atmosphereRadius = 1.0f;
+    float planetRadius = 1000.0f;
+    float atmosphereRadius = 50.0f;
   } properties;
 
   auto &atmosphere() { return m_atmosphere; }

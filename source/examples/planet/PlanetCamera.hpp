@@ -58,8 +58,8 @@ private:
   float targetLongitude = 0.0f;
   float currentLongitude = 0.0f;
 
-  float targetDistance = 1.5f;
-  float currentDistance = 1.5f;
+  float targetDistance = 5.0f;
+  float currentDistance = 5.0f;
 
   Planet const *m_planet = nullptr;
 };
@@ -73,7 +73,7 @@ protected:
 
 private:
   int currentMode = 0;
-  float m_farPlane = 3.0f;
+  float m_farPlane = 5.0f;
   std::reference_wrapper<PlanetCamera> m_camera;
 };
 } // namespace TestApp
