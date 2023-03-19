@@ -1,0 +1,30 @@
+#version 450
+layout (local_size_x = 1, local_size_y = 1) in;
+
+layout (binding = 0) uniform sampler2D heightMap;
+layout (binding = 1, rgba8) uniform image2D bumpMap;
+
+void main() {
+    ivec2 id = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+
+    ivec2 imageSize = ivec2(1 * gl_NumWorkGroups.x, 1 * gl_NumWorkGroups.y);
+    vec2 uv = vec2(id) / vec2(imageSize);
+
+    const vec2 size = vec2(2.0,0.0);
+    const ivec3 off = ivec3(-1,0,1);
+
+    vec4 height = texture(heightMap, uv);
+    float s11 = height.x;
+    vec4 tmp;
+    float s01 = textureOffset(heightMap, uv, off.xy).x;
+    float s21 = textureOffset(heightMap, uv, off.zy).x;
+    float s10 = textureOffset(heightMap, uv, off.yx).x;
+    float s12 = textureOffset(heightMap, uv, off.yz).x;
+    vec3 va = normalize(vec3(size.xy,5.0f * (s21-s01)));
+    vec3 vb = normalize(vec3(size.yx,5.0f * (s12-s10)));
+    vec4 bump = vec4( cross(va,vb), s11 );
+    bump.y *= -1.0f;
+    bump = (bump + 1.0f) / 2.0f;
+    imageStore(bumpMap, id, bump);
+
+}

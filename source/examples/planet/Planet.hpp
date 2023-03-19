@@ -2,6 +2,7 @@
 #define TESTAPP_PLANET_HPP
 
 #include "Atmosphere.hpp"
+#include "BumpMap.hpp"
 #include "Camera.h"
 #include "GUI.h"
 #include "SphereMesh.hpp"
@@ -116,11 +117,13 @@ private:
 class PlanetTexture : public RenderEngine::Material {
 public:
   PlanetTexture(vkw::Device &device, PlanetPool &pool,
-                vkw::Image<vkw::COLOR, vkw::I2D> const &colorMap);
+                vkw::Image<vkw::COLOR, vkw::I2D> const &colorMap,
+                BumpMap const &bumpMap);
 
 private:
   vkw::Sampler m_sampler;
   vkw::ImageView<vkw::COLOR, vkw::V2D> m_colorMap;
+  vkw::ImageView<vkw::COLOR, vkw::V2D> m_bumpMap;
 };
 
 class Planet {

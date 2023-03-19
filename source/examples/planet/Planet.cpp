@@ -128,11 +128,15 @@ Planet::SurfaceProjection::SurfaceProjection(
 }
 
 PlanetTexture::PlanetTexture(vkw::Device &device, PlanetPool &pool,
-                             const vkw::Image<vkw::COLOR, vkw::I2D> &colorMap)
+                             const vkw::Image<vkw::COLOR, vkw::I2D> &colorMap,
+                             BumpMap const &bumpMap)
     : RenderEngine::Material(pool.planetSurfaceMaterialLayout()),
       m_sampler(createDefaultSampler(device)),
-      m_colorMap(device, colorMap, colorMap.format()) {
+      m_colorMap(device, colorMap, colorMap.format()),
+      m_bumpMap(device, bumpMap, bumpMap.format()) {
   set().write(0, m_colorMap, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+              m_sampler);
+  set().write(1, m_bumpMap, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
               m_sampler);
 }
 
@@ -206,7 +210,9 @@ PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
               RenderEngine::SubstageDescription{
                   "scattering_emissive",
                   {vkw::DescriptorSetLayoutBinding{
-                      0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
+                       0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                   vkw::DescriptorSetLayoutBinding{
+                       1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
               vkw::RasterizationStateCreateInfo{
                   false, false, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
                   VK_FRONT_FACE_COUNTER_CLOCKWISE},

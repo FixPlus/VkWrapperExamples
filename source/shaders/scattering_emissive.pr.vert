@@ -13,6 +13,7 @@ layout (location = 5) out vec3 outInScatterReileigh;
 layout (location = 6) out vec3 outInScatterMei;
 layout (location = 7) out vec3 outOutScatterSun;
 layout (location = 8) out vec3 outOutScatterEmissive;
+layout (location = 9) out vec3 outWorldTangent;
 
 layout (set = 1, binding = 0) uniform Atmosphere{
     vec4 ScatterConstants; // xyz - rayleigh, w - mei
@@ -145,15 +146,15 @@ Scatter inScatter(vec3 pov, vec3 vertex){
 
     for(int i = 0; i < atmosphere.samples; ++i){
         vec3 currentPoint = startPoint + ray * float(i) / float(atmosphere.samples);
-        float currentSunPsi = acos(dot(normalize(currentPoint), -sunDir));
+        float currentSunPsi = clamp(acos(clamp(dot(normalize(currentPoint), -sunDir), -1.0f, 1.0f)) / PI, 0.0f, 1.0f);
         vec4 sunDirHitGround = sphereHit(currentPoint, -sunDir, atmosphere.properties.x);
         if(sunDirHitGround.w == 1.0f)
-        continue;
+          continue;
         float currentPsi = psiAngle(currentPoint, endPoint);
         if(psiLargerThatPI2)
         currentPsi = 1.0f - currentPsi;
         float h = clamp((length(currentPoint) - atmosphere.properties.x) / atmosphere.properties.y, 0.001f, 0.999f);
-        vec4 precomputedSunScatter = texture(outScatterTexture, vec2(h, currentSunPsi / PI ));
+        vec4 precomputedSunScatter = texture(outScatterTexture, vec2(h, currentSunPsi ));
         vec4 precomputedScatter = texture(outScatterTexture, vec2(h, currentPsi));
 
 
@@ -235,6 +236,7 @@ void Projection(WorldVertexInfo worldVertexInfo){
     float cameraPsi = dot(normalize(worldVertexInfo.position - vec3(atmosphere.center)), normalize(-worldVertexInfo.position + vec3(cameraPos))) / PI;
     outOutScatterEmissive = outScatter(cameraPos - atmosphere.center.xyz, worldVertexInfo.position.xyz - atmosphere.center.xyz);
     outWorldNormal = worldVertexInfo.normal;
+    outWorldTangent = worldVertexInfo.tangent;
     outUVW = worldVertexInfo.UVW;
     outColor = worldVertexInfo.color;
     outWorldPos = worldVertexInfo.position;

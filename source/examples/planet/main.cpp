@@ -25,7 +25,9 @@ public:
                      window<PlanetSceneWindow>().camera(), onScreenPass(), 0),
         m_sphereMeshProperties(gui(), m_planetPool.mesh()),
         m_image(textureLoader().loadTexture("earth_color")),
-        m_planetTexture(device(), m_planetPool, m_image),
+        m_heightMap(textureLoader().loadTexture("earth_height")),
+        m_bumpMap(device(), shaderLoader(), m_heightMap),
+        m_planetTexture(device(), m_planetPool, m_image, m_bumpMap),
         m_planet(m_planetPool, m_planetTexture),
         m_planetProperties(gui(), m_planet) {
     window<PlanetSceneWindow>().setCameraTarget(m_planet);
@@ -52,6 +54,8 @@ private:
   PlanetPool m_planetPool;
   SphereMeshOptions m_sphereMeshProperties;
   vkw::Image<vkw::COLOR, vkw::I2D> m_image;
+  vkw::Image<vkw::COLOR, vkw::I2D> m_heightMap;
+  BumpMap m_bumpMap;
   PlanetTexture m_planetTexture;
   Planet m_planet;
   PlanetProperties m_planetProperties;

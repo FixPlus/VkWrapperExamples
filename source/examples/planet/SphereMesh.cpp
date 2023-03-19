@@ -19,6 +19,17 @@ glm::vec2 getUV(glm::vec3 dir) {
   return {1.0f - angle / (2.0f * glm::pi<float>()),
           acos(dir.y) / glm::pi<float>()};
 }
+
+glm::vec3 getTangent(glm::vec3 normal) {
+  constexpr auto upDir = glm::vec3{0.0, 1.0f, 0.0f};
+  auto cross = glm::cross(normal, upDir);
+  if (glm::length(cross) < 0.0001f) {
+    return glm::vec3{1.0, 0.0f, 0.0f};
+  } else {
+    return -glm::normalize(glm::cross(normal, upDir));
+  }
+}
+
 std::pair<std::vector<SphereMesh::Vertex>, std::vector<unsigned short>>
 createIcosahedron(bool inverseNormal) {
   std::vector<SphereMesh::Vertex> vertices;
@@ -27,50 +38,57 @@ createIcosahedron(bool inverseNormal) {
   SphereMesh::Vertex vertex;
   auto pi6 = glm::pi<float>() / 6.0f;
 
+  auto upDir = glm::vec3{0.0, 1.0f, 0.0f};
   vertex.Position = glm::vec3{cos(pi6), sin(pi6), 0.0f};
   vertex.Normal = !inverseNormal ? vertex.Position : -vertex.Position;
+  vertex.Tangent = getTangent(vertex.Normal);
   vertex.UV = getUV(vertex.Position);
 
   vertices.emplace_back(vertex);
 
   vertex.Position = glm::vec3{-cos(pi6), sin(pi6), 0.0f};
   vertex.Normal = !inverseNormal ? vertex.Position : -vertex.Position;
+  vertex.Tangent = getTangent(vertex.Normal);
   vertex.UV = getUV(vertex.Position);
 
   vertices.emplace_back(vertex);
 
   vertex.Position = glm::vec3{-cos(pi6), -sin(pi6), 0.0f};
   vertex.Normal = !inverseNormal ? vertex.Position : -vertex.Position;
+  vertex.Tangent = getTangent(vertex.Normal);
   vertex.UV = getUV(vertex.Position);
 
   vertices.emplace_back(vertex);
 
   vertex.Position = glm::vec3{cos(pi6), -sin(pi6), 0.0f};
   vertex.Normal = !inverseNormal ? vertex.Position : -vertex.Position;
+  vertex.Tangent = getTangent(vertex.Normal);
   vertex.UV = getUV(vertex.Position);
 
   vertices.emplace_back(vertex);
 
   vertices.resize(12);
   std::transform(vertices.begin(), std::next(vertices.begin(), 4),
-                 std::next(vertices.begin(), 4), [](auto &vertex) {
+                 std::next(vertices.begin(), 4), [&upDir](auto &vertex) {
                    SphereMesh::Vertex newVertex = vertex;
                    std::swap(newVertex.Position.x, newVertex.Position.z);
                    std::swap(newVertex.Normal.x, newVertex.Normal.z);
                    std::swap(newVertex.Position.x, newVertex.Position.y);
                    std::swap(newVertex.Normal.x, newVertex.Normal.y);
                    newVertex.UV = getUV(newVertex.Position);
+                   newVertex.Tangent = getTangent(vertex.Normal);
                    return newVertex;
                  });
 
   std::transform(vertices.begin(), std::next(vertices.begin(), 4),
-                 std::next(vertices.begin(), 8), [](auto &vertex) {
+                 std::next(vertices.begin(), 8), [&upDir](auto &vertex) {
                    SphereMesh::Vertex newVertex = vertex;
                    std::swap(newVertex.Position.y, newVertex.Position.z);
                    std::swap(newVertex.Normal.y, newVertex.Normal.z);
                    std::swap(newVertex.Position.y, newVertex.Position.x);
                    std::swap(newVertex.Normal.y, newVertex.Normal.x);
                    newVertex.UV = getUV(newVertex.Position);
+                   newVertex.Tangent = getTangent(vertex.Normal);
                    return newVertex;
                  });
 
@@ -242,6 +260,7 @@ void subdivide(std::vector<SphereMesh::Vertex> &vertices,
         sub.Position = glm::normalize(v1.Position + v2.Position);
         sub.Normal = glm::normalize(v1.Normal + v2.Normal);
         sub.UV = getUV(sub.Position);
+        sub.Tangent = getTangent(sub.Normal);
         short index = m_vertices.get().size();
         m_vertices.get().emplace_back(sub);
         emplace(std::pair<unsigned short, unsigned short>{index1, index2},
