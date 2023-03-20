@@ -9,11 +9,11 @@ layout (location = 1) out vec3 outUVW;
 layout (location = 2) out vec3 outWorldPos;
 layout (location = 3) out vec3 outWorldNormal;
 layout (location = 4) out vec3 outViewPos;
-layout (location = 5) out vec3 outInScatterReileigh;
-layout (location = 6) out vec3 outInScatterMei;
-layout (location = 7) out vec3 outOutScatterSun;
-layout (location = 8) out vec3 outOutScatterEmissive;
-layout (location = 9) out vec3 outWorldTangent;
+layout (location = 5) out vec3 outWorldTangent;
+layout (location = 6) out vec3 outInScatterReileigh;
+layout (location = 7) out vec3 outInScatterMei;
+layout (location = 8) out vec3 outOutScatterSun;
+layout (location = 9) out vec3 outOutScatterEmissive;
 
 layout (set = 1, binding = 0) uniform Atmosphere{
     vec4 ScatterConstants; // xyz - rayleigh, w - mei

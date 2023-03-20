@@ -9,8 +9,9 @@ layout (location = 1) out vec3 outUVW;
 layout (location = 2) out vec3 outWorldPos;
 layout (location = 3) out vec3 outWorldNormal;
 layout (location = 4) out vec3 outViewPos;
-layout (location = 5) out vec3 outRayleigh;
-layout (location = 6) out vec3 outMei;
+layout (location = 5) out vec3 outTangent;
+layout (location = 6) out vec3 outRayleigh;
+layout (location = 7) out vec3 outMei;
 
 layout (set = 1, binding = 0) uniform Atmosphere{
     vec4 ScatterConstants; // xyz - rayleigh, w - mei

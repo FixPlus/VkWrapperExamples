@@ -7,7 +7,7 @@ layout (location = 1) in vec3 inUVW;
 layout (location = 2) in vec3 inWorldPos;
 layout (location = 3) in vec3 inWorldNormal;
 layout (location = 4) in vec3 inViewPos;
-layout (location = 9) in vec3 inWorldTangent;
+layout (location = 5) in vec3 inWorldTangent;
 
 layout (set = 2, binding = 0) uniform sampler2D colorMap;
 layout (set = 2, binding = 1) uniform sampler2D bumpMap;

@@ -2,10 +2,10 @@
 #extension GL_GOOGLE_include_directive : require
 #include "MaterialLightingInterface.h.glsl"
 
-layout (location = 5) in vec3 inInScatterReileigh;
-layout (location = 6) in vec3 inInScatterMei;
-layout (location = 7) in vec3 inOutScatterSun;
-layout (location = 8) in vec3 inOutScatterEmissive;
+layout (location = 6) in vec3 inInScatterReileigh;
+layout (location = 7) in vec3 inInScatterMei;
+layout (location = 8) in vec3 inOutScatterSun;
+layout (location = 9) in vec3 inOutScatterEmissive;
 
 layout (location = 0) out vec4 outFragColor;
 

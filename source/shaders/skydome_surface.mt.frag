@@ -7,6 +7,7 @@ layout (location = 1) in vec3 inUVW;
 layout (location = 2) in vec3 inWorldPos;
 layout (location = 3) in vec3 inWorldNormal;
 layout (location = 4) in vec3 inViewPos;
+layout (location = 5) in vec3 inTangent;
 
 
 
