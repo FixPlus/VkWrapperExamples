@@ -59,19 +59,39 @@ vec3 calculateNormal(vec2 uv)
 
 vec2 calculateDisp(vec3 viewDir)
 {
-    #if 0
+
     float depthSample = 2.0f * texture(bumpMap, inUVW.xy).a - 1.0f;
-    depthSample *= 0.01f;
+    depthSample *= 0.004f;
     vec3 N = normalize(inWorldNormal);
     vec3 T = normalize(inWorldTangent);
     vec3 B = normalize(cross(N, T));
-    float viewAngle = clamp(dot(viewDir, N), 0.5f, 1.0f);
+    float viewAngle = clamp(dot(viewDir, N), 0.5, 1.5f);
     vec3 resultViewVec = sin(viewAngle) * (viewDir - N * dot(viewDir, N)) + cos(viewAngle) * N;
     vec3 disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
     vec2 uvDiff = vec2(-dot(T, disp), dot(B, disp));
+#if 1
+    depthSample = 2.0f * texture(bumpMap, inUVW.xy + uvDiff).a - 1.0f;
+    depthSample *= 0.004f;
+    disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
+    uvDiff = vec2(-dot(T, disp), dot(B, disp));
+
+    depthSample = 2.0f * texture(bumpMap, inUVW.xy + uvDiff).a - 1.0f;
+    depthSample *= 0.004f;
+    disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
+    uvDiff = vec2(-dot(T, disp), dot(B, disp));
+
+    depthSample = 2.0f * texture(bumpMap, inUVW.xy + uvDiff).a - 1.0f;
+    depthSample *= 0.004f;
+    disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
+    uvDiff = vec2(-dot(T, disp), dot(B, disp));
+
+    depthSample = 2.0f * texture(bumpMap, inUVW.xy + uvDiff).a - 1.0f;
+    depthSample *= 0.004f;
+    disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
+    uvDiff = vec2(-dot(T, disp), dot(B, disp));
+#endif
     return inUVW.xy + uvDiff;
-    #endif
-    return inUVW.xy;
+    //return inUVW.xy;
 }
 SurfaceInfo Material(){
 
