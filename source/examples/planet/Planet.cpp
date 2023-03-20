@@ -32,7 +32,7 @@ void PlanetPool::update() {
   m_cameraUbo.flush();
 }
 
-Planet::Planet(PlanetPool &planetPool, PlanetTexture const &texture)
+Planet::Planet(PlanetPool &planetPool, PlanetTexture &texture)
     : m_atmosphere(planetPool.device(), planetPool.shaderLoader()),
       m_meshGeometry(planetPool.device(), planetPool.meshGeometryLayout(),
                      properties),
@@ -50,6 +50,8 @@ void Planet::update() {
   m_atmosphere.properties.planetRadius = properties.planetRadius;
   m_atmosphere.properties.atmosphereRadius = properties.atmosphereRadius;
   m_atmosphere.properties.planetPosition = glm::vec4{properties.position, 1.0f};
+  m_surfaceMaterial.get().landscapeProps.planetRadius = properties.planetRadius;
+  m_surfaceMaterial.get().update();
   m_atmosphere.update();
   m_meshGeometry.update(properties);
 }
@@ -137,11 +139,23 @@ PlanetTexture::PlanetTexture(vkw::Device &device, PlanetPool &pool,
     : RenderEngine::Material(pool.planetSurfaceMaterialLayout()),
       m_sampler(createDefaultSampler(device)),
       m_colorMap(device, colorMap, colorMap.format()),
-      m_bumpMap(device, bumpMap, bumpMap.format()) {
+      m_bumpMap(device, bumpMap, bumpMap.format()),
+      m_landscapeUbo(device,
+                     VmaAllocationCreateInfo{
+                         .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+                         .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                     VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+      m_device(device) {
   set().write(0, m_colorMap, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
               m_sampler);
   set().write(1, m_bumpMap, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
               m_sampler);
+  set().write(2, m_landscapeUbo);
+  update();
+}
+
+void PlanetTexture::update() {
+  loadUsingStaging(m_device.get(), m_landscapeUbo, landscapeProps);
 }
 
 PlanetPool::MeshGeometryLayout::MeshGeometryLayout(vkw::Device &device,
@@ -215,7 +229,9 @@ PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
                   {vkw::DescriptorSetLayoutBinding{
                        0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                    vkw::DescriptorSetLayoutBinding{
-                       1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
+                       1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                   vkw::DescriptorSetLayoutBinding{
+                       2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
               vkw::RasterizationStateCreateInfo{
                   false, false, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
                   VK_FRONT_FACE_COUNTER_CLOCKWISE},
@@ -253,10 +269,25 @@ void PlanetProperties::onGui() {
     AtmosphereProperties::onGui();
   }
 
-  if (!ImGui::CollapsingHeader("General"))
-    return;
-
   bool needUpdate = false;
+
+  if (ImGui::CollapsingHeader("Surface")) {
+    if (ImGui::SliderFloat("Terrain height",
+                           &m_planet.get().surface().landscapeProps.height,
+                           0.0f, 100.0f))
+      needUpdate = true;
+    if (ImGui::SliderInt("POM samples",
+                         &m_planet.get().surface().landscapeProps.samples, 5,
+                         50))
+      needUpdate = true;
+  }
+
+  if (!ImGui::CollapsingHeader("General")) {
+    if (needUpdate)
+      m_planet.get().update();
+    return;
+  }
+
   if (ImGui::SliderFloat("radius", &m_planet.get().properties.planetRadius,
                          10.0f, 1000.0f))
     needUpdate = true;

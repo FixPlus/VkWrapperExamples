@@ -1,6 +1,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "MaterialLightingInterface.h.glsl"
+#define PI 3.1415926
 
 layout (location = 0) in vec4 inColor;
 layout (location = 1) in vec3 inUVW;
@@ -11,6 +12,11 @@ layout (location = 5) in vec3 inWorldTangent;
 
 layout (set = 2, binding = 0) uniform sampler2D colorMap;
 layout (set = 2, binding = 1) uniform sampler2D bumpMap;
+
+layout (set = 2, binding = 2) uniform Landscape{
+    vec4 props; // x - height, y - planet radius
+    int samples;
+} landscape;
 
 vec3 calculateNormal(vec2 uv)
 {
@@ -28,16 +34,21 @@ vec3 calculateNormal(vec2 uv)
 
 vec2 calculateDisp(vec3 viewDir)
 {
+    float planetRadius = landscape.props.y;
     vec3 N = normalize(inWorldNormal);
     vec3 T = normalize(inWorldTangent);
     vec3 B = normalize(cross(N, T));
 
-    int samples = 10;
-    float heightScale = 2.0f;
-    float distanceScale = 1.0f / 2000.0f;
-    float viewAngleCos = clamp(dot(-viewDir, N), 0.25f, 1.0f);
-    vec3 dispVec3 = -(heightScale / viewAngleCos) * viewDir * distanceScale;
-    vec2 dispVec2 = vec2(dot(T, dispVec3), -dot(B, dispVec3) * 2.0f);
+    int samples = landscape.samples;
+    float heightScale = landscape.props.x;
+    float distanceScale = 1.0f / (planetRadius * 2.0f * PI);
+    float viewAngleCos = clamp(dot(-viewDir, N), 0.0f, 1.0f);
+    float gamma = acos(planetRadius / (planetRadius + heightScale) * sin(acos(viewAngleCos))) - (PI / 2.0f - acos(viewAngleCos));
+    float distance = planetRadius * gamma * distanceScale;
+    vec2 dispVec2 = vec2(dot(T, -viewDir), -dot(B, -viewDir)) * distance;
+    vec2 orig = vec2(planetRadius, 0.0f);
+    vec2 dest = vec2(cos(gamma), sin(gamma)) * (planetRadius + heightScale);
+    vec2 ray = dest - orig;
 
     vec2 curUV = inUVW.xy + dispVec2;
 
@@ -51,7 +62,7 @@ vec2 calculateDisp(vec3 viewDir)
         float factor = 1.0f - float(i) / float(samples);
         curUV = inUVW.xy + factor * dispVec2;
         float curHeight = (2.0f * texture(bumpMap, curUV).a - 1.0f);
-        float currentRayHeight = factor;
+        float currentRayHeight = (length(ray * factor + orig) - planetRadius) / heightScale;
         if(curHeight > currentRayHeight){
             float currentDepth = curHeight - currentRayHeight;
             float prevDepth = abs(lastHeight - lastRayHeight);

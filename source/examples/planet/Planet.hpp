@@ -133,10 +133,21 @@ public:
                 vkw::Image<vkw::COLOR, vkw::I2D> const &colorMap,
                 BumpMap const &bumpMap);
 
+  struct LandscapeProps {
+    float height = 1.0f;
+    float planetRadius = 1.0f;
+    float pad[2];
+    int samples = 10;
+  } landscapeProps;
+
+  void update();
+
 private:
   vkw::Sampler m_sampler;
   vkw::ImageView<vkw::COLOR, vkw::V2D> m_colorMap;
   vkw::ImageView<vkw::COLOR, vkw::V2D> m_bumpMap;
+  vkw::UniformBuffer<LandscapeProps> m_landscapeUbo;
+  vkw::StrongReference<vkw::Device> m_device;
 };
 
 class Planet {
@@ -150,7 +161,9 @@ public:
 
   auto &atmosphere() { return m_atmosphere; }
 
-  Planet(PlanetPool &planetPool, PlanetTexture const &texture);
+  auto &surface() { return m_surfaceMaterial.get(); }
+
+  Planet(PlanetPool &planetPool, PlanetTexture &texture);
 
   void drawSkyDome(RenderEngine::GraphicsRecordingState &recorder);
 
@@ -190,7 +203,7 @@ private:
         vkw::UniformBuffer<std::pair<glm::mat4, glm::mat4>> const &cameraBuf);
   } m_surfaceProj;
 
-  std::reference_wrapper<PlanetTexture const> m_surfaceMaterial;
+  std::reference_wrapper<PlanetTexture> m_surfaceMaterial;
 
   std::reference_wrapper<PlanetPool> m_planetPool;
 };
