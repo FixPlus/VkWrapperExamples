@@ -12,14 +12,16 @@ PlanetPool::PlanetPool(vkw::Device &device,
       m_emissiveProjLayout(device, maxPlanets),
       m_transparentProjLayout(device, maxPlanets),
       m_planetSurfaceMaterialLayout(device, maxPlanets),
-      m_lightingLayout(device, pass, subpass, 1),
+      m_emissiveLightingLayout(device, pass, subpass, 1),
+      m_transparentLightingLayout(device, pass, subpass, 1),
       m_skyDomeMaterialLayout(device, 1), m_device(device),
       m_shaderLoader(shaderLoader), m_sunlight(sunlight), m_camera(camera),
       m_cameraUbo(device,
                   VmaAllocationCreateInfo{
                       .usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
                       .requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
-      m_baseMesh(device, 6), m_commonLighting(m_lightingLayout),
+      m_baseMesh(device, 6), m_transparentLighting(m_transparentLightingLayout),
+      m_emissiveLighting(m_emissiveLightingLayout),
       m_skyDomeMaterial(m_skyDomeMaterialLayout) {
   m_cameraUbo.map();
 }
@@ -53,6 +55,7 @@ void Planet::update() {
 }
 
 void Planet::drawSkyDome(RenderEngine::GraphicsRecordingState &recorder) {
+  m_planetPool.get().setTransparentLighting(recorder);
   recorder.setGeometry(m_meshGeometry);
   recorder.setProjection(m_skyDomeProj);
   m_planetPool.get().setSkyDomeMaterial(recorder);
@@ -65,6 +68,7 @@ void Planet::drawSkyDome(RenderEngine::GraphicsRecordingState &recorder) {
 }
 
 void Planet::drawSurface(RenderEngine::GraphicsRecordingState &recorder) {
+  m_planetPool.get().setEmissiveLighting(recorder);
   recorder.setGeometry(m_meshGeometry);
   recorder.setProjection(m_surfaceProj);
   recorder.setMaterial(m_surfaceMaterial.get());
@@ -193,14 +197,13 @@ PlanetPool::TransparentSurfaceProjectionLayout::
 PlanetPool::SkyDomeMaterialLayout::SkyDomeMaterialLayout(vkw::Device &device,
                                                          unsigned int maxSets)
     : RenderEngine::MaterialLayout(
-          device,
-          RenderEngine::MaterialLayout::CreateInfo{
-              RenderEngine::SubstageDescription{"scattering_transparent"},
-              vkw::RasterizationStateCreateInfo{
-                  false, false, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
-                  VK_FRONT_FACE_CLOCKWISE},
-              vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, false},
-              maxSets}) {}
+          device, RenderEngine::MaterialLayout::CreateInfo{
+                      RenderEngine::SubstageDescription{"skydome_surface"},
+                      vkw::RasterizationStateCreateInfo{
+                          false, false, VK_POLYGON_MODE_FILL,
+                          VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE},
+                      vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, false},
+                      maxSets}) {}
 
 PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
     vkw::Device &device, unsigned int maxSets)
@@ -208,7 +211,7 @@ PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
           device,
           RenderEngine::MaterialLayout::CreateInfo{
               RenderEngine::SubstageDescription{
-                  "scattering_emissive",
+                  "planet_surface",
                   {vkw::DescriptorSetLayoutBinding{
                        0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                    vkw::DescriptorSetLayoutBinding{
@@ -219,14 +222,23 @@ PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
               vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, true},
               maxSets}) {}
 
-PlanetPool::LightingLayout::LightingLayout(vkw::Device &device,
-                                           vkw::RenderPass &pass,
-                                           unsigned int subpass,
-                                           unsigned int maxSets)
+PlanetPool::TransparentLightingLayout::TransparentLightingLayout(
+    vkw::Device &device, vkw::RenderPass &pass, unsigned int subpass,
+    unsigned int maxSets)
     : RenderEngine::LightingLayout(
           device,
           RenderEngine::LightingLayout::CreateInfo{
-              RenderEngine::SubstageDescription{"scattering_blend"}, pass,
+              RenderEngine::SubstageDescription{"scattering_transparent"}, pass,
+              subpass},
+          maxSets) {}
+
+PlanetPool::EmissiveLightingLayout::EmissiveLightingLayout(
+    vkw::Device &device, vkw::RenderPass &pass, unsigned int subpass,
+    unsigned int maxSets)
+    : RenderEngine::LightingLayout(
+          device,
+          RenderEngine::LightingLayout::CreateInfo{
+              RenderEngine::SubstageDescription{"scattering_emissive"}, pass,
               subpass},
           maxSets) {}
 

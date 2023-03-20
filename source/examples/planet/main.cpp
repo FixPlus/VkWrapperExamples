@@ -42,7 +42,6 @@ protected:
   void onMainPass(vkw::PrimaryCommandBuffer &buffer,
                   RenderEngine::GraphicsRecordingState &recorder) override {
     m_planetPool.bindMesh(recorder);
-    m_planetPool.setLighting(recorder);
     m_planet.drawSurface(recorder);
     m_planet.drawSkyDome(recorder);
   }

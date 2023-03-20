@@ -56,9 +56,14 @@ public:
     PlanetSurfaceMaterialLayout(vkw::Device &device, unsigned maxSets);
   };
 
-  struct LightingLayout : public RenderEngine::LightingLayout {
-    LightingLayout(vkw::Device &device, vkw::RenderPass &pass, unsigned subpass,
-                   unsigned maxSets);
+  struct EmissiveLightingLayout : public RenderEngine::LightingLayout {
+    EmissiveLightingLayout(vkw::Device &device, vkw::RenderPass &pass,
+                           unsigned subpass, unsigned maxSets);
+  };
+
+  struct TransparentLightingLayout : public RenderEngine::LightingLayout {
+    TransparentLightingLayout(vkw::Device &device, vkw::RenderPass &pass,
+                              unsigned subpass, unsigned maxSets);
   };
 
   void update();
@@ -76,8 +81,14 @@ public:
     m_baseMesh.draw(recorder);
   }
 
-  void setLighting(RenderEngine::GraphicsRecordingState &recorder) const {
-    recorder.setLighting(m_commonLighting);
+  void
+  setEmissiveLighting(RenderEngine::GraphicsRecordingState &recorder) const {
+    recorder.setLighting(m_emissiveLighting);
+  }
+
+  void
+  setTransparentLighting(RenderEngine::GraphicsRecordingState &recorder) const {
+    recorder.setLighting(m_transparentLighting);
   }
 
   auto &cameraBuffer() const { return m_cameraUbo; }
@@ -104,8 +115,10 @@ private:
   SkyDomeMaterialLayout m_skyDomeMaterialLayout;
   RenderEngine::Material m_skyDomeMaterial;
   PlanetSurfaceMaterialLayout m_planetSurfaceMaterialLayout;
-  LightingLayout m_lightingLayout;
-  RenderEngine::Lighting m_commonLighting;
+  EmissiveLightingLayout m_emissiveLightingLayout;
+  TransparentLightingLayout m_transparentLightingLayout;
+  RenderEngine::Lighting m_emissiveLighting;
+  RenderEngine::Lighting m_transparentLighting;
   PlanetMesh m_baseMesh;
   vkw::UniformBuffer<std::pair<glm::mat4, glm::mat4>> m_cameraUbo;
   std::reference_wrapper<const Camera> m_camera;

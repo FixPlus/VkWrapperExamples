@@ -7,41 +7,10 @@ layout (location = 1) in vec3 inUVW;
 layout (location = 2) in vec3 inWorldPos;
 layout (location = 3) in vec3 inWorldNormal;
 layout (location = 4) in vec3 inViewPos;
-layout (location = 5) in vec3 inInScatterReileigh;
-layout (location = 6) in vec3 inInScatterMei;
-layout (location = 7) in vec3 inOutScatterSun;
-layout (location = 8) in vec3 inOutScatterEmissive;
 layout (location = 9) in vec3 inWorldTangent;
 
 layout (set = 2, binding = 0) uniform sampler2D colorMap;
 layout (set = 2, binding = 1) uniform sampler2D bumpMap;
-
-layout (set = 1, binding = 0) uniform Atmosphere{
-    vec4 ScatterConstants; // xyz - rayleigh, w - mei
-    vec4 properties; // x - planet radius, y - atmosphere radius, z - H0, w - g
-    vec4 center;
-    int samples;
-} atmosphere;
-
-layout (set = 1, binding = 1) uniform SunLight{
-    vec4 color;
-    vec4 pos; // x - phi, y -phi, z - intensity, w -distance
-} sunlight;
-
-
-
-float phaseFunction(float Thetha, float g){
-    float cosThetha = cos(Thetha);
-    float gSquared = g * g;
-    return 3.0f * (1.0f - gSquared) * (1.0f + cosThetha * cosThetha) / (2.0f * (2.0f + gSquared) * pow(1.0f + gSquared -  2.0f * g * cosThetha, 3.0f / 2.0f));
-}
-
-vec3 dir(vec2 spherical){
-    float phi = spherical.x;
-    float psi = spherical.y;
-    return vec3(cos(psi) * sin(phi), sin(psi), cos(psi) * cos(phi));
-}
-
 
 vec3 calculateNormal(vec2 uv)
 {
@@ -59,21 +28,50 @@ vec3 calculateNormal(vec2 uv)
 
 vec2 calculateDisp(vec3 viewDir)
 {
-
-    float depthSample = 2.0f * texture(bumpMap, inUVW.xy).a - 1.0f;
-    depthSample *= 0.004f;
     vec3 N = normalize(inWorldNormal);
     vec3 T = normalize(inWorldTangent);
     vec3 B = normalize(cross(N, T));
+
+    int samples = 10;
+    float heightScale = 2.0f;
+    float distanceScale = 1.0f / 2000.0f;
+    float viewAngleCos = clamp(dot(-viewDir, N), 0.25f, 1.0f);
+    vec3 dispVec3 = -(heightScale / viewAngleCos) * viewDir * distanceScale;
+    vec2 dispVec2 = vec2(dot(T, dispVec3), -dot(B, dispVec3) * 2.0f);
+
+    vec2 curUV = inUVW.xy + dispVec2;
+
+    vec2 lastUV = curUV;
+    float lastHeight = (2.0f * texture(bumpMap, curUV).a - 1.0f);
+    float lastRayHeight = 1.0f;
+
+    if(lastHeight >= lastRayHeight)
+      return curUV;
+    for(int i = 1; i <= samples; ++i){
+        float factor = 1.0f - float(i) / float(samples);
+        curUV = inUVW.xy + factor * dispVec2;
+        float curHeight = (2.0f * texture(bumpMap, curUV).a - 1.0f);
+        float currentRayHeight = factor;
+        if(curHeight > currentRayHeight){
+            float currentDepth = curHeight - currentRayHeight;
+            float prevDepth = abs(lastHeight - lastRayHeight);
+            float weight = prevDepth / (currentDepth + prevDepth);
+            return curUV * weight + (1.0f - weight) * lastUV;
+        }
+        lastHeight = curHeight;
+        lastRayHeight = currentRayHeight;
+        lastUV = curUV;
+    }
+
+    return inUVW.xy;
+#if 0
+    float depthSample = 2.0f * texture(bumpMap, inUVW.xy).a - 1.0f;
+    depthSample *= 0.004f;
+
     float viewAngle = clamp(dot(viewDir, N), 0.5, 1.5f);
     vec3 resultViewVec = sin(viewAngle) * (viewDir - N * dot(viewDir, N)) + cos(viewAngle) * N;
     vec3 disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
     vec2 uvDiff = vec2(-dot(T, disp), dot(B, disp));
-#if 1
-    depthSample = 2.0f * texture(bumpMap, inUVW.xy + uvDiff).a - 1.0f;
-    depthSample *= 0.004f;
-    disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
-    uvDiff = vec2(-dot(T, disp), dot(B, disp));
 
     depthSample = 2.0f * texture(bumpMap, inUVW.xy + uvDiff).a - 1.0f;
     depthSample *= 0.004f;
@@ -89,27 +87,24 @@ vec2 calculateDisp(vec3 viewDir)
     depthSample *= 0.004f;
     disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
     uvDiff = vec2(-dot(T, disp), dot(B, disp));
-#endif
+
+    depthSample = 2.0f * texture(bumpMap, inUVW.xy + uvDiff).a - 1.0f;
+    depthSample *= 0.004f;
+    disp = resultViewVec * (depthSample / dot(resultViewVec, N)) + N * depthSample;
+    uvDiff = vec2(-dot(T, disp), dot(B, disp));
+
     return inUVW.xy + uvDiff;
     //return inUVW.xy;
+    #endif
 }
 SurfaceInfo Material(){
-
-
     vec3 direction = normalize(inWorldPos - inViewPos);
     vec2 UV =  calculateDisp(direction);
-    vec3 sunDir = dir(vec2(sunlight.pos.x, sunlight.pos.y));
-    float Thetha = acos(dot(direction, sunDir));
 
-    float phaseMay = phaseFunction(Thetha, atmosphere.properties.w);
-    float phaseRayleigh = phaseFunction(Thetha, 0.0f);
-
-    float diffuse = clamp(dot(-sunDir, calculateNormal(UV)), 0.0f, 1.0f);
     SurfaceInfo ret;
-    ret.albedo = vec4(vec3(texture(colorMap, UV)) * inOutScatterEmissive * clamp(inOutScatterSun, 0.0f, 1.0f) * diffuse + inInScatterReileigh * phaseRayleigh + inInScatterMei * phaseMay, 1.0f);
-    //ret.albedo = texture(bumpMap, inUVW.xy);
+    ret.albedo = texture(colorMap, UV);
     ret.position = inWorldPos;
-    ret.normal = inWorldNormal;
+    ret.normal = calculateNormal(UV);
     ret.cameraOffset = inViewPos;
     ret.metallic = 0.0f;
     ret.roughness = 1.0f;
