@@ -14,6 +14,8 @@ layout (location = 6) out vec3 outInScatterReileigh;
 layout (location = 7) out vec3 outInScatterMei;
 layout (location = 8) out vec3 outOutScatterSun;
 layout (location = 9) out vec3 outOutScatterEmissive;
+layout (location = 10) out vec3 outInScatterReileighReflect;
+layout (location = 11) out vec3 outInScatterMeiReflect;
 
 layout (set = 1, binding = 0) uniform Atmosphere{
     vec4 ScatterConstants; // xyz - rayleigh, w - mei
@@ -114,7 +116,7 @@ Scatter inScatter(vec3 pov, vec3 vertex){
         endPoint = vertex - planetCenter;
     }
 
-    endPoint = vertex - planetCenter;
+    //endPoint = vertex - planetCenter;
 
     // Maybe we hit ground first
     #if 0
@@ -147,7 +149,7 @@ Scatter inScatter(vec3 pov, vec3 vertex){
     for(int i = 0; i < atmosphere.samples; ++i){
         vec3 currentPoint = startPoint + ray * float(i) / float(atmosphere.samples);
         float currentSunPsi = clamp(acos(clamp(dot(normalize(currentPoint), -sunDir), -1.0f, 1.0f)) / PI, 0.0f, 1.0f);
-        vec4 sunDirHitGround = sphereHit(currentPoint, -sunDir, atmosphere.properties.x);
+        vec4 sunDirHitGround = sphereHit(currentPoint * 1.001f, -sunDir, atmosphere.properties.x);
         if(sunDirHitGround.w == 1.0f)
           continue;
         float currentPsi = psiAngle(currentPoint, endPoint);
@@ -213,12 +215,12 @@ vec3 outScatter(vec3 pov, vec3 vertex){
     if(psiGreaterThanPI2){
         psi2 = 1.0f - psi2;
     }
-    float h1 = clamp(length(startPoint) - atmosphere.properties.x, 0.0f, 1.0f);
-    float h2 = clamp(length(endPoint) - atmosphere.properties.x, 0.0f, 1.0f);
+    float h1 = clamp((length(startPoint) - atmosphere.properties.x) / atmosphere.properties.y, 0.0f, 1.0f);
+    float h2 = clamp((length(endPoint) - atmosphere.properties.x) / atmosphere.properties.y, 0.0f, 1.0f);
 
     float ReleighOutScatter = texture(outScatterTexture, vec2(h1, psi1)).y - texture(outScatterTexture, vec2(h2, psi2)).y;
     float MeiOutScatter = texture(outScatterTexture, vec2(h1, psi1)).w - texture(outScatterTexture, vec2(h2, psi2)).w;
-    if(psiGreaterThanPI2){
+    if(ReleighOutScatter < 0.0f){
         ReleighOutScatter *=-1.0f;
         MeiOutScatter *= -1.0f;
     }
@@ -228,9 +230,13 @@ vec3 outScatter(vec3 pov, vec3 vertex){
 void Projection(WorldVertexInfo worldVertexInfo){
     vec3 sunDir = dir(vec2(sunlight.pos.x, sunlight.pos.y));
     vec3 cameraPos = vec3(inverse(camera.cameraSpace) * vec4(0.0f, 0.0f, 0.0f, 1.0f));
+    vec3 reflectDir = reflect(normalize(worldVertexInfo.position.xyz - cameraPos), worldVertexInfo.normal);
     Scatter scatter = inScatter(cameraPos,  worldVertexInfo.position.xyz);
+    Scatter scatterReflect = inScatter(worldVertexInfo.position.xyz,  worldVertexInfo.position.xyz + normalize(reflectDir) * (atmosphere.properties.x + atmosphere.properties.y) * 2.0f);
     outInScatterMei = scatter.Mei;
     outInScatterReileigh = scatter.Rayleigh;
+    outInScatterMeiReflect = scatterReflect.Mei;
+    outInScatterReileighReflect = scatterReflect.Rayleigh;
     float sunPsi = dot(normalize(worldVertexInfo.position - vec3(atmosphere.center)), -sunDir) / PI;
     outOutScatterSun = sunIntensity() * exp(-4.0f * PI * atmosphere.ScatterConstants.xyz * texture(outScatterTexture, vec2(0.0f, sunPsi)).y) * exp(-4.0f * PI * vec3(atmosphere.ScatterConstants.w) * texture(outScatterTexture, vec2(0.0f, sunPsi)).w);
     float cameraPsi = dot(normalize(worldVertexInfo.position - vec3(atmosphere.center)), normalize(-worldVertexInfo.position + vec3(cameraPos))) / PI;

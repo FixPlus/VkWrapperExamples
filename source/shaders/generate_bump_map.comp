@@ -20,8 +20,16 @@ void main() {
     float s21 = textureOffset(heightMap, uv, off.zy).x;
     float s10 = textureOffset(heightMap, uv, off.yx).x;
     float s12 = textureOffset(heightMap, uv, off.yz).x;
-    vec3 va = normalize(vec3(size.xy,5.0f * (s21-s01)));
-    vec3 vb = normalize(vec3(size.yx,5.0f * (s12-s10)));
+    float a = (s21-s01);
+    float b = (s12-s10);
+
+    if(abs(a) < 0.004f)
+      a = 0.0f;
+    if(abs(b) < 0.004f)
+      b = 0.0f;
+
+    vec3 va = normalize(vec3(size.xy,5.0f * a));
+    vec3 vb = normalize(vec3(size.yx,5.0f * b));
     vec4 bump = vec4( cross(va,vb), s11 );
     bump.y *= -1.0f;
     bump = (bump + 1.0f) / 2.0f;

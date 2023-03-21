@@ -133,13 +133,15 @@ Planet::SurfaceProjection::SurfaceProjection(
               atmosphere.outScatterTextureSampler());
 }
 
-PlanetTexture::PlanetTexture(vkw::Device &device, PlanetPool &pool,
-                             const vkw::Image<vkw::COLOR, vkw::I2D> &colorMap,
-                             BumpMap const &bumpMap)
+PlanetTexture::PlanetTexture(
+    vkw::Device &device, PlanetPool &pool,
+    const vkw::Image<vkw::COLOR, vkw::I2D> &colorMap, BumpMap const &bumpMap,
+    vkw::Image<vkw::COLOR, vkw::I2D> const &metallicMap)
     : RenderEngine::Material(pool.planetSurfaceMaterialLayout()),
       m_sampler(createDefaultSampler(device)),
       m_colorMap(device, colorMap, colorMap.format()),
       m_bumpMap(device, bumpMap, bumpMap.format()),
+      m_metallicMap(device, metallicMap, metallicMap.format()),
       m_landscapeUbo(device,
                      VmaAllocationCreateInfo{
                          .usage = VMA_MEMORY_USAGE_GPU_ONLY,
@@ -150,7 +152,9 @@ PlanetTexture::PlanetTexture(vkw::Device &device, PlanetPool &pool,
               m_sampler);
   set().write(1, m_bumpMap, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
               m_sampler);
-  set().write(2, m_landscapeUbo);
+  set().write(2, m_metallicMap, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+              m_sampler);
+  set().write(3, m_landscapeUbo);
   update();
 }
 
@@ -231,7 +235,9 @@ PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
                    vkw::DescriptorSetLayoutBinding{
                        1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
                    vkw::DescriptorSetLayoutBinding{
-                       2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                       2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+                   vkw::DescriptorSetLayoutBinding{
+                       3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
               vkw::RasterizationStateCreateInfo{
                   false, false, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
                   VK_FRONT_FACE_COUNTER_CLOCKWISE},

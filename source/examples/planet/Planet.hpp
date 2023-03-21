@@ -131,7 +131,8 @@ class PlanetTexture : public RenderEngine::Material {
 public:
   PlanetTexture(vkw::Device &device, PlanetPool &pool,
                 vkw::Image<vkw::COLOR, vkw::I2D> const &colorMap,
-                BumpMap const &bumpMap);
+                BumpMap const &bumpMap,
+                vkw::Image<vkw::COLOR, vkw::I2D> const &metallicMap);
 
   struct LandscapeProps {
     float height = 1.0f;
@@ -146,6 +147,7 @@ private:
   vkw::Sampler m_sampler;
   vkw::ImageView<vkw::COLOR, vkw::V2D> m_colorMap;
   vkw::ImageView<vkw::COLOR, vkw::V2D> m_bumpMap;
+  vkw::ImageView<vkw::COLOR, vkw::V2D> m_metallicMap;
   vkw::UniformBuffer<LandscapeProps> m_landscapeUbo;
   vkw::StrongReference<vkw::Device> m_device;
 };

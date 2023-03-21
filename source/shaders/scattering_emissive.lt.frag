@@ -6,6 +6,8 @@ layout (location = 6) in vec3 inInScatterReileigh;
 layout (location = 7) in vec3 inInScatterMei;
 layout (location = 8) in vec3 inOutScatterSun;
 layout (location = 9) in vec3 inOutScatterEmissive;
+layout (location = 10) in vec3 inInScatterReileighReflect;
+layout (location = 11) in vec3 inInScatterMeiReflect;
 
 layout (location = 0) out vec4 outFragColor;
 
@@ -42,7 +44,17 @@ void Lighting(SurfaceInfo surfaceInfo){
     float phaseMay = phaseFunction(Thetha, atmosphere.properties.w);
     float phaseRayleigh = phaseFunction(Thetha, 0.0f);
 
+    vec3 reflectDir = reflect(direction, surfaceInfo.normal);
+    float ThethaReflect = acos(dot(reflectDir, sunDir));
+
+    float phaseMayReflect = phaseFunction(ThethaReflect, atmosphere.properties.w);
+    float phaseRayleighReflect = phaseFunction(ThethaReflect, 0.0f);
+
     float diffuse = clamp(dot(-sunDir, surfaceInfo.normal), 0.0f, 1.0f);
-    outFragColor = vec4(vec3(surfaceInfo.albedo) * inOutScatterEmissive * clamp(inOutScatterSun, 0.0f, 1.0f) * diffuse + inInScatterReileigh * phaseRayleigh + inInScatterMei * phaseMay, 1.0f);
+    vec3 reflect = inInScatterReileighReflect * phaseRayleighReflect + inInScatterMeiReflect * phaseMayReflect;
+    vec3 diffusive = vec3(surfaceInfo.albedo) *(clamp(inOutScatterSun, 0.0f, 1.0f) * diffuse + inInScatterReileighReflect * phaseRayleighReflect / 2.0f);
+    vec3 emissive = reflect * surfaceInfo.metallic + diffusive * (1.0f - surfaceInfo.metallic);
+    vec3 final = emissive * inOutScatterEmissive + inInScatterReileigh * phaseRayleigh + inInScatterMei * phaseMay;
+    outFragColor = vec4(final, 1.0f);
 
 }

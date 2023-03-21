@@ -12,8 +12,9 @@ layout (location = 5) in vec3 inWorldTangent;
 
 layout (set = 2, binding = 0) uniform sampler2D colorMap;
 layout (set = 2, binding = 1) uniform sampler2D bumpMap;
+layout (set = 2, binding = 2) uniform sampler2D metallicMap;
 
-layout (set = 2, binding = 2) uniform Landscape{
+layout (set = 2, binding = 3) uniform Landscape{
     vec4 props; // x - height, y - planet radius
     int samples;
 } landscape;
@@ -114,10 +115,14 @@ SurfaceInfo Material(){
 
     SurfaceInfo ret;
     ret.albedo = texture(colorMap, UV);
+    ret.metallic = texture(metallicMap, UV).x;
     ret.position = inWorldPos;
-    ret.normal = calculateNormal(UV);
+    //if(ret.metallic > 0.5f)
+        //ret.normal = inWorldNormal;
+    //else
+        ret.normal = calculateNormal(UV);
     ret.cameraOffset = inViewPos;
-    ret.metallic = 0.0f;
+
     ret.roughness = 1.0f;
     return ret;
 }

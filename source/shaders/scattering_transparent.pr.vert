@@ -131,7 +131,7 @@ Scatter inScatter(vec3 pov, vec3 vertex){
         endPoint = vertex - planetCenter;
     }
 
-    endPoint = vertex - planetCenter;
+    //endPoint = vertex - planetCenter;
 
     // Maybe we hit ground first
     #if 0
