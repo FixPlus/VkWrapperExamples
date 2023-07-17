@@ -6,14 +6,13 @@
 
 SkyBox::SkyBox(vkw::Device &device, vkw::RenderPass const &pass, uint32_t subpass, RenderEngine::ShaderLoaderInterface& shaderLoader) :
         m_device(device),
-        m_geometry_layout(device, RenderEngine::GeometryLayout::CreateInfo{nullptr,vkw::InputAssemblyStateCreateInfo{},RenderEngine::SubstageDescription{"skybox"}, 1}),
-        m_projection_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, 1),
-        m_material_layout(device, RenderEngine::MaterialLayout::CreateInfo{
+        m_geometry_layout(device, shaderLoader, RenderEngine::GeometryLayout::CreateInfo{nullptr,vkw::InputAssemblyStateCreateInfo{},RenderEngine::SubstageDescription{"skybox"}, 1}),
+        m_projection_layout(device, shaderLoader, RenderEngine::SubstageDescription{.shaderSubstageName="skybox"}, 1),
+        m_material_layout(device, shaderLoader, RenderEngine::MaterialLayout::CreateInfo{
             RenderEngine::SubstageDescription{
-                "skybox",
-                {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
+                "skybox"},
             vkw::RasterizationStateCreateInfo{}, std::optional<vkw::DepthTestStateCreateInfo>{}, 1}),
-        m_lighting_layout(device, RenderEngine::LightingLayout::CreateInfo{RenderEngine::SubstageDescription{"flat"}, pass, subpass}, 1),
+        m_lighting_layout(device, shaderLoader, RenderEngine::LightingLayout::CreateInfo{RenderEngine::SubstageDescription{"flat"}, pass, subpass}, 1),
         m_geometry(m_geometry_layout),
         m_projection(m_projection_layout),
         m_lighting(m_lighting_layout),
@@ -65,8 +64,7 @@ SkyBox::OutScatterTexture::OutScatterTexture(vkw::Device &device, RenderEngine::
                                              RenderEngine::ComputeLayout(device,
                                                                          shaderLoader,
                                                                          RenderEngine::SubstageDescription{
-                                                                            .shaderSubstageName="atmosphere_outscatter",
-                                                                            .setBindings={{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}, {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}}, 1),
+                                                                            .shaderSubstageName="atmosphere_outscatter"}, 1),
                                              RenderEngine::Compute(static_cast<RenderEngine::ComputeLayout&>(*this)),
                                              m_view(device, *this, format()){
     VkComponentMapping mapping{};

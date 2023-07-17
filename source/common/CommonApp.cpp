@@ -15,8 +15,8 @@ namespace TestApp {
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
   GUI(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-      RenderEngine::TextureLoader const &textureLoader)
-      : GUIBackend(device, pass, subpass, textureLoader) {
+      RenderEngine::TextureLoader const &textureLoader, RenderEngine::ShaderLoaderInterface& shaderLoader)
+      : GUIBackend(device, pass, subpass, shaderLoader, textureLoader) {
     ImGui::SetCurrentContext(context());
     auto &io = ImGui::GetIO();
 
@@ -333,7 +333,7 @@ CommonApp::CommonApp(AppCreateInfo const &createInfo) {
       surface().getSurfaceCapabilities(physDevice()).currentExtent;
 
   m_internal().gui =
-      std::make_unique<GUI>(device(), m_internal().pass, 0, textureLoader());
+      std::make_unique<GUI>(device(), m_internal().pass, 0, textureLoader(), shaderLoader());
   m_window->setContext(*m_internal().gui);
   if(auto* SceneProj = dynamic_cast<SceneProjector*>(m_window.get()))
     m_internal().appStat =

@@ -15,8 +15,8 @@ namespace RenderEngine{
             uint32_t subpass;
             boost::container::small_vector<std::pair<VkPipelineColorBlendAttachmentState, uint32_t>, 2> blendStates{};
         };
-        LightingLayout(vkw::Device& device, CreateInfo const& desc, uint32_t maxSets = 0):
-                PipelineStageLayout(device, desc.substageDescription, maxSets), m_pass(desc.pass.get()), m_subpass(desc.subpass), m_blend_states(desc.blendStates){}
+        LightingLayout(vkw::Device& device, ShaderLoaderInterface& loader, CreateInfo const& desc, uint32_t maxSets = 0):
+                PipelineStageLayout(device, loader, desc.substageDescription, 3, ".lt.frag", maxSets), m_pass(desc.pass.get()), m_subpass(desc.subpass), m_blend_states(desc.blendStates){}
 
         auto const& blendStates() const{
             return m_blend_states;

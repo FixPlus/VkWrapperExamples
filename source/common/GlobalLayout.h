@@ -17,7 +17,7 @@ namespace TestApp {
     class GlobalLayout : public vkw::ReferenceGuard{
     public:
 
-        GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera,
+        GlobalLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader, vkw::RenderPass &pass, uint32_t subpass, TestApp::Camera const &camera,
                      TestApp::ShadowRenderPass &shadowPass, const SkyBox &skyBox);
 
         void bind(RenderEngine::GraphicsRecordingState &state, bool useSimpleLighting = false) const {

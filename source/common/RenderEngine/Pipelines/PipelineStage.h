@@ -4,6 +4,7 @@
 #include <string>
 #include <vkw/DescriptorSet.hpp>
 #include <vkw/DescriptorPool.hpp>
+#include <vkw/SPIRVModule.hpp>
 #include <set>
 #include <optional>
 
@@ -11,21 +12,16 @@ namespace RenderEngine{
 
     struct SubstageDescription{
         std::string shaderSubstageName;
-        boost::container::small_vector<vkw::DescriptorSetLayoutBinding, 3> setBindings;
-        boost::container::small_vector<VkPushConstantRange, 3> pushConstants;
         boost::container::small_vector<std::string, 2> additionalShaderFiles;
     };
+
+    class ShaderLoaderInterface;
 
     class PipelineStageBase;
 
     class PipelineStageLayout: public vkw::ReferenceGuard{
     public:
-        PipelineStageLayout(vkw::Device& device, SubstageDescription desc, uint32_t maxSets): m_layout(device,
-                                                                                                       desc.setBindings, 0),
-                                                                                              m_description(std::move(desc)){
-            if(!m_description.setBindings.empty())
-                m_pool.emplace(m_initPool(device, m_description, maxSets));
-        }
+        PipelineStageLayout(vkw::Device& device, ShaderLoaderInterface& loader, SubstageDescription desc, uint32_t stageSet, std::string_view stagePostfix, uint32_t maxSets);
 
         PipelineStageLayout(PipelineStageLayout&& another) noexcept;
         PipelineStageLayout& operator=(PipelineStageLayout&& another) noexcept;
@@ -38,13 +34,17 @@ namespace RenderEngine{
             return m_description;
         }
 
+        auto& module() const{
+          return m_module;
+        }
+
         virtual ~PipelineStageLayout() = default;
     private:
-        static vkw::DescriptorPool m_initPool(vkw::Device& device, SubstageDescription const & createInfo, uint32_t maxSets);
 
         friend class PipelineStageBase;
 
         std::set<PipelineStageBase*> m_stages;
+        vkw::SPIRVModule m_module;
         vkw::DescriptorSetLayout m_layout;
         std::optional<vkw::DescriptorPool> m_pool;
         SubstageDescription m_description;

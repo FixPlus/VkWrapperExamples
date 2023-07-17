@@ -75,24 +75,21 @@ class ShaderImporter : public AssetImporterBase {
 public:
   ShaderImporter(vkw::Device &device, std::string const &rootDirectory);
 
-  vkw::VertexShader loadVertexShader(std::string const &name) const;
+  vkw::SPIRVModule loadModule(std::string_view name) const;
 
-  vkw::VertexShader loadVertexShader(
-      std::string const &geometry, std::string const &projection,
-      std::span<const std::string_view> additionalStages = {}) const;
+  vkw::VertexShader loadVertexShader(std::string const &name) const;
 
   vkw::FragmentShader loadFragmentShader(std::string const &name) const;
 
-  vkw::FragmentShader loadFragmentShader(
-      std::string const &material, std::string const &lighting,
-      std::span<const std::string_view> additionalStages = {}) const;
-
   vkw::ComputeShader loadComputeShader(std::string const &name) const;
 
+  vkw::VertexShader loadVertexShader(vkw::SPIRVModule const& module) const;
+  vkw::FragmentShader loadFragmentShader(vkw::SPIRVModule const& module) const;
+  vkw::ComputeShader loadComputeShader(vkw::SPIRVModule const& module) const;
+
 private:
+
   vkw::StrongReference<vkw::Device> m_device;
-  vkw::SPIRVModule m_general_vert;
-  vkw::SPIRVModule m_general_frag;
 };
 
 } // namespace RenderEngine

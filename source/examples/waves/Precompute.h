@@ -23,8 +23,6 @@ namespace TestApp {
         }
 
     private:
-        static RenderEngine::SubstageDescription &m_emplace_image_binding(RenderEngine::SubstageDescription &desc);
-
         uint32_t m_xGroupSize, m_yGroupSize;
     };
 

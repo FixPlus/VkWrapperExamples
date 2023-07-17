@@ -42,7 +42,7 @@ class SimpleSphereMesh : public SphereMesh,
                          public RenderEngine::GeometryLayout,
                          public RenderEngine::Geometry {
 public:
-  SimpleSphereMesh(vkw::Device &device, unsigned subdivisions,
+  SimpleSphereMesh(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader, unsigned subdivisions,
                    bool inverseNormal);
 
   struct Transform {

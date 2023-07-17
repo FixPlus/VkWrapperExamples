@@ -41,9 +41,7 @@ Atmosphere::OutScatterTexture::OutScatterTexture(
       RenderEngine::ComputeLayout(
           device, shaderLoader,
           RenderEngine::SubstageDescription{
-              .shaderSubstageName = "atmosphere_outscatter2",
-              .setBindings = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                              {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}},
+              .shaderSubstageName = "atmosphere_outscatter2"},
           1),
       RenderEngine::Compute(static_cast<RenderEngine::ComputeLayout &>(*this)),
       m_view(device, *this, format()),

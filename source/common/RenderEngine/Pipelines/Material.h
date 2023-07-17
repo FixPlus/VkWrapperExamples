@@ -21,7 +21,7 @@ namespace RenderEngine{
             std::optional<vkw::DepthTestStateCreateInfo> depthTestState{};
             uint32_t maxMaterials = 0;
         };
-        MaterialLayout(vkw::Device& device, CreateInfo const & createInfo);
+        MaterialLayout(vkw::Device& device, ShaderLoaderInterface& loader, CreateInfo const & createInfo);
 
         vkw::RasterizationStateCreateInfo const& rasterizationState() const{
             return m_rasterizationState;

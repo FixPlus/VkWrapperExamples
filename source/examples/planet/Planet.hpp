@@ -35,34 +35,34 @@ public:
              unsigned subpass, unsigned maxPlanets = 10);
 
   struct MeshGeometryLayout : public RenderEngine::GeometryLayout {
-    MeshGeometryLayout(vkw::Device &device, unsigned maxSets);
+    MeshGeometryLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, unsigned maxSets);
   };
 
   struct EmissiveSurfaceProjectionLayout
       : public RenderEngine::ProjectionLayout {
-    EmissiveSurfaceProjectionLayout(vkw::Device &device, unsigned maxSets);
+    EmissiveSurfaceProjectionLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, unsigned maxSets);
   };
 
   struct TransparentSurfaceProjectionLayout
       : public RenderEngine::ProjectionLayout {
-    TransparentSurfaceProjectionLayout(vkw::Device &device, unsigned maxSets);
+    TransparentSurfaceProjectionLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, unsigned maxSets);
   };
 
   struct SkyDomeMaterialLayout : public RenderEngine::MaterialLayout {
-    SkyDomeMaterialLayout(vkw::Device &device, unsigned maxSets);
+    SkyDomeMaterialLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, unsigned maxSets);
   };
 
   struct PlanetSurfaceMaterialLayout : public RenderEngine::MaterialLayout {
-    PlanetSurfaceMaterialLayout(vkw::Device &device, unsigned maxSets);
+    PlanetSurfaceMaterialLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, unsigned maxSets);
   };
 
   struct EmissiveLightingLayout : public RenderEngine::LightingLayout {
-    EmissiveLightingLayout(vkw::Device &device, vkw::RenderPass &pass,
+    EmissiveLightingLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, vkw::RenderPass &pass,
                            unsigned subpass, unsigned maxSets);
   };
 
   struct TransparentLightingLayout : public RenderEngine::LightingLayout {
-    TransparentLightingLayout(vkw::Device &device, vkw::RenderPass &pass,
+    TransparentLightingLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, vkw::RenderPass &pass,
                               unsigned subpass, unsigned maxSets);
   };
 

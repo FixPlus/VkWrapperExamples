@@ -17,7 +17,7 @@ namespace TestApp{
             float splits[TestApp::SHADOW_CASCADES_COUNT * 4];
         } shadowMapSpace;
 
-        ShadowRenderPass(vkw::Device &device);
+        ShadowRenderPass(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader);
 
 
         void execute(vkw::PrimaryCommandBuffer& buffer, RenderEngine::GraphicsRecordingState& state) const;

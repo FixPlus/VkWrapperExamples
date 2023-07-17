@@ -122,7 +122,7 @@ namespace TestApp {
 
     class ModelMaterialLayout : public RenderEngine::MaterialLayout {
     public:
-        explicit ModelMaterialLayout(vkw::Device &device);
+        explicit ModelMaterialLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface& loader);
 
     private:
     };
@@ -145,7 +145,7 @@ namespace TestApp {
 
     class ModelGeometryLayout : public RenderEngine::GeometryLayout {
     public:
-        explicit ModelGeometryLayout(vkw::Device &device);
+        explicit ModelGeometryLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface& loader);
 
     };
 
@@ -273,7 +273,7 @@ namespace TestApp {
 
     public:
 
-        GLTFModel(vkw::Device &renderer, DefaultTexturePool& pool, std::filesystem::path const &path);
+        GLTFModel(vkw::Device &renderer, RenderEngine::ShaderLoaderInterface& loader, DefaultTexturePool& pool, std::filesystem::path const &path);
 
         GLTFModelInstance createNewInstance();
 

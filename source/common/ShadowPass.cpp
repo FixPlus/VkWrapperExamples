@@ -3,20 +3,18 @@
 
 namespace TestApp{
 
-    ShadowRenderPass::ShadowRenderPass(vkw::Device &device) :
+    ShadowRenderPass::ShadowRenderPass(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader) :
     m_pass{TestApp::ShadowPass(device, VK_FORMAT_D32_SFLOAT)},
-m_shadow_proj_layout(device, RenderEngine::SubstageDescription{.shaderSubstageName="shadow", .setBindings={
-        vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-        vkw::DescriptorSetLayoutBinding{1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+m_shadow_proj_layout(device, shaderLoader, RenderEngine::SubstageDescription{.shaderSubstageName="shadow"},
         TestApp::SHADOW_CASCADES_COUNT),
-m_shadow_material_layout(device,
+m_shadow_material_layout(device, shaderLoader,
         RenderEngine::MaterialLayout::CreateInfo{.substageDescription={.shaderSubstageName="null"}, .rasterizationState=vkw::RasterizationStateCreateInfo{
         VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE,
         VK_FRONT_FACE_COUNTER_CLOCKWISE, true, 3.0f, 0.0f,
         1.2f}, .depthTestState=vkw::DepthTestStateCreateInfo(VK_COMPARE_OP_LESS,
                                                              VK_TRUE), .maxMaterials=1}),
 m_shadow_material(m_shadow_material_layout),
-m_shadow_pass_layout(device,
+m_shadow_pass_layout(device, shaderLoader,
                      RenderEngine::LightingLayout::CreateInfo{.substageDescription={.shaderSubstageName="shadow"}, .pass=m_pass, .subpass=0},
                      1),
 m_shadow_pass(m_shadow_pass_layout),

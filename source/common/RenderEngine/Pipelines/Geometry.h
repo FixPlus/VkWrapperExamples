@@ -23,7 +23,7 @@ namespace RenderEngine {
 
         };
 
-        GeometryLayout(vkw::Device &device, CreateInfo&& createInfo);
+        GeometryLayout(vkw::Device &device, ShaderLoaderInterface& loader, CreateInfo&& createInfo);
 
         GeometryLayout(GeometryLayout &&another) noexcept:
                 m_inputAssemblyState(another.m_inputAssemblyState),

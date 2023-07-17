@@ -2,17 +2,11 @@
 
 TestApp::PrecomputeImageLayout::PrecomputeImageLayout(vkw::Device& device,
                                                       RenderEngine::ShaderLoaderInterface& shaderLoader, RenderEngine::SubstageDescription stageDescription, uint32_t xGroupSize, uint32_t yGroupSize):
-                                                      RenderEngine::ComputeLayout(device, shaderLoader, m_emplace_image_binding(stageDescription), 10),
+                                                      RenderEngine::ComputeLayout(device, shaderLoader, stageDescription, 10),
                                                       m_xGroupSize(xGroupSize),
                                                       m_yGroupSize(yGroupSize)
 {
 
-}
-
-RenderEngine::SubstageDescription &
-TestApp::PrecomputeImageLayout::m_emplace_image_binding(RenderEngine::SubstageDescription &desc) {
-    desc.setBindings.insert(desc.setBindings.begin(), {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE});
-    return desc;
 }
 
 TestApp::PrecomputeImage::PrecomputeImage(vkw::Device &device, TestApp::PrecomputeImageLayout &parent,

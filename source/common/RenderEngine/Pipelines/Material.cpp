@@ -3,12 +3,15 @@
 
 namespace RenderEngine {
 
+MaterialLayout::MaterialLayout(vkw::Device &device,
+                               ShaderLoaderInterface &loader,
+                               const MaterialLayout::CreateInfo &createInfo)
+    : PipelineStageLayout(device, loader, createInfo.substageDescription, 2,
+                          ".mt.frag", createInfo.maxMaterials),
+      m_rasterizationState(createInfo.rasterizationState),
+      m_depthTestState(createInfo.depthTestState) {}
 
-    MaterialLayout::MaterialLayout(vkw::Device &device, const MaterialLayout::CreateInfo &createInfo) : PipelineStageLayout(device, createInfo.substageDescription, createInfo.maxMaterials),
-    m_rasterizationState(createInfo.rasterizationState), m_depthTestState(createInfo.depthTestState){
-    }
-
-    void Material::bind(GraphicsRecordingState &state) const {
-        state.setMaterial(*this);
-    }
+void Material::bind(GraphicsRecordingState &state) const {
+  state.setMaterial(*this);
 }
+} // namespace RenderEngine

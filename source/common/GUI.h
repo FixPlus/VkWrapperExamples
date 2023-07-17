@@ -75,7 +75,7 @@ namespace TestApp {
         using Texture = vkw::Image<vkw::COLOR, vkw::I2D, vkw::SINGLE>;
         using TextureView = vkw::ImageView<vkw::COLOR, vkw::V2D>;
 
-        GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, RenderEngine::TextureLoader textureLoader);
+        GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, RenderEngine::ShaderLoaderInterface& shaderLoader, RenderEngine::TextureLoader textureLoader);
 
         /** Records draw commands. */
         void draw(RenderEngine::GraphicsRecordingState& recorder);

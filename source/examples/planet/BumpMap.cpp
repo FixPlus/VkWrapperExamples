@@ -46,11 +46,7 @@ BumpMap::BumpMap(vkw::Device &device,
   auto computeLayout = RenderEngine::ComputeLayout(
       device, shaderLoader,
       RenderEngine::SubstageDescription{
-          .shaderSubstageName = "generate_bump_map",
-          .setBindings = {vkw::DescriptorSetLayoutBinding{
-                              0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                          vkw::DescriptorSetLayoutBinding{
-                              1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}},
+          .shaderSubstageName = "generate_bump_map"},
       1);
   auto compute = BumpCompute(computeLayout, device, heightMap, *this);
 

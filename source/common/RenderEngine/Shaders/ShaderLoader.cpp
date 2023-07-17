@@ -1,8 +1,15 @@
 #include "RenderEngine/Shaders/ShaderLoader.h"
+#include <array>
 
 namespace RenderEngine {
 ShaderLoader::ShaderLoader(vkw::Device &device, std::string shaderLoadPath)
-    : ShaderImporter(device, shaderLoadPath) {}
+    : ShaderImporter(device, shaderLoadPath),
+      m_general_vert(loadModule("general.vert")),
+      m_general_frag(loadModule("general.frag")) {}
+
+vkw::SPIRVModule ShaderLoader::loadModule(std::string_view name) {
+  return ShaderImporter::loadModule(name);
+}
 
 vkw::VertexShader const &ShaderLoader::loadVertexShader(
     RenderEngine::GeometryLayout const &geometry,
@@ -11,22 +18,10 @@ vkw::VertexShader const &ShaderLoader::loadVertexShader(
   if (m_vertexShaders.contains(key))
     return m_vertexShaders.at(key);
 
-  boost::container::small_vector<std::string_view, 2> additionalStages;
-  std::transform(geometry.description().additionalShaderFiles.begin(),
-                 geometry.description().additionalShaderFiles.end(),
-                 std::back_inserter(additionalStages),
-                 [](auto &shaderName) { return shaderName; });
-
-  std::transform(projection.description().additionalShaderFiles.begin(),
-                 projection.description().additionalShaderFiles.end(),
-                 std::back_inserter(additionalStages),
-                 [](auto &shaderName) { return shaderName; });
+  std::array<vkw::SPIRVModule, 3> modules = {geometry.module(), projection.module(), m_general_vert};
 
   return m_vertexShaders
-      .emplace(key, ShaderImporter::loadVertexShader(
-                        geometry.description().shaderSubstageName,
-                        projection.description().shaderSubstageName,
-                        additionalStages))
+      .emplace(key, ShaderImporter::loadVertexShader(vkw::SPIRVModule(modules)))
       .first->second;
 }
 
@@ -48,20 +43,20 @@ ShaderLoader::loadFragmentShader(RenderEngine::MaterialLayout const &material,
                  std::back_inserter(additionalStages),
                  [](auto &shaderName) { return shaderName; });
 
+  std::array<vkw::SPIRVModule, 3> modules = {material.module(), lighting.module(), m_general_frag};
+
   return m_fragmentShaders
       .emplace(key,
-               ShaderImporter::loadFragmentShader(
-                   material.description().shaderSubstageName,
-                   lighting.description().shaderSubstageName, additionalStages))
+               ShaderImporter::loadFragmentShader(vkw::SPIRVModule(modules)))
       .first->second;
 }
 
 vkw::ComputeShader const &
-ShaderLoader::loadComputeShader(const std::string &name) {
-  if (m_computeShaders.contains(name))
-    return m_computeShaders.at(name);
+ShaderLoader::loadComputeShader(vkw::SPIRVModule const& module) {
+  if (m_computeShaders.contains(&module.info()))
+    return m_computeShaders.at(&module.info());
 
-  return m_computeShaders.emplace(name, ShaderImporter::loadComputeShader(name))
+  return m_computeShaders.emplace(&module.info(), ShaderImporter::loadComputeShader(vkw::SPIRVModule{std::span{&module, 1}}))
       .first->second;
 }
 } // namespace RenderEngine

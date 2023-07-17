@@ -55,10 +55,10 @@ std::vector<std::filesystem::path> listAvailableModels(std::filesystem::path con
     }
     return ret;
 }
-std::unique_ptr<GLTFModel> tryLoad(vkw::Device &renderer, DefaultTexturePool& pool, std::filesystem::path const &path){
+std::unique_ptr<GLTFModel> tryLoad(vkw::Device &renderer, RenderEngine::ShaderLoaderInterface& shaderLoader, DefaultTexturePool& pool, std::filesystem::path const &path){
 
     try{
-        return std::make_unique<GLTFModel>(renderer, pool, path);
+        return std::make_unique<GLTFModel>(renderer, shaderLoader, pool, path);
     } catch (std::runtime_error& e){
         std::stringstream ss;
         ss << "Error while loading " << path.filename();
@@ -70,9 +70,9 @@ std::unique_ptr<GLTFModel> tryLoad(vkw::Device &renderer, DefaultTexturePool& po
 class ModelApp final: public CommonApp{
 public:
     ModelApp(): CommonApp(AppCreateInfo{true, "Model"}),
-                shadowPass(device()),
+                shadowPass(device(), shaderLoader()),
                 skybox(device(), onScreenPass(), 0, shaderLoader()),
-                globalState{device(), onScreenPass(), 0, window().camera(), shadowPass, skybox},
+                globalState{device(), shaderLoader(), onScreenPass(), 0, window().camera(), shadowPass, skybox},
                 skyboxSettings(gui(), skybox, "Sky box"),
                 defaultTextures(device()),
                 modelPipelinePool(device(), shaderLoader()),
@@ -95,7 +95,7 @@ public:
 
         int loadedModel = 0;
         for(auto& modelPath: modelList){
-            model = tryLoad(device(), defaultTextures, modelPath);
+            model = tryLoad(device(), shaderLoader(), defaultTextures, modelPath);
             if(model)
                 break;
             loadedModel++;
@@ -104,7 +104,7 @@ public:
             throw std::runtime_error("Failed to load any GLTF model");
         }
 
-        model = std::make_unique<GLTFModel>(device(), defaultTextures, modelList.front());
+        model = std::make_unique<GLTFModel>(device(), shaderLoader(), defaultTextures, modelList.front());
         instance = std::make_unique<GLTFModelInstance>(model->createNewInstance());
         instance->update();
 
@@ -131,7 +131,7 @@ public:
                 }
                 instance.reset();
                 modelPipelinePool.clear();
-                auto expectModel = tryLoad(device(), defaultTextures, modelList.at(current_model));
+                auto expectModel = tryLoad(device(), shaderLoader(), defaultTextures, modelList.at(current_model));
                 if(!expectModel){
                     current_model = oldSelect;
                 } else{

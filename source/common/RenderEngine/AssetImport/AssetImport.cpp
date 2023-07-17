@@ -10,6 +10,9 @@
 #include <vkw/Queue.hpp>
 #include <vkw/SPIRVModule.hpp>
 #include <vkw/StagingBuffer.hpp>
+#include <iostream>
+#include <ranges>
+#include <algorithm>
 
 bool RenderEngine::AssetImporterBase::try_open(
     const std::string &filename) const {
@@ -241,77 +244,42 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture,
   return ret;
 }
 
+vkw::SPIRVModule RenderEngine::ShaderImporter::loadModule(std::string_view name) const {
+  std::string filename = std::string(name) + ".spv";
+  auto code = read_binary<uint32_t>(filename);
+  return vkw::SPIRVModule{code};
+}
+
 vkw::VertexShader
 RenderEngine::ShaderImporter::loadVertexShader(const std::string &name) const {
-  std::string filename = name + ".vert.spv";
-  auto code = read_binary<uint32_t>(filename);
-  auto PreLinkModule = vkw::SPIRVModule{code};
-  return {m_device, vkw::SPIRVModule{std::array{PreLinkModule}}};
+  std::string filename = name + ".vert";
+  return {m_device, loadModule(filename)};
 }
 
 vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(
     const std::string &name) const {
-  std::string filename = name + ".frag.spv";
-  auto code = read_binary<uint32_t>(filename);
-  auto PreLinkModule = vkw::SPIRVModule{code};
-  return {m_device, vkw::SPIRVModule{std::array{PreLinkModule}}};
+  std::string filename = name + ".frag";
+  return {m_device, loadModule(filename)};
 }
 
-vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(
-    const std::string &geometry, const std::string &projection,
-    std::span<const std::string_view> additionalStages) const {
-
-  std::string geom_filename = geometry + ".gm.vert.spv";
-  std::string proj_filename = projection + ".pr.vert.spv";
-  boost::container::small_vector<vkw::SPIRVModule, 3> stages;
-
-  stages.emplace_back(read_binary<uint32_t>(geom_filename));
-  stages.emplace_back(read_binary<uint32_t>(proj_filename));
-  stages.emplace_back(m_general_vert);
-
-  std::transform(additionalStages.begin(), additionalStages.end(),
-                 std::back_inserter(stages), [this](auto &stageName) {
-                   return vkw::SPIRVModule{read_binary<uint32_t>(
-                       std::string(stageName) + ".vert.spv")};
-                 });
-
-  return vkw::VertexShader{m_device.get(), vkw::SPIRVModule{stages}};
+vkw::ComputeShader
+RenderEngine::ShaderImporter::loadComputeShader(const std::string &name) const {
+  std::string filename = name + ".comp";
+  return vkw::ComputeShader{m_device,
+                            vkw::SPIRVModule{loadModule(filename)}};
 }
 
-vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(
-    const std::string &material, const std::string &lighting,
-    std::span<const std::string_view> additionalStages) const {
-  std::string material_filename = material + ".mt.frag.spv";
-  std::string lighting_filename = lighting + ".lt.frag.spv";
-  auto MaterialModule =
-      vkw::SPIRVModule{read_binary<uint32_t>(material_filename)};
-  auto LightingModule =
-      vkw::SPIRVModule{read_binary<uint32_t>(lighting_filename)};
-  boost::container::small_vector<vkw::SPIRVModule, 3> stages;
-  stages.emplace_back(read_binary<uint32_t>(material_filename));
-  stages.emplace_back(read_binary<uint32_t>(lighting_filename));
-  stages.emplace_back(m_general_frag);
-
-  std::transform(additionalStages.begin(), additionalStages.end(),
-                 std::back_inserter(stages), [this](auto &stageName) {
-                   return vkw::SPIRVModule{read_binary<uint32_t>(
-                       std::string(stageName) + ".frag.spv")};
-                 });
-
-  return vkw::FragmentShader{m_device.get(), vkw::SPIRVModule{stages}};
+vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(vkw::SPIRVModule const& module) const{
+  return vkw::VertexShader(m_device, module);
+}
+vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(vkw::SPIRVModule const& module) const{
+  return vkw::FragmentShader(m_device, module);
+}
+vkw::ComputeShader RenderEngine::ShaderImporter::loadComputeShader(vkw::SPIRVModule const& module) const{
+  return vkw::ComputeShader(m_device, module);
 }
 
 RenderEngine::ShaderImporter::ShaderImporter(vkw::Device &device,
                                              std::string const &rootDirectory)
-    : AssetImporterBase(rootDirectory), m_device(device),
-      m_general_vert(read_binary<uint32_t>("general.vert.spv")),
-      m_general_frag(read_binary<uint32_t>("general.frag.spv")) {}
+    : AssetImporterBase(rootDirectory), m_device(device){}
 
-vkw::ComputeShader
-RenderEngine::ShaderImporter::loadComputeShader(const std::string &name) const {
-  std::string filename = name + ".comp.spv";
-  auto code = read_binary<uint32_t>(filename);
-  auto PreLinkModule = vkw::SPIRVModule{code};
-  return vkw::ComputeShader{m_device,
-                            vkw::SPIRVModule{std::array{PreLinkModule}}};
-}

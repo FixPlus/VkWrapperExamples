@@ -360,7 +360,7 @@ void TestApp::MMesh::drawGeometryOnly(RenderEngine::GraphicsRecordingState &reco
     }
 }
 
-TestApp::GLTFModel::GLTFModel(vkw::Device &device, DefaultTexturePool& pool,
+TestApp::GLTFModel::GLTFModel(vkw::Device &device, RenderEngine::ShaderLoaderInterface& loader, DefaultTexturePool& pool,
                               std::filesystem::path const &path) :
         renderer_(device),
         sampler(device, VkSamplerCreateInfo{.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext=nullptr,
@@ -374,8 +374,8 @@ TestApp::GLTFModel::GLTFModel(vkw::Device &device, DefaultTexturePool& pool,
                 .minLod=0.0f,
                 .maxLod=1.0f,
         }),
-        materialLayout(device),
-        geometryLayout(device),
+        materialLayout(device, loader),
+        geometryLayout(device, loader),
         m_defaultTexturePool(pool){
 
     if (!path.has_extension())
@@ -658,15 +658,9 @@ void TestApp::GLTFModel::setRootMatrix(glm::mat4 transform, size_t id) {
     }
 }
 
-TestApp::ModelMaterialLayout::ModelMaterialLayout(vkw::Device &device) :
-        RenderEngine::MaterialLayout(device,
-                                     RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"pbr", {
-                                             vkw::DescriptorSetLayoutBinding{0,
-                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                             vkw::DescriptorSetLayoutBinding{1,
-                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                             vkw::DescriptorSetLayoutBinding{2,
-                                                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, vkw::RasterizationStateCreateInfo(
+TestApp::ModelMaterialLayout::ModelMaterialLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface& loader) :
+        RenderEngine::MaterialLayout(device, loader,
+                                     RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"pbr"}, vkw::RasterizationStateCreateInfo(
                                              VK_FALSE, VK_FALSE, VK_POLYGON_MODE_FILL,
                                              VK_CULL_MODE_BACK_BIT), vkw::DepthTestStateCreateInfo(
                                              VK_COMPARE_OP_LESS, VK_TRUE), 50}) {
@@ -696,11 +690,9 @@ TestApp::ModelMaterial::ModelMaterial(vkw::Device &device, DefaultTexturePool& p
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *info.sampler);
 }
 
-TestApp::ModelGeometryLayout::ModelGeometryLayout(vkw::Device &device) :
-        RenderEngine::GeometryLayout(device,
-                                     RenderEngine::GeometryLayout::CreateInfo{std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<TestApp::ModelAttributes, 0>>>(), vkw::InputAssemblyStateCreateInfo{}, RenderEngine::SubstageDescription{"model", {
-                                             vkw::DescriptorSetLayoutBinding{0,
-                                                                             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}}, 1000}) {
+TestApp::ModelGeometryLayout::ModelGeometryLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface& loader) :
+        RenderEngine::GeometryLayout(device, loader,
+                                     RenderEngine::GeometryLayout::CreateInfo{std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<TestApp::ModelAttributes, 0>>>(), vkw::InputAssemblyStateCreateInfo{}, RenderEngine::SubstageDescription{"model"}, 1000}) {
 
 }
 

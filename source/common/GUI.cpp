@@ -17,19 +17,17 @@ namespace TestApp {
         state.alphaBlendOp = VK_BLEND_OP_ADD;
         return state;
     }
-    GUIBackend::GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, RenderEngine::TextureLoader textureLoader) :
+    GUIBackend::GUIBackend(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass, RenderEngine::ShaderLoaderInterface& shaderLoader, RenderEngine::TextureLoader textureLoader) :
             m_device(device),
             m_sampler(m_sampler_init(device)),
             m_font_loader(std::move(textureLoader)),
-            m_geometryLayout(device,
-                             RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<GUIBackend::GUIVertex, 0>>>(), .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="ui", .pushConstants={
-                                     VkPushConstantRange{.stageFlags=VK_SHADER_STAGE_VERTEX_BIT, .offset=0u, .size=
-                                     sizeof(glm::vec2) * 2u}}}, .maxGeometries=1}),
+            m_geometryLayout(device, shaderLoader,
+                             RenderEngine::GeometryLayout::CreateInfo{.vertexInputState=std::make_unique<vkw::VertexInputStateCreateInfo<vkw::per_vertex<GUIBackend::GUIVertex, 0>>>(), .substageDescription=RenderEngine::SubstageDescription{.shaderSubstageName="ui"}, .maxGeometries=1}),
             m_geometry(m_geometryLayout),
-            m_projectionLayout(device, RenderEngine::SubstageDescription{.shaderSubstageName="flat"}, 1),
+            m_projectionLayout(device, shaderLoader, RenderEngine::SubstageDescription{.shaderSubstageName="flat"}, 1),
             m_projection(m_projectionLayout),
-            m_materialLayout(device, RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"ui", {vkw::DescriptorSetLayoutBinding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}}, vkw::RasterizationStateCreateInfo{}, std::optional<vkw::DepthTestStateCreateInfo>{}, 1000}),
-            m_lightingLayout(device, RenderEngine::LightingLayout::CreateInfo{RenderEngine::SubstageDescription{"flat"},pass,subpass, {{getUIBlendState(), 0}}}, 1),
+            m_materialLayout(device, shaderLoader, RenderEngine::MaterialLayout::CreateInfo{RenderEngine::SubstageDescription{"ui"}, vkw::RasterizationStateCreateInfo{}, std::optional<vkw::DepthTestStateCreateInfo>{}, 1000}),
+            m_lightingLayout(device, shaderLoader, RenderEngine::LightingLayout::CreateInfo{RenderEngine::SubstageDescription{"flat"},pass,subpass, {{getUIBlendState(), 0}}}, 1),
             m_lighting(m_lightingLayout),
     m_vertices(m_create_vertex_buffer(device, 1000)),
     m_indices(m_create_index_buffer(device, 1000)) {

@@ -12,11 +12,14 @@ namespace RenderEngine{
 
     class ShaderLoaderInterface: public vkw::ReferenceGuard{
     public:
+
+        virtual vkw::SPIRVModule loadModule(std::string_view name) = 0;
+
         virtual vkw::VertexShader const& loadVertexShader(GeometryLayout const& geometry, ProjectionLayout const& projection) = 0;
 
         virtual vkw::FragmentShader const& loadFragmentShader(MaterialLayout const& material, LightingLayout const& lighting) = 0;
 
-        virtual vkw::ComputeShader const& loadComputeShader(std::string const& name) = 0;
+        virtual vkw::ComputeShader const& loadComputeShader(vkw::SPIRVModule const& module) = 0;
 
     };
 }

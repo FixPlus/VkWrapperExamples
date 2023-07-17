@@ -1,23 +1,17 @@
 #include "GlobalLayout.h"
 
 namespace TestApp {
-    GlobalLayout::GlobalLayout(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
+    GlobalLayout::GlobalLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader, vkw::RenderPass &pass, uint32_t subpass,
                                TestApp::Camera const &camera, TestApp::ShadowRenderPass &shadowPass,
                                const SkyBox &skyBox) :
-            m_camera_projection_layout(device,
+            m_camera_projection_layout(device, shaderLoader,
                                        RenderEngine::SubstageDescription{
-                                               "perspective",
-                                               {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}},
+                                               "perspective"},
                                        1),
-            m_light_layout(device,
+            m_light_layout(device, shaderLoader,
                            RenderEngine::LightingLayout::CreateInfo{
                                    RenderEngine::SubstageDescription{
-                                           "sunlightShadow",
-                                           {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                                                         {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-                                                         {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                                                         {3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-                                                         {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER}}},
+                                           "sunlightShadow"},
                                    pass,
                                    subpass,
                                    {{m_getBlendState(), 0}}
@@ -27,10 +21,9 @@ namespace TestApp {
             m_camera(camera),
             m_light(device, m_light_layout, shadowPass, skyBox),
             m_camera_projection(device, m_camera_projection_layout),
-            m_simple_light_layout(device, RenderEngine::LightingLayout::CreateInfo{
+            m_simple_light_layout(device, shaderLoader, RenderEngine::LightingLayout::CreateInfo{
                 RenderEngine::SubstageDescription{
-                    "sunlightSimple",
-                    {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER}}
+                    "sunlightSimple"
                 },
                 pass,
                 subpass
