@@ -1,6 +1,3 @@
 #include "SceneProjector.h"
 
-
-namespace TestApp{
-
-}
+namespace TestApp {}

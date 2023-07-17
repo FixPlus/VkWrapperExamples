@@ -420,9 +420,9 @@ void SphereMeshOptions::onGui() {
     mesh().remesh(m_subdivisions, m_inverseNormal);
 }
 
-SimpleSphereMesh::SimpleSphereMesh(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader,
-                                   unsigned int subdivisions,
-                                   bool inverseNormal)
+SimpleSphereMesh::SimpleSphereMesh(
+    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+    unsigned int subdivisions, bool inverseNormal)
     : SphereMesh(device, subdivisions, inverseNormal),
       RenderEngine::GeometryLayout(
           device, shaderLoader,
@@ -430,8 +430,7 @@ SimpleSphereMesh::SimpleSphereMesh(vkw::Device &device, RenderEngine::ShaderLoad
               .vertexInputState =
                   std::make_unique<vkw::VertexInputStateCreateInfo<
                       vkw::per_vertex<Vertex, 0>>>(),
-              .substageDescription =
-                  {.shaderSubstageName = "planet"},
+              .substageDescription = {.shaderSubstageName = "planet"},
               .maxGeometries = 1}),
       RenderEngine::Geometry(
           static_cast<RenderEngine::GeometryLayout &>(*this)),

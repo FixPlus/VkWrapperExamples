@@ -1,11 +1,11 @@
 #include "Atmosphere.hpp"
+#include "Utils.h"
 #include <vkw/Queue.hpp>
 #include <vkw/StagingBuffer.hpp>
-#include "Utils.h"
 
 namespace TestApp {
 
-vkw::Sampler createSampler(vkw::Device& device) {
+vkw::Sampler createSampler(vkw::Device &device) {
   VkSamplerCreateInfo createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
   createInfo.pNext = nullptr;
@@ -40,12 +40,11 @@ Atmosphere::OutScatterTexture::OutScatterTexture(
                                VK_IMAGE_USAGE_SAMPLED_BIT},
       RenderEngine::ComputeLayout(
           device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "atmosphere_outscatter2"},
+          RenderEngine::SubstageDescription{.shaderSubstageName =
+                                                "atmosphere_outscatter2"},
           1),
       RenderEngine::Compute(static_cast<RenderEngine::ComputeLayout &>(*this)),
-      m_view(device, *this, format()),
-      m_sampler(createSampler(device)){
+      m_view(device, *this, format()), m_sampler(createSampler(device)) {
 
   set().write(0, atmo);
   set().writeStorageImage(1, m_view);
@@ -185,33 +184,42 @@ AtmosphereProperties::AtmosphereProperties(GUIFrontEnd &gui,
 
 void AtmosphereProperties::onGui() {
   bool needUpdate = false;
-  if(m_trackRadius){
-    if(ImGui::SliderFloat("Planet radius", &m_atmosphere.get().properties.planetRadius, 10.0f, 1000.0f))
+  if (m_trackRadius) {
+    if (ImGui::SliderFloat("Planet radius",
+                           &m_atmosphere.get().properties.planetRadius, 10.0f,
+                           1000.0f))
       needUpdate = true;
-    if(ImGui::SliderFloat("Atmosphere radius", &m_atmosphere.get().properties.atmosphereRadius, 1.0f, 100.0f))
+    if (ImGui::SliderFloat("Atmosphere radius",
+                           &m_atmosphere.get().properties.atmosphereRadius,
+                           1.0f, 100.0f))
       needUpdate = true;
   }
-  if(ImGui::SliderFloat3("Rayleigh", &m_atmosphere.get().properties.RayleighConstants.x, 0.0f, 1.0f)){
+  if (ImGui::SliderFloat3("Rayleigh",
+                          &m_atmosphere.get().properties.RayleighConstants.x,
+                          0.0f, 1.0f)) {
     needUpdate = true;
   }
 
-  if(ImGui::SliderFloat("Mei", &m_atmosphere.get().properties.MeiConstants, 0.0f, 1.0f)){
+  if (ImGui::SliderFloat("Mei", &m_atmosphere.get().properties.MeiConstants,
+                         0.0f, 1.0f)) {
     needUpdate = true;
   }
 
-  if(ImGui::SliderFloat("HO", &m_atmosphere.get().properties.H0, 0.0f, 1.0f)){
+  if (ImGui::SliderFloat("HO", &m_atmosphere.get().properties.H0, 0.0f, 1.0f)) {
     needUpdate = true;
   }
 
-  if(ImGui::SliderFloat("g", &m_atmosphere.get().properties.g, -0.9999f, -0.5f)){
+  if (ImGui::SliderFloat("g", &m_atmosphere.get().properties.g, -0.9999f,
+                         -0.5f)) {
     needUpdate = true;
   }
 
-  if(ImGui::SliderInt("samples", &m_atmosphere.get().properties.samples, 5, 50)){
+  if (ImGui::SliderInt("samples", &m_atmosphere.get().properties.samples, 5,
+                       50)) {
     needUpdate = true;
   }
 
-  if(needUpdate)
+  if (needUpdate)
     m_atmosphere.get().update();
 }
 

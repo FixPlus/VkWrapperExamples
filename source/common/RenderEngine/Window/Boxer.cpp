@@ -62,48 +62,48 @@ Boxer::Selection getSelection(gint response) {
 
 namespace {
 
-    UINT getIcon(Boxer::Style style) {
-        switch (style) {
-            case Boxer::Style::Info:
-                return MB_ICONINFORMATION;
-            case Boxer::Style::Warning:
-                return MB_ICONWARNING;
-            case Boxer::Style::Error:
-                return MB_ICONERROR;
-            case Boxer::Style::Question:
-                return MB_ICONQUESTION;
-            default:
-                return MB_ICONINFORMATION;
-        }
-    }
+UINT getIcon(Boxer::Style style) {
+  switch (style) {
+  case Boxer::Style::Info:
+    return MB_ICONINFORMATION;
+  case Boxer::Style::Warning:
+    return MB_ICONWARNING;
+  case Boxer::Style::Error:
+    return MB_ICONERROR;
+  case Boxer::Style::Question:
+    return MB_ICONQUESTION;
+  default:
+    return MB_ICONINFORMATION;
+  }
+}
 
-    UINT getButtons(Boxer::Buttons buttons) {
-        switch (buttons) {
-            case Boxer::Buttons::OK:
-                return MB_OK;
-            case Boxer::Buttons::OKCancel:
-                return MB_OKCANCEL;
-            case Boxer::Buttons::YesNo:
-                return MB_YESNO;
-            default:
-                return MB_OK;
-        }
-    }
+UINT getButtons(Boxer::Buttons buttons) {
+  switch (buttons) {
+  case Boxer::Buttons::OK:
+    return MB_OK;
+  case Boxer::Buttons::OKCancel:
+    return MB_OKCANCEL;
+  case Boxer::Buttons::YesNo:
+    return MB_YESNO;
+  default:
+    return MB_OK;
+  }
+}
 
-    Boxer::Selection getSelection(int response) {
-        switch (response) {
-            case IDOK:
-                return Boxer::Selection::OK;
-            case IDCANCEL:
-                return Boxer::Selection::Cancel;
-            case IDYES:
-                return Boxer::Selection::Yes;
-            case IDNO:
-                return Boxer::Selection::No;
-            default:
-                return Boxer::Selection::NONE;
-        }
-    }
+Boxer::Selection getSelection(int response) {
+  switch (response) {
+  case IDOK:
+    return Boxer::Selection::OK;
+  case IDCANCEL:
+    return Boxer::Selection::Cancel;
+  case IDYES:
+    return Boxer::Selection::Yes;
+  case IDNO:
+    return Boxer::Selection::No;
+  default:
+    return Boxer::Selection::NONE;
+  }
+}
 
 } // namespace
 #else
@@ -111,9 +111,9 @@ namespace {
 #error "unsupported platform"
 
 #endif
-RenderEngine::Boxer::Selection
-RenderEngine::Boxer::show(std::string_view const& message, std::string_view const& title, RenderEngine::Boxer::Style style,
-                          RenderEngine::Boxer::Buttons buttons) {
+RenderEngine::Boxer::Selection RenderEngine::Boxer::show(
+    std::string_view const &message, std::string_view const &title,
+    RenderEngine::Boxer::Style style, RenderEngine::Boxer::Buttons buttons) {
 
 #ifdef __linux__
 #if 0
@@ -135,15 +135,15 @@ RenderEngine::Boxer::show(std::string_view const& message, std::string_view cons
 
    return selection;
 #else
-   std::cout << title << ": " << std::endl << message << std::endl;
+  std::cout << title << ": " << std::endl << message << std::endl;
 #endif
 #elif defined _WIN32
-    UINT flags = MB_TASKMODAL;
+  UINT flags = MB_TASKMODAL;
 
-    flags |= getIcon(style);
-    flags |= getButtons(buttons);
+  flags |= getIcon(style);
+  flags |= getButtons(buttons);
 
-    return getSelection(MessageBox(NULL, message.data(), title.data(), flags));
+  return getSelection(MessageBox(NULL, message.data(), title.data(), flags));
 #endif
-    return Selection::NONE;
+  return Selection::NONE;
 }

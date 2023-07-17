@@ -48,7 +48,7 @@ PipelineStageLayout::PipelineStageLayout(vkw::Device &device,
         }
         return vkw::DescriptorSetLayout(device, bindings);
       }()),
-      m_pool([&]() -> std::optional<vkw::DescriptorPool>{
+      m_pool([&]() -> std::optional<vkw::DescriptorPool> {
         /// Descriptor pool is initialized like Descriptor layout - form
         /// reflected info.
         auto &moduleInfo = m_module.info();

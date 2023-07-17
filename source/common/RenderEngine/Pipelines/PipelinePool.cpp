@@ -10,7 +10,7 @@ getPushConstants(const RenderEngine::GeometryLayout &geometryLayout,
   std::vector<VkPushConstantRange> ret;
 
   for (auto &&constant : geometryLayout.module().info().pushConstants()) {
-    if (std::ranges::any_of(ret, [&constant](auto& c) {
+    if (std::ranges::any_of(ret, [&constant](auto &c) {
           return c.offset == constant.offset();
         }))
       continue;
@@ -19,7 +19,7 @@ getPushConstants(const RenderEngine::GeometryLayout &geometryLayout,
   }
 
   for (auto &&constant : projectionLayout.module().info().pushConstants()) {
-    if (std::ranges::any_of(ret,  [&constant](auto& c) {
+    if (std::ranges::any_of(ret, [&constant](auto &c) {
           return c.offset == constant.offset();
         }))
       continue;
@@ -28,9 +28,8 @@ getPushConstants(const RenderEngine::GeometryLayout &geometryLayout,
   }
 
   for (auto &&constant : materialLayout.module().info().pushConstants()) {
-    auto found = std::ranges::find_if(ret,  [&constant](auto& c) {
-      return c.offset == constant.offset();
-    });
+    auto found = std::ranges::find_if(
+        ret, [&constant](auto &c) { return c.offset == constant.offset(); });
     if (found != ret.end()) {
       found->stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
       continue;
@@ -40,9 +39,8 @@ getPushConstants(const RenderEngine::GeometryLayout &geometryLayout,
   }
 
   for (auto &&constant : lightingLayout.module().info().pushConstants()) {
-    auto found = std::ranges::find_if(ret,  [&constant](auto& c) {
-      return c.offset == constant.offset();
-    });
+    auto found = std::ranges::find_if(
+        ret, [&constant](auto &c) { return c.offset == constant.offset(); });
     if (found != ret.end()) {
       found->stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
       continue;

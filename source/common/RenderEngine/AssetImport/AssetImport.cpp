@@ -1,8 +1,11 @@
 #include "AssetImport.h"
 #include "tiny_gltf/stb_image.h"
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <fstream>
+#include <iostream>
+#include <ranges>
 #include <set>
 #include <vkw/Buffer.hpp>
 #include <vkw/CommandBuffer.hpp>
@@ -10,9 +13,6 @@
 #include <vkw/Queue.hpp>
 #include <vkw/SPIRVModule.hpp>
 #include <vkw/StagingBuffer.hpp>
-#include <iostream>
-#include <ranges>
-#include <algorithm>
 
 bool RenderEngine::AssetImporterBase::try_open(
     const std::string &filename) const {
@@ -244,7 +244,8 @@ RenderEngine::TextureLoader::loadTexture(const unsigned char *texture,
   return ret;
 }
 
-vkw::SPIRVModule RenderEngine::ShaderImporter::loadModule(std::string_view name) const {
+vkw::SPIRVModule
+RenderEngine::ShaderImporter::loadModule(std::string_view name) const {
   std::string filename = std::string(name) + ".spv";
   auto code = read_binary<uint32_t>(filename);
   return vkw::SPIRVModule{code};
@@ -265,21 +266,22 @@ vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(
 vkw::ComputeShader
 RenderEngine::ShaderImporter::loadComputeShader(const std::string &name) const {
   std::string filename = name + ".comp";
-  return vkw::ComputeShader{m_device,
-                            vkw::SPIRVModule{loadModule(filename)}};
+  return vkw::ComputeShader{m_device, vkw::SPIRVModule{loadModule(filename)}};
 }
 
-vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(vkw::SPIRVModule const& module) const{
+vkw::VertexShader RenderEngine::ShaderImporter::loadVertexShader(
+    vkw::SPIRVModule const &module) const {
   return vkw::VertexShader(m_device, module);
 }
-vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(vkw::SPIRVModule const& module) const{
+vkw::FragmentShader RenderEngine::ShaderImporter::loadFragmentShader(
+    vkw::SPIRVModule const &module) const {
   return vkw::FragmentShader(m_device, module);
 }
-vkw::ComputeShader RenderEngine::ShaderImporter::loadComputeShader(vkw::SPIRVModule const& module) const{
+vkw::ComputeShader RenderEngine::ShaderImporter::loadComputeShader(
+    vkw::SPIRVModule const &module) const {
   return vkw::ComputeShader(m_device, module);
 }
 
 RenderEngine::ShaderImporter::ShaderImporter(vkw::Device &device,
                                              std::string const &rootDirectory)
-    : AssetImporterBase(rootDirectory), m_device(device){}
-
+    : AssetImporterBase(rootDirectory), m_device(device) {}

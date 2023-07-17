@@ -18,7 +18,8 @@ vkw::VertexShader const &ShaderLoader::loadVertexShader(
   if (m_vertexShaders.contains(key))
     return m_vertexShaders.at(key);
 
-  std::array<vkw::SPIRVModule, 3> modules = {geometry.module(), projection.module(), m_general_vert};
+  std::array<vkw::SPIRVModule, 3> modules = {
+      geometry.module(), projection.module(), m_general_vert};
 
   return m_vertexShaders
       .emplace(key, ShaderImporter::loadVertexShader(vkw::SPIRVModule(modules)))
@@ -43,7 +44,8 @@ ShaderLoader::loadFragmentShader(RenderEngine::MaterialLayout const &material,
                  std::back_inserter(additionalStages),
                  [](auto &shaderName) { return shaderName; });
 
-  std::array<vkw::SPIRVModule, 3> modules = {material.module(), lighting.module(), m_general_frag};
+  std::array<vkw::SPIRVModule, 3> modules = {material.module(),
+                                             lighting.module(), m_general_frag};
 
   return m_fragmentShaders
       .emplace(key,
@@ -52,11 +54,13 @@ ShaderLoader::loadFragmentShader(RenderEngine::MaterialLayout const &material,
 }
 
 vkw::ComputeShader const &
-ShaderLoader::loadComputeShader(vkw::SPIRVModule const& module) {
+ShaderLoader::loadComputeShader(vkw::SPIRVModule const &module) {
   if (m_computeShaders.contains(&module.info()))
     return m_computeShaders.at(&module.info());
 
-  return m_computeShaders.emplace(&module.info(), ShaderImporter::loadComputeShader(vkw::SPIRVModule{std::span{&module, 1}}))
+  return m_computeShaders
+      .emplace(&module.info(), ShaderImporter::loadComputeShader(
+                                   vkw::SPIRVModule{std::span{&module, 1}}))
       .first->second;
 }
 } // namespace RenderEngine

@@ -24,7 +24,9 @@ public:
   } properties;
 
   auto &outScatterTexture() const { return m_out_scatter_texture.m_view; }
-  auto &outScatterTextureSampler() const { return m_out_scatter_texture.m_sampler; }
+  auto &outScatterTextureSampler() const {
+    return m_out_scatter_texture.m_sampler;
+  }
   const vkw::UniformBuffer<Properties> &propertiesBuffer() const {
     return m_ubo;
   }
@@ -69,13 +71,10 @@ public:
   AtmosphereProperties(GUIFrontEnd &gui, Atmosphere &atmosphere,
                        std::string_view title = "Atmosphere properties");
 
-  void disableRadiusTrack(){
-    m_trackRadius = false;
-  }
+  void disableRadiusTrack() { m_trackRadius = false; }
 
-  void enableRadiusTrack() {
-    m_trackRadius = true;
-  }
+  void enableRadiusTrack() { m_trackRadius = true; }
+
 protected:
   void onGui() override;
 

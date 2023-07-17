@@ -23,7 +23,7 @@ struct AppCreateInfo {
       [](auto &i) {};
   std::function<void(vkw::PhysicalDevice &)> amendDeviceCreateInfo =
       [](auto &d) {};
-  WindowIO* customWindow = nullptr;
+  WindowIO *customWindow = nullptr;
 };
 
 class CommonApp {
@@ -36,8 +36,9 @@ public:
 
 protected:
   auto &library() { return *m_library; }
-  template<class Upcast = SceneProjector>
-  auto &window() { return static_cast<Upcast&>(*m_window); }
+  template <class Upcast = SceneProjector> auto &window() {
+    return static_cast<Upcast &>(*m_window);
+  }
 
   auto &instance() { return *m_instance; }
 

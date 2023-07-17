@@ -1,14 +1,15 @@
 #include "WaterSurface.h"
 #include <random>
 
-WaterSurface::WaterSurface(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, WaveSurfaceTexture &texture)
+WaterSurface::WaterSurface(vkw::Device &device,
+                           RenderEngine::ShaderLoaderInterface &shaderLoader,
+                           WaveSurfaceTexture &texture)
     : TestApp::Grid(device),
       RenderEngine::GeometryLayout(
           device, shaderLoader,
           RenderEngine::GeometryLayout::CreateInfo{
               .vertexInputState = m_createVertexState(),
-              .substageDescription =
-                  {.shaderSubstageName = "waves"},
+              .substageDescription = {.shaderSubstageName = "waves"},
               .maxGeometries = 1}),
       m_geometry(device, *this, texture) {}
 
@@ -62,13 +63,12 @@ vkw::Sampler WaterSurface::Geometry::m_sampler_create(vkw::Device &device) {
   return {device, createInfo};
 }
 WaterMaterial::WaterMaterial(vkw::Device &device,
-                             RenderEngine::ShaderLoaderInterface &shaderLoader, WaveSurfaceTexture &texture,
-                             bool wireframe)
+                             RenderEngine::ShaderLoaderInterface &shaderLoader,
+                             WaveSurfaceTexture &texture, bool wireframe)
     : RenderEngine::MaterialLayout(
           device, shaderLoader,
           RenderEngine::MaterialLayout::CreateInfo{
-              RenderEngine::SubstageDescription{
-                  "water"},
+              RenderEngine::SubstageDescription{"water"},
               {VK_FALSE, VK_FALSE,
                wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL,
                VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE},
@@ -291,8 +291,7 @@ WaveSurfaceTexture::WaveSurfaceTexture(
     uint32_t baseCascadeSize, uint32_t cascades)
     : m_spectrum_precompute_layout(
           device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "spectrum"},
+          RenderEngine::SubstageDescription{.shaderSubstageName = "spectrum"},
           16, 16),
       m_spectrum_params(
           device,
@@ -300,16 +299,14 @@ WaveSurfaceTexture::WaveSurfaceTexture(
                                   .requiredFlags =
                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT}),
       m_device(device), m_fft(device, shaderLoader),
-      m_dyn_spectrum_gen_layout(
-          device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "dynamic_spectrum"},
-          cascades),
-      m_combiner_layout(
-          device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "combine_water_texture"},
-          cascades),
+      m_dyn_spectrum_gen_layout(device, shaderLoader,
+                                RenderEngine::SubstageDescription{
+                                    .shaderSubstageName = "dynamic_spectrum"},
+                                cascades),
+      m_combiner_layout(device, shaderLoader,
+                        RenderEngine::SubstageDescription{
+                            .shaderSubstageName = "combine_water_texture"},
+                        cascades),
       m_dyn_params(device,
                    VmaAllocationCreateInfo{
                        .usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
@@ -676,25 +673,21 @@ void WaveSurfaceTexture::WaveSurfaceTextureCascade::SpectrumTextures::update() {
 }
 
 FFT::FFT(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader)
-    : m_permute_row_layout(
-          device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "permute_row"},
-          100),
-      m_permute_column_layout(
-          device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "permute_column"},
-          100),
+    : m_permute_row_layout(device, shaderLoader,
+                           RenderEngine::SubstageDescription{
+                               .shaderSubstageName = "permute_row"},
+                           100),
+      m_permute_column_layout(device, shaderLoader,
+                              RenderEngine::SubstageDescription{
+                                  .shaderSubstageName = "permute_column"},
+                              100),
       m_fft_row_layout(
           device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "fft_row"},
+          RenderEngine::SubstageDescription{.shaderSubstageName = "fft_row"},
           100),
       m_fft_column_layout(
           device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              .shaderSubstageName = "fft_column"},
+          RenderEngine::SubstageDescription{.shaderSubstageName = "fft_column"},
           100) {}
 
 void FFT::ftt(vkw::CommandBuffer &buffer, const Complex2DTexture &input,

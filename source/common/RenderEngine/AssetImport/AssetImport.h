@@ -83,12 +83,11 @@ public:
 
   vkw::ComputeShader loadComputeShader(std::string const &name) const;
 
-  vkw::VertexShader loadVertexShader(vkw::SPIRVModule const& module) const;
-  vkw::FragmentShader loadFragmentShader(vkw::SPIRVModule const& module) const;
-  vkw::ComputeShader loadComputeShader(vkw::SPIRVModule const& module) const;
+  vkw::VertexShader loadVertexShader(vkw::SPIRVModule const &module) const;
+  vkw::FragmentShader loadFragmentShader(vkw::SPIRVModule const &module) const;
+  vkw::ComputeShader loadComputeShader(vkw::SPIRVModule const &module) const;
 
 private:
-
   vkw::StrongReference<vkw::Device> m_device;
 };
 

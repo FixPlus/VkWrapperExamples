@@ -42,8 +42,9 @@ class SimpleSphereMesh : public SphereMesh,
                          public RenderEngine::GeometryLayout,
                          public RenderEngine::Geometry {
 public:
-  SimpleSphereMesh(vkw::Device &device, RenderEngine::ShaderLoaderInterface& shaderLoader, unsigned subdivisions,
-                   bool inverseNormal);
+  SimpleSphereMesh(vkw::Device &device,
+                   RenderEngine::ShaderLoaderInterface &shaderLoader,
+                   unsigned subdivisions, bool inverseNormal);
 
   struct Transform {
     glm::vec3 translate = glm::vec3(0.0f);

@@ -162,53 +162,53 @@ void PlanetTexture::update() {
   loadUsingStaging(m_device.get(), m_landscapeUbo, landscapeProps);
 }
 
-PlanetPool::MeshGeometryLayout::MeshGeometryLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
-                                                   unsigned int maxSets)
+PlanetPool::MeshGeometryLayout::MeshGeometryLayout(
+    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+    unsigned int maxSets)
     : RenderEngine::GeometryLayout(
           device, shaderLoader,
           RenderEngine::GeometryLayout::CreateInfo{
               std::make_unique<vkw::VertexInputStateCreateInfo<
                   vkw::per_vertex<SphereMesh::Vertex, 0>>>(),
               vkw::InputAssemblyStateCreateInfo{},
-              RenderEngine::SubstageDescription{
-                  "planet"},
-              maxSets}) {}
+              RenderEngine::SubstageDescription{"planet"}, maxSets}) {}
 
 PlanetPool::EmissiveSurfaceProjectionLayout::EmissiveSurfaceProjectionLayout(
-    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, unsigned int maxSets)
+    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+    unsigned int maxSets)
     : RenderEngine::ProjectionLayout(
           device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              "scattering_emissive"},
-          maxSets) {}
+          RenderEngine::SubstageDescription{"scattering_emissive"}, maxSets) {}
 
 PlanetPool::TransparentSurfaceProjectionLayout::
-    TransparentSurfaceProjectionLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
-                                       unsigned int maxSets)
+    TransparentSurfaceProjectionLayout(
+        vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+        unsigned int maxSets)
     : RenderEngine::ProjectionLayout(
           device, shaderLoader,
-          RenderEngine::SubstageDescription{
-              "scattering_transparent"},
+          RenderEngine::SubstageDescription{"scattering_transparent"},
           maxSets) {}
 
-PlanetPool::SkyDomeMaterialLayout::SkyDomeMaterialLayout(vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
-                                                         unsigned int maxSets)
-    : RenderEngine::MaterialLayout(
-          device, shaderLoader, RenderEngine::MaterialLayout::CreateInfo{
-                      RenderEngine::SubstageDescription{"skydome_surface"},
-                      vkw::RasterizationStateCreateInfo{
-                          false, false, VK_POLYGON_MODE_FILL,
-                          VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE},
-                      vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, false},
-                      maxSets}) {}
-
-PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
-    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, unsigned int maxSets)
+PlanetPool::SkyDomeMaterialLayout::SkyDomeMaterialLayout(
+    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+    unsigned int maxSets)
     : RenderEngine::MaterialLayout(
           device, shaderLoader,
           RenderEngine::MaterialLayout::CreateInfo{
-              RenderEngine::SubstageDescription{
-                  "planet_surface"},
+              RenderEngine::SubstageDescription{"skydome_surface"},
+              vkw::RasterizationStateCreateInfo{
+                  false, false, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
+                  VK_FRONT_FACE_CLOCKWISE},
+              vkw::DepthTestStateCreateInfo{VK_COMPARE_OP_LESS, false},
+              maxSets}) {}
+
+PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
+    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+    unsigned int maxSets)
+    : RenderEngine::MaterialLayout(
+          device, shaderLoader,
+          RenderEngine::MaterialLayout::CreateInfo{
+              RenderEngine::SubstageDescription{"planet_surface"},
               vkw::RasterizationStateCreateInfo{
                   false, false, VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
                   VK_FRONT_FACE_COUNTER_CLOCKWISE},
@@ -216,8 +216,8 @@ PlanetPool::PlanetSurfaceMaterialLayout::PlanetSurfaceMaterialLayout(
               maxSets}) {}
 
 PlanetPool::TransparentLightingLayout::TransparentLightingLayout(
-    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, vkw::RenderPass &pass, unsigned int subpass,
-    unsigned int maxSets)
+    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+    vkw::RenderPass &pass, unsigned int subpass, unsigned int maxSets)
     : RenderEngine::LightingLayout(
           device, shaderLoader,
           RenderEngine::LightingLayout::CreateInfo{
@@ -226,8 +226,8 @@ PlanetPool::TransparentLightingLayout::TransparentLightingLayout(
           maxSets) {}
 
 PlanetPool::EmissiveLightingLayout::EmissiveLightingLayout(
-    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader, vkw::RenderPass &pass, unsigned int subpass,
-    unsigned int maxSets)
+    vkw::Device &device, RenderEngine::ShaderLoaderInterface &shaderLoader,
+    vkw::RenderPass &pass, unsigned int subpass, unsigned int maxSets)
     : RenderEngine::LightingLayout(
           device, shaderLoader,
           RenderEngine::LightingLayout::CreateInfo{

@@ -15,7 +15,8 @@ namespace TestApp {
 class GUI : public GUIFrontEnd, public GUIBackend {
 public:
   GUI(vkw::Device &device, vkw::RenderPass &pass, uint32_t subpass,
-      RenderEngine::TextureLoader const &textureLoader, RenderEngine::ShaderLoaderInterface& shaderLoader)
+      RenderEngine::TextureLoader const &textureLoader,
+      RenderEngine::ShaderLoaderInterface &shaderLoader)
       : GUIBackend(device, pass, subpass, shaderLoader, textureLoader) {
     ImGui::SetCurrentContext(context());
     auto &io = ImGui::GetIO();
@@ -70,11 +71,10 @@ private:
 
 class ApplicationStatisticsExtended : public ApplicationStatistics {
 public:
-  ApplicationStatisticsExtended(GUIFrontEnd &gui, TestApp::SceneProjector &window,
-                        VulkanMemoryMonitor const &monitor)
-      : ApplicationStatistics(
-            gui, window, monitor),
-        m_window(window),
+  ApplicationStatisticsExtended(GUIFrontEnd &gui,
+                                TestApp::SceneProjector &window,
+                                VulkanMemoryMonitor const &monitor)
+      : ApplicationStatistics(gui, window, monitor), m_window(window),
         m_nearClip(window.camera().nearPlane()),
         m_farClip(window.camera().farPlane()) {}
 
@@ -249,9 +249,9 @@ CommonApp::CommonApp(AppCreateInfo const &createInfo) {
                               "Irrecoverable vkw::Error",
                               RenderEngine::Boxer::Style::Error);
   });
-  if(!createInfo.customWindow)
+  if (!createInfo.customWindow)
     m_window = std::make_unique<SceneProjector>(
-      800, 600, createInfo.applicationName.data());
+        800, 600, createInfo.applicationName.data());
   else
     m_window.reset(createInfo.customWindow);
 
@@ -332,15 +332,15 @@ CommonApp::CommonApp(AppCreateInfo const &createInfo) {
   m_current_surface_extents =
       surface().getSurfaceCapabilities(physDevice()).currentExtent;
 
-  m_internal().gui =
-      std::make_unique<GUI>(device(), m_internal().pass, 0, textureLoader(), shaderLoader());
+  m_internal().gui = std::make_unique<GUI>(device(), m_internal().pass, 0,
+                                           textureLoader(), shaderLoader());
   m_window->setContext(*m_internal().gui);
-  if(auto* SceneProj = dynamic_cast<SceneProjector*>(m_window.get()))
-    m_internal().appStat =
-      std::make_unique<ApplicationStatisticsExtended>(gui(), *SceneProj, *m_allocator);
+  if (auto *SceneProj = dynamic_cast<SceneProjector *>(m_window.get()))
+    m_internal().appStat = std::make_unique<ApplicationStatisticsExtended>(
+        gui(), *SceneProj, *m_allocator);
   else
-    m_internal().appStat =
-        std::make_unique<ApplicationStatistics>(gui(), window<WindowIO>(), *m_allocator);
+    m_internal().appStat = std::make_unique<ApplicationStatistics>(
+        gui(), window<WindowIO>(), *m_allocator);
 }
 
 CommonApp::~CommonApp() = default;
@@ -367,7 +367,7 @@ void CommonApp::run() {
     } else
       firstEncounter = false;
 
-    if(auto* SceneProj = dynamic_cast<SceneProjector*>(m_window.get()))
+    if (auto *SceneProj = dynamic_cast<SceneProjector *>(m_window.get()))
       SceneProj->update();
     recordingState.reset();
     m_internal().gui->frame();
@@ -490,10 +490,10 @@ void CommonApp::addFrameFence(std::shared_ptr<vkw::Fence> fence) {
 
 GUIFrontEnd &CommonApp::gui() { return *m_internal().gui; }
 void CommonApp::onFramebufferResize() {
-  if(auto* SceneProj = dynamic_cast<SceneProjector*>(m_window.get())) {
+  if (auto *SceneProj = dynamic_cast<SceneProjector *>(m_window.get())) {
     auto extents = SceneProj->framebufferExtents();
     SceneProj->camera().setRatio(static_cast<float>(extents.first) /
-                               static_cast<float>(extents.second));
+                                 static_cast<float>(extents.second));
   }
 }
 
